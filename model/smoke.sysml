@@ -4,17 +4,26 @@ package Model {
     }
     part def pd {
         rep language "asciidoc"
-            /*Textual representation*/
+            /*
+            = sysml-name:[]
+            
+            sysml-doc::[]
+
+            sysml-name:[]
+            */
     }
-    part <a> aaaa : pd {
-        doc /*Documentation*/
-        @m {
-            a := "aa";
+        part <a> aaaa : pd {
+            doc /*
+            Documentation for part a
+            */
+            @m {
+                a := "aa";
+            }
+            port p;
         }
-        port p;
+        part <b> bbb : pd {
+            doc /* This is sysml-name:[] part */
+            port p;
+        }
+        interface connect (a.p, b.p);
     }
-    part <b> bbb : pd {
-        port p;
-    }
-    interface connect (a.p, b.p);
-}

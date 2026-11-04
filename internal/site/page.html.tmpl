@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{if .Landing}}{{.SiteTitle}}{{else}}{{.TitleText}} — {{.SiteTitle}}{{end}}</title>
+<link rel="stylesheet" href="{{.AssetsHref}}asciidoctor.css">
+<link rel="stylesheet" href="{{.AssetsHref}}layout.css">
+</head>
+<body class="article">
+<div class="layout">
+<main id="content">
+<h1>{{.TitleHTML}}</h1>
+{{- if .QualifiedName}}
+<p class="qualified-name">{{.QualifiedName}}</p>
+{{- end}}
+{{- if .Empty}}
+<p class="empty-page">This element has no AsciiDoc representation. See the pages below it in the tree.</p>
+{{- end}}
+{{- if .Landing}}
+<p>Select an element in the page tree.</p>
+{{- end}}
+{{- range .Own}}
+<section class="rep">
+{{.HTML}}
+</section>
+{{- end}}
+{{- range .Inherited}}
+<section class="rep inherited">
+<p class="from">From {{if .FromHref}}<a href="{{.FromHref}}">{{.FromName}}</a>{{else}}{{.FromName}}{{end}}</p>
+{{.HTML}}
+</section>
+{{- end}}
+</main>
+<aside class="sidebar" aria-label="Page tree">
+<nav>
+<a class="home" href="{{.HomeHref}}"{{if .Landing}} aria-current="page"{{end}}>{{.SiteTitle}}</a>
+{{template "tree" .Nav}}
+</nav>
+</aside>
+</div>
+</body>
+</html>
+{{- define "tree"}}
+{{- if .}}
+<ul>
+{{- range .}}
+<li{{if .Empty}} class="empty"{{end}}><a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Title}}</a>
+{{- template "tree" .Children}}</li>
+{{- end}}
+</ul>
+{{- end}}
+{{- end}}

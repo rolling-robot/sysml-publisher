@@ -1,0 +1,184 @@
+// Package model loads a SysML v2 model and exposes it as the SysML v2 API
+// element array (the "api-json" form), which the rest of the publisher reads.
+package model
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/Open-MBEE/OpenSysML/client/opensysml"
+)
+
+// Element is one element of the SysML v2 API element array: its metamodel
+// properties keyed by name, references written as {"@id": ...}.
+type Element map[string]any
+
+// ID is the element's @id.
+func (e Element) ID() string { return e.Str("@id") }
+
+// Type is the element's metaclass, its @type.
+func (e Element) Type() string { return e.Str("@type") }
+
+// Str is a string-valued property, "" when absent or null.
+func (e Element) Str(key string) string {
+	s, _ := e[key].(string)
+	return s
+}
+
+// Ref is the id a single-valued reference property names, "" when absent.
+func (e Element) Ref(key string) string { return refID(e[key]) }
+
+// Refs are the ids a reference property names, in order. A single-valued
+// reference yields one id, so callers need not know the cardinality.
+func (e Element) Refs(key string) []string {
+	switch v := e[key].(type) {
+	case []any:
+		ids := make([]string, 0, len(v))
+		for _, item := range v {
+			if id := refID(item); id != "" {
+				ids = append(ids, id)
+			}
+		}
+		return ids
+	case map[string]any:
+		if id := refID(v); id != "" {
+			return []string{id}
+		}
+	}
+	return nil
+}
+
+func refID(v any) string {
+	m, _ := v.(map[string]any)
+	id, _ := m["@id"].(string)
+	return id
+}
+
+// Model is a loaded model.
+type Model struct {
+	// Files are the model files parsed, in the order given to the parser.
+	Files []string
+	// Elements by @id, and Order lists the ids as the element array does.
+	Elements map[string]Element
+	Order    []string
+	// Warnings are the parser's diagnostics below error severity, each as
+	// "file:line:col: severity: message".
+	Warnings []string
+	// ExperimentalNotice is non-empty when the element form is marked
+	// experimental by the parser, as OpenSysML marks api-json today.
+	ExperimentalNotice string
+}
+
+// Source is where a model comes from. The MVP reads a folder of files; a
+// SysML v2 API service is a later Source (requirements DS-1, DS-3).
+type Source interface {
+	Load(ctx context.Context) (*Model, error)
+}
+
+// ErrNoModelFiles is returned when the model folder holds no model files (ER-3).
+var ErrNoModelFiles = errors.New("no model files")
+
+// DiagnosticsError reports a model with errors (ER-2).
+type DiagnosticsError struct {
+	// Errors are the error diagnostics, each as "file:line:col: error: message".
+	Errors []string
+}
+
+func (e *DiagnosticsError) Error() string {
+	return fmt.Sprintf("model has %d error(s):\n%s", len(e.Errors), strings.Join(e.Errors, "\n"))
+}
+
+// Folder is a folder of *.sysml and *.kerml files, searched recursively and
+// parsed in-process as one model.
+type Folder struct {
+	Dir string
+}
+
+// Load parses every model file under the folder as one model and converts it
+// to the API element array.
+func (f Folder) Load(ctx context.Context) (*Model, error) {
+	files, err := modelFiles(f.Dir)
+	if err != nil {
+		return nil, err
+	}
+	client, err := opensysml.New()
+	if err != nil {
+		return nil, fmt.Errorf("starting the SysML engine: %w", err)
+	}
+	defer client.Close()
+
+	parsed, err := client.ParseFiles(ctx, files)
+	if err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", f.Dir, err)
+	}
+	m := &Model{Files: files}
+	var errs []string
+	for _, d := range parsed.Diagnostics {
+		if d.Severity == opensysml.SeverityError {
+			errs = append(errs, d.String())
+		} else {
+			m.Warnings = append(m.Warnings, d.String())
+		}
+	}
+	if len(errs) > 0 {
+		return nil, &DiagnosticsError{Errors: errs}
+	}
+
+	conv, err := client.Convert(ctx, parsed, opensysml.FormatAPIJSON)
+	if err != nil {
+		return nil, fmt.Errorf("converting the model to API JSON: %w", err)
+	}
+	if conv.Experimental {
+		m.ExperimentalNotice = conv.ExperimentalNotice
+	}
+	var elements []Element
+	if err := json.Unmarshal([]byte(conv.Content), &elements); err != nil {
+		return nil, fmt.Errorf("reading the API JSON element array: %w", err)
+	}
+	m.Elements = make(map[string]Element, len(elements))
+	m.Order = make([]string, 0, len(elements))
+	for _, e := range elements {
+		id := e.ID()
+		if id == "" {
+			continue
+		}
+		if _, dup := m.Elements[id]; !dup {
+			m.Order = append(m.Order, id)
+		}
+		m.Elements[id] = e
+	}
+	return m, nil
+}
+
+// modelFiles lists the model files under dir, sorted so every run parses them
+// in the same order.
+func modelFiles(dir string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		switch filepath.Ext(path) {
+		case ".sysml", ".kerml":
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading model folder: %w", err)
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("%w in %s", ErrNoModelFiles, dir)
+	}
+	sort.Strings(files)
+	return files, nil
+}

@@ -1,0 +1,81 @@
+= sysml-publish AsciiDoc macros
+
+These macros can be used in the AsciiDoc textual representations of a model
+(`rep language "asciidoc" /* ... */`). They are replaced when the page is
+built. Every macro name starts with `sysml-`.
+
+"The page's element" is the element whose page is being built. A
+representation inherited from a definition is shown on the page of each usage
+typed by it, so there the page's element is the usage, not the definition.
+
+== sysml-name
+
+Inline macro. Replaced by the name of the page's element. An element without
+a name gives `Unnamed`. It gives the element's name, not the page title, so it
+can be used in a document title: `= Element: sysml-name:[]` titles each page
+showing the representation with that page's element.
+
+Syntax:: `sysml-name:[]`
+Attributes:: none
+
+Example:
+
+[source,sysml]
+----
+part def Pump {
+    rep language "asciidoc"
+        /* The sysml-name:[] pump moves coolant. */
+}
+part mainPump : Pump;
+----
+
+The page of `Pump` reads "The Pump pump moves coolant." The page of
+`mainPump` reads "The mainPump pump moves coolant."
+
+== sysml-qualified-name
+
+Inline macro. Replaced by the qualified name of the page's element, written as
+SysML writes it: `Model::pd`, or `Model::'my part'` for a quoted name. An
+element without a qualified name, such as an unnamed one, gives its positional
+name, like `Model::@2`.
+
+Syntax:: `sysml-qualified-name:[]`
+Attributes:: none
+
+Example: `Defined as sysml-qualified-name:[].` on the page of `mainPump` in
+package `Plant` reads "Defined as Plant::mainPump."
+
+== sysml-doc
+
+Block macro, on a line of its own. Replaced by the `doc` comments of the page's
+element, in the order they are declared, each parsed as AsciiDoc, so markup in
+a `doc` works. An element without a `doc` gives nothing.
+
+Only the page's element's own `doc` comments are used: in a representation
+inherited from `Pump`, it shows the doc of `mainPump` on `mainPump`'s page, not
+the doc of `Pump`.
+
+The documentation is placed in an open block with the role `sysml-doc`, for
+styling.
+
+Syntax:: `sysml-doc::[]`
+Attributes:: none
+
+Example:
+
+[source,sysml]
+----
+part def Pump {
+    rep language "asciidoc"
+        /*
+        = sysml-name:[]
+
+        sysml-doc::[]
+        */
+}
+part mainPump : Pump {
+    doc /* The *main* coolant pump. */
+}
+----
+
+The page of `mainPump` shows "The main coolant pump.", with "main" in bold.

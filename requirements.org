@@ -36,21 +36,34 @@
 * Pages
 - PG-1 :: The tool shall generate exactly one page per documented element,
   and one page per ancestor of a documented element (PG-6).
-- PG-2 :: A page shall show the element's name as its title, followed by
-  the body of each AsciiDoc representation it owns, in declaration order,
-  and then its inherited representations (PG-7).
+- PG-2 :: A page shall show its title (PG-8), followed by the body of each
+  AsciiDoc representation the element owns, in declaration order, and then
+  its inherited representations (PG-7).
 - PG-3 :: Representation bodies shall be converted to HTML with asciidoctorg.
 - PG-4 :: Representations in other languages shall be ignored with a
   warning naming the element and the language.
-- PG-5 :: An element without a name that owns an AsciiDoc representation
-  shall get a page titled "Unnamed", and the tool shall report a warning
-  for it.
+- PG-5 :: An element without a name that has a page shall be named
+  "Unnamed" wherever its name is shown (PG-6, PG-7, MC-8), and the tool
+  shall report a warning for it.
 - PG-6 :: An element that is not a documented element, but has a documented
   element among its descendants at any depth, shall get an empty page: its
-  title (as in PG-2 and PG-5) and no body.
+  title, which is the element's name, and no body.
 - PG-7 :: On a page, each inherited representation shall be shown
   once, even when reached through several specializations, under a label
   naming the element that owns it, nearest specialization first.
+- PG-8 :: The title of a documented element's page shall be the AsciiDoc
+  document title (the ~= Title~ header line) that Asciidoctor produces for
+  the first of the page's representations, in page order (PG-2), that has
+  one, with macros resolved for that page. If none has one, the title shall
+  be =untitled-N=, where N numbers such pages among their siblings, starting
+  at 1, in tree order. The title shall be used for the page heading, the
+  browser tab and the sidebar; page folders do not change (PT-1).
+- PG-9 :: When a page's title equals that of an earlier sibling, a suffix
+  =-N= shall be added, N being the smallest number from 2 that makes it
+  unique among the siblings (=Same=, =Same-2=, =Same-3=).
+- PG-10 :: The representation that gives the page its title shall not
+  repeat that title in its body; the document titles of the page's other
+  representations shall be shown in their bodies.
 
 * Page tree
 - PT-1 :: Page locations shall follow the model's containment tree: the page
@@ -86,13 +99,47 @@
 - AM-1 :: (First step after the MVP.) The =doc= text of an element shall
   appear on a page only where an AsciiDoc macro in one of the page's
   representations asks for it; the macro shall be replaced by the doc text.
-  Without the macro, =doc= comments shall not appear. (TBD-7)
+  Without the macro, =doc= comments shall not appear. The macro is
+  =sysml-doc= (MC-10).
 - AM-2 :: (Not in the MVP, not yet scheduled.) AsciiDoc in a representation
   may link to other elements' pages (=xref:=).
 
+* Macros
+Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
+- MC-1 :: Every macro name shall start with =sysml-= (e.g. =sysml-name=), so
+  it cannot collide with Asciidoctor's built-in macros or other extensions.
+- MC-2 :: A macro shall be able to refer to the element whose page is being
+  rendered ("the page's element"). For an inherited representation (PG-7)
+  that is the element of the page showing it, not the element that owns the
+  representation.
+- MC-3 :: The same representation may render differently on different pages
+  (MC-2), so each page shall render its representations itself rather than
+  reuse another page's output.
+- MC-4 :: Macros shall be written in Go and registered on the asciidoctorg
+  instance in one place, the package =internal/macros=, one file per macro
+  with its test beside it.
+- MC-5 :: The page's element shall be passed to macros as document
+  attributes set when a representation is converted (e.g. =sysml-element=,
+  the element's id), so macros keep no global state.
+- MC-6 :: Every macro shall be documented in =docs/macros.adoc=: its syntax,
+  its attributes, and an example.
+- MC-7 :: (TBD-8) A macro that cannot do its job, e.g. one naming an element
+  the model does not have, shall produce a warning naming the page and the
+  macro.
+- MC-8 :: The inline macro =sysml-name:[]= shall be replaced by the name of
+  the page's element (MC-2), "Unnamed" for an element without a name
+  (PG-5). It gives the element's name, not the page title (PG-8), so it can
+  be used inside a document title.
+- MC-9 :: The inline macro =sysml-qualified-name:[]= shall be replaced by
+  the qualified name of the page's element (MC-2), as SysML writes it
+  (=Model::'a<b'=). An element without a qualified name, such as an unnamed
+  one, gives its positional name (=Model::@2=).
+- MC-10 :: The block macro =sysml-doc::[]= shall be replaced by the =doc=
+  comments the page's element owns (MC-2), in declaration order, each parsed
+  as AsciiDoc. An element without a =doc= gives nothing, and the macro line
+  is dropped.
+
 * Open questions
-- TBD-7 :: For AM-1: the macro's name and syntax, and whose doc it inserts.
-  An inherited representation (PG-7) is written on =pd= but shown on the
-  page of =aaaa=. Suggested: a block macro =sysml-doc::[]= inserting the
-  doc of the page's element (=aaaa=), with an optional target naming
-  another element (=sysml-doc::Model::pd[]=).
+- TBD-8 :: For MC-7: besides the warning, what does a failing macro leave on
+  the page, and should it fail the run? Suggested: a visible placeholder
+  naming the problem, and the run still succeeds.
