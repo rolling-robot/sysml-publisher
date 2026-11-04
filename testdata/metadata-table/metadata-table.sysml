@@ -25,7 +25,8 @@ package Meta {
     metadata def Base {
         attribute origin : String default "base";
     }
-    metadata def Derived :> Base {
+    // <drv>: the macro finds a metadata def by its short name too.
+    metadata def <drv> Derived :> Base {
         attribute extra : String default "x";
     }
 

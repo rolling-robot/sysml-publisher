@@ -238,6 +238,14 @@ func modelFiles(dir string) ([]string, error) {
 		if err != nil {
 			return err
 		}
+		// Hidden files and folders are not the model: editor lock files
+		// (Emacs' .#smoke.sysml, a dangling link), .git, and the like.
+		if path != dir && strings.HasPrefix(d.Name(), ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if d.IsDir() {
 			return nil
 		}

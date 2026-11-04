@@ -80,25 +80,19 @@ type Tree struct {
 	// Warnings are skipped representations (PG-4) and unnamed pages (PG-5).
 	Warnings []string
 
-	// supers are each element's direct generals through subclassification
-	// and subsetting (redefinition and reference subsetting included), not
-	// typing; see Specializes.
-	supers map[string][]string
+	// generals are each element's direct generals through every
+	// specialization (typing, subclassification, subsetting, redefinition),
+	// in declaration order; shared by inheritance and Specializes.
+	generals map[string][]string
 }
 
-// subclassOrSubset are the specializations that make an element a subclass
-// or a subset of another; typing (FeatureTyping) is not one of them.
-var subclassOrSubset = map[string]bool{
-	"Subclassification": true, "Subsetting": true, "Redefinition": true,
-	"ReferenceSubsetting": true, "CrossSubsetting": true,
-}
-
-// Specializes reports whether element specific subclasses or subsets element
-// general, directly or through a chain of such relationships (MC-12). Being
-// typed by general is not enough, and no element specializes itself.
+// Specializes reports whether element specific is typed by, subclasses or
+// subsets element general, directly or through a chain of such relationships
+// (part spare : Sport with Sport :> Wheel specializes Wheel; MC-12). No
+// element specializes itself.
 func (t *Tree) Specializes(specific, general string) bool {
 	seen := map[string]bool{specific: true}
-	queue := append([]string(nil), t.supers[specific]...)
+	queue := append([]string(nil), t.generals[specific]...)
 	for len(queue) > 0 {
 		g := queue[0]
 		queue = queue[1:]
@@ -109,14 +103,14 @@ func (t *Tree) Specializes(specific, general string) bool {
 			continue
 		}
 		seen[g] = true
-		queue = append(queue, t.supers[g]...)
+		queue = append(queue, t.generals[g]...)
 	}
 	return false
 }
 
 // Build computes the page tree of m.
 func Build(m *model.Model) *Tree {
-	b := &builder{m: m, t: &Tree{Model: m, ByID: map[string]*Node{}, supers: map[string][]string{}}}
+	b := &builder{m: m, t: &Tree{Model: m, ByID: map[string]*Node{}}}
 	b.collectReps()
 	b.collectDocs()
 	b.collectGenerals()
@@ -132,11 +126,10 @@ func Build(m *model.Model) *Tree {
 }
 
 type builder struct {
-	m        *model.Model
-	t        *Tree
-	reps     map[string][]Rep    // owner id → its AsciiDoc representations
-	docs     map[string][]string // owner id → its doc comment bodies
-	generals map[string][]string // specific id → general ids, in order
+	m    *model.Model
+	t    *Tree
+	reps map[string][]Rep    // owner id → its AsciiDoc representations
+	docs map[string][]string // owner id → its doc comment bodies
 }
 
 // isAsciiDoc reports whether a representation's language is AsciiDoc.
@@ -177,19 +170,16 @@ func (b *builder) collectDocs() {
 
 // collectGenerals reads every specialization relationship (typing,
 // subclassification, subsetting, redefinition): each names a specific and a
-// general element. Those other than typing also go to Tree.supers.
+// general element.
 func (b *builder) collectGenerals() {
-	b.generals = map[string][]string{}
+	b.t.generals = map[string][]string{}
 	for _, id := range b.m.Order {
 		e := b.m.Elements[id]
 		specific, general := e.Ref("specific"), e.Ref("general")
 		if specific == "" || general == "" || specific == general {
 			continue
 		}
-		b.generals[specific] = append(b.generals[specific], general)
-		if subclassOrSubset[e.Type()] {
-			b.t.supers[specific] = append(b.t.supers[specific], general)
-		}
+		b.t.generals[specific] = append(b.t.generals[specific], general)
 	}
 }
 
@@ -203,7 +193,7 @@ func (b *builder) inherited(id string) []Rep {
 	var out []Rep
 	seenRep := map[string]bool{}
 	visited := map[string]bool{id: true}
-	queue := append([]string(nil), b.generals[id]...)
+	queue := append([]string(nil), b.t.generals[id]...)
 	for len(queue) > 0 {
 		g := queue[0]
 		queue = queue[1:]
@@ -217,7 +207,7 @@ func (b *builder) inherited(id string) []Rep {
 				out = append(out, r)
 			}
 		}
-		queue = append(queue, b.generals[g]...)
+		queue = append(queue, b.t.generals[g]...)
 	}
 	return out
 }

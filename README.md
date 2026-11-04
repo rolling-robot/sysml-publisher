@@ -186,10 +186,14 @@ the element that owns the representation.
 | `sysml-value:<attribute>[]` | inline | the attribute's value with its unit, `9 kg` |
 | `sysml-doc::[]` | block | the element's `doc` comments |
 | `sysml-members-list::[]` | block | a list of its members with their types |
-| `sysml-members-list::<element>[]` | block | its members that subclass or subset `<element>` |
+| `sysml-members-list::<element>[]` | block | its members typed by, subclassing or subsetting `<element>` |
+| `sysml-members-list::<kind>[]` | block | its members of one kind: `partUsage`, `interfaceUsage`, ... |
 | `sysml-metadata-table::<metadata def>[]` | block | a table of that metadata's attributes on the element |
 
 Inline macros go anywhere in text; block macros go on a line of their own.
+Where a macro takes an element, name it as SysML would: by qualified name,
+by a name relative to the page's element, or by a name only one element has;
+short names work in every part of a name (`V::W` for `Vehicles::Wheel`).
 
 ```sysml
 part def Pump {
@@ -226,7 +230,7 @@ sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json]
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `-model DIR` | `./model` | folder with the model; every `*.sysml` and `*.kerml` file in it, searched recursively, is read as one model, so references across files work |
+| `-model DIR` | `./model` | folder with the model; every `*.sysml` and `*.kerml` file in it, searched recursively, is read as one model, so references across files work; hidden files and folders (`.git`, editor lock files) are skipped |
 | `-out DIR` | `./site` | folder to write the site to; replaced on every run |
 | `-v` | off | also report how long each stage and each page took |
 | `-log-format` | `text` | `text` for people, `json` for one JSON object per line, for CI and log tools |

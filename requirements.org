@@ -17,7 +17,9 @@
   the SysML files itself, or from an external service that serves the
   SysML v2 API. For the MVP, the tool shall parse files internally only.
 - DS-2 :: The tool shall load every file in the model folder as one model,
-  so references across files resolve.
+  so references across files resolve. Hidden files and folders (names
+  starting with =.=, such as editor lock files and =.git=) shall be
+  ignored.
 - DS-3 :: (Post-MVP) When an external service is used, the user shall give
   its SysML v2 API base URL and the project to read on the command line.
 
@@ -153,7 +155,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
 - MC-11 :: The inline macro =sysml-short-name:[]= shall be replaced by the
   short name of the page's element (MC-2), the =a= of =part <a> aaaa=. An
   element without a short name gives nothing.
-- MC-12 :: The block macro =sysml-members-list::[<element>][]= shall be
+- MC-12 :: The block macro =sysml-members-list::[<element or kind>][]= shall be
   replaced by a bullet list of the members the page's element owns (MC-2),
   in declaration order, each shown by its name ("Unnamed" for one without)
   and linked to its page when it has one. Annotations (=doc=, comments,
@@ -161,15 +163,19 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   - Without =<element>=, every such member shall be listed, followed by its
     types in parentheses when it has any: =mass (Real)=,
     =both (Wheel, Sport)=.
-  - With =<element>=, only the members that subclass or subset it shall be
-    listed, without types: through subclassification or subsetting
-    (redefinition and reference subsetting included), directly or through
-    a chain of them. Being typed by the element does not count.
-  - =<element>= shall be found as a qualified name; else as a name inside
-    the page's element, then inside each enclosing namespace outward; else
-    as a name only one element of the model has (standard-library elements
-    the model refers to included). Otherwise the run shall stop with an
-    error naming the macro and the page.
+  - With =<element>=, only the members that are typed by it, subclass it
+    or subset it shall be listed, without types: through typing,
+    subclassification or subsetting (redefinition and reference subsetting
+    included), directly or through a chain of them (=part spare : Sport=
+    with =Sport :> Wheel= is listed for =Wheel=).
+  - With an element kind (a SysML metaclass name in any letter case:
+    =partUsage=, =InterfaceUsage=), only the members of exactly that
+    metaclass shall be listed, without types. The target shall be read as
+    an element (MC-15) first, and as a kind only when no element has that
+    name.
+  - A target that is neither an element nor a kind, or that several
+    elements answer to, shall stop the run with an error naming the macro
+    and the page.
   - An empty list gives nothing.
 - MC-13 :: The block macro =sysml-metadata-table::<metadata def>[]= shall be
   replaced by a table of the attributes of that metadata on the page's
@@ -178,8 +184,8 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   is the one the element binds; where it binds none, the value the metadata
   def gives (a default or a fixed value); where neither exists, "(no value)".
   Strings are shown without quotes, other values as written in the model.
-  The metadata def is named by qualified name, or by name when that is
-  unique. An element without that metadata gives nothing. A name that is
+  The metadata def is named as MC-15 says, among metadata defs only. An
+  element without that metadata gives nothing. A name that is
   missing, unknown or ambiguous shall stop the run with an error naming the
   macro and the page (until TBD-8 decides otherwise).
 - MC-14 :: The inline macro =sysml-value:<attribute>[]= shall be replaced
@@ -194,6 +200,13 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   does not have shall stop the run with an error naming the macro and the
   page.
 
+- MC-15 :: A macro that names an element shall find it by trying, in turn:
+  a qualified name from the top of the model; a name inside the page's
+  element, then inside each element around it, outward; the qualified name
+  of a standard-library element the model refers to; a plain name only one
+  element of the model has. Each segment of a name may be the element's
+  name or its short name, quoted or not. When several elements answer in
+  the same step, the name is ambiguous.
 * Open questions
 - TBD-8 :: For MC-7: besides the warning, what does a failing macro leave on
   the page, and should it fail the run? Suggested: a visible placeholder

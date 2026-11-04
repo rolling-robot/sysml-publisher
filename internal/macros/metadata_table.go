@@ -1,6 +1,7 @@
 package macros
 
 import (
+	"errors"
 	"fmt"
 	"html"
 	"strings"
@@ -30,7 +31,7 @@ func registerMetadataTable(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", MetadataTable, err)
 			}
-			def, err := md.definition(target)
+			def, err := md.definition(target, n)
 			if err != nil {
 				return nil, fmt.Errorf("%s::%s[] on the page of %s: %w", MetadataTable, target, n.QualifiedName, err)
 			}
@@ -58,14 +59,15 @@ func registerMetadataTable(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 
 // metadataIndex answers questions about metadata from the model.
 type metadataIndex struct {
-	m *model.Model
+	m     *model.Model
+	names *nameIndex
 	// supertypes are each definition's direct supertypes, from its
 	// subclassifications, in declaration order.
 	supertypes map[string][]string
 }
 
 func newMetadataIndex(m *model.Model) *metadataIndex {
-	md := &metadataIndex{m: m, supertypes: map[string][]string{}}
+	md := &metadataIndex{m: m, names: newNameIndex(m), supertypes: map[string][]string{}}
 	for _, id := range m.Order {
 		e := m.Elements[id]
 		if e.Type() == "Subclassification" {
@@ -76,36 +78,21 @@ func newMetadataIndex(m *model.Model) *metadataIndex {
 	return md
 }
 
-// definition finds the metadata def a macro names: by qualified name, or by
-// name when only one metadata def has it.
-func (md *metadataIndex) definition(target string) (model.Element, error) {
+// definition finds the metadata def a macro names, the way every macro reads
+// a name (nameIndex.resolve), among metadata defs only: Info, Plant::Info,
+// or a short name.
+func (md *metadataIndex) definition(target string, n *tree.Node) (model.Element, error) {
 	if target == "" {
 		return nil, fmt.Errorf("no metadata def named; write %s::<metadata def>[]", MetadataTable)
 	}
-	var byName []model.Element
-	for _, id := range md.m.Order {
-		e := md.m.Elements[id]
-		if e.Type() != "MetadataDefinition" {
-			continue
-		}
-		if e.Str("qualifiedName") == target {
-			return e, nil
-		}
-		if e.Str("declaredName") == target {
-			byName = append(byName, e)
-		}
-	}
-	switch len(byName) {
-	case 0:
+	id, err := md.names.resolve(target, n, func(e model.Element) bool { return e.Type() == "MetadataDefinition" })
+	if errors.Is(err, errNoSuchName) {
 		return nil, fmt.Errorf("the model has no metadata def %q", target)
-	case 1:
-		return byName[0], nil
 	}
-	var names []string
-	for _, e := range byName {
-		names = append(names, e.Str("qualifiedName"))
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("%q names several metadata defs (%s); use a qualified name", target, strings.Join(names, ", "))
+	return md.m.Elements[id], nil
 }
 
 // usages are the metadata usages the element owns that are typed by def, in

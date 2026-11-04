@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -97,6 +98,18 @@ func TestMetadataTableByQualifiedName(t *testing.T) {
 	}
 	if got := tables(out)["Derived"]; len(got) != 2 {
 		t.Errorf("rows = %v, want 2", got)
+	}
+}
+
+// A metadata def is found by its short name too (<drv> Derived).
+func TestMetadataTableByShortName(t *testing.T) {
+	tr, ad := setupFixture(t, "metadata-table")
+	out, err := ad.Convert("sysml-metadata-table::drv[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "Meta/specialized"))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := tables(out)["Derived"], []string{"extra = x", "origin = here"}; !slices.Equal(got, want) {
+		t.Errorf("rows = %q, want %q", got, want)
 	}
 }
 

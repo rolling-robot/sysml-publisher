@@ -28,14 +28,27 @@ func TestMembersList(t *testing.T) {
 			"spare (Sport)",
 			"Racing",
 			"both (Wheel, Sport)",
+			"link",
 		}},
-		{"subclasses at any depth, not typing", "M/pd", "sysml-members-list::Wheel[]", []string{"Racing"}},
-		{"qualified name", "M/pd", "sysml-members-list::M::Sport[]", []string{"Racing"}},
+		{"typed, subclasses and subsets at any depth", "M/pd", "sysml-members-list::Wheel[]",
+			[]string{"wheels", "front", "spare", "Racing", "both"}},
+		{"qualified name", "M/pd", "sysml-members-list::M::Sport[]", []string{"spare", "Racing", "both"}},
+		{"typed only", "M/pd", "sysml-members-list::other[]", []string{"Unnamed"}},
 		{"name relative to the page's element", "M/pd", "sysml-members-list::wheels[]", []string{"front"}},
 		{"nothing specializes it", "M/pd", "sysml-members-list::sub[]", nil},
-		// mass : Real is typed by the library's Real, which is not a
-		// subset: the name resolves, the list is empty.
-		{"library element", "M/pd", "sysml-members-list::ScalarValues::Real[]", nil},
+		// mass : Real is typed by the library's Real.
+		{"library element", "M/pd", "sysml-members-list::ScalarValues::Real[]", []string{"mass"}},
+		// Short names, in every segment and every lookup.
+		{"short name", "M/pd", "sysml-members-list::W[]", []string{"wheels", "front", "spare", "Racing", "both"}},
+		{"qualified, all segments short", "M/pd", "sysml-members-list::MM::W[]", []string{"wheels", "front", "spare", "Racing", "both"}},
+		{"relative short name", "M/pd", "sysml-members-list::ws[]", []string{"front"}},
+		{"relative qualified, short last segment", "M/pd", "sysml-members-list::pd::ws[]", []string{"front"}},
+		// Element kinds: exact metaclass, any letter case.
+		{"kind", "M/pd", "sysml-members-list::partUsage[]", []string{
+			`<a href="sub/index.html">sub</a>`, "Unnamed", "wheels", "front", "spare", "both"}},
+		{"kind, interface", "M/pd", "sysml-members-list::InterfaceUsage[]", []string{"link"}},
+		{"kind, lower case", "M/pd", "sysml-members-list::attributeusage[]", []string{"mass"}},
+		{"kind without members", "M/pd", "sysml-members-list::ActionUsage[]", nil},
 		{"the page's element's members only", "M/leaf", "sysml-members-list::[]", []string{"q"}},
 		{"no members", "M/pd/sub", "sysml-members-list::[]", nil},
 		{"relative name inside the page's element", "M/Car", "sysml-members-list::front[]", nil},
@@ -70,7 +83,7 @@ func TestMembersListErrors(t *testing.T) {
 	page := Attributes(pageAt(t, tr, "M/pd"))
 	cases := []struct{ name, macro, want string }{
 		{"unknown element", "sysml-members-list::Nothing[]",
-			`sysml-members-list::Nothing[] on the page of M::pd: the model has no element named "Nothing"`},
+			`sysml-members-list::Nothing[] on the page of M::pd: the model has no element named "Nothing", and it is no element kind (such as partUsage)`},
 		{"ambiguous plain name", "sysml-members-list::x[]",
 			`"x" names several elements (M::A::x, M::B::x); use a qualified name`},
 	}

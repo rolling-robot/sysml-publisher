@@ -34,15 +34,23 @@ package Model {
         attribute power : ISQ::PowerValue default 1.5 [kW];
     }
     part aircraft : ap {
-        doc
+        rep language "asciidoc"
         /*
+        == Purpose
+
+        sysml-doc::[]
+
         == Owned parts:
-        
-        sysml-members-list::[partUsage]
+
+        sysml-members-list::PartUsage[]
 
         == Interfaces:
-        
-        sysml-members-list::[interfaceUsage]
+
+        sysml-members-list::InterfaceUsage[]
+        */
+
+        doc /*
+        The purpose of the aircraft is to transport people
         */
         part <a> wing : ap {
             doc /*
@@ -77,7 +85,7 @@ package Model {
         }
         part airConditioner : ap {
             in port air;
-            attribute mass := 20;
+            attribute :>> mass := 20 [kg];
             @m {
                 owner = "Bob";
                 reviewed = true;

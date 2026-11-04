@@ -8,6 +8,25 @@ built. Every macro name starts with `sysml-`.
 representation inherited from a definition is shown on the page of each usage
 typed by it, so there the page's element is the usage, not the definition.
 
+[[naming]]
+== Naming elements
+
+Macros that take an element (`sysml-members-list`, `sysml-metadata-table`)
+read its name the way a SysML reference is read, trying in turn:
+
+. a qualified name from the top of the model: `Vehicles::Wheel`;
+. a name inside the page's element, then inside each element around it,
+  outward: `wheels`, or `pd::wheels` from the page of a sibling of `pd`;
+. the qualified name of a standard-library element the model uses:
+  `ScalarValues::Real`;
+. a plain name that only one element in the model has: `Wheel`.
+
+Every segment may be the element's name or its short name, quoted or not:
+for `package <V> Vehicles { part def <W> Wheel; }`, `Vehicles::Wheel`,
+`V::W`, `V::Wheel` and `W` all name the wheel. A name that several elements
+answer to in the same step is an error asking for a qualified name; a name
+nothing answers to is an error too.
+
 == sysml-name
 
 Inline macro. Replaced by the name of the page's element. An element without
@@ -106,22 +125,27 @@ Inherited members are not listed.
   `both (Wheel, Sport)`. A member whose type comes only from what it subsets
   (`part front :> wheels;`) is shown without one.
 * With an element, `sysml-members-list::Wheel[]` lists only the members that
-  subclass or subset it (`part def Racing :> Wheel;`, `part front :> wheels;`,
-  a redefinition), directly or through a chain (`Racing :> Sport :> Wheel`),
-  without their types. A member that is only typed by the element
-  (`part w : Wheel;`) is not listed.
+  are typed by it, subclass it or subset it (`part w : Wheel;`,
+  `part def Racing :> Wheel;`, `part front :> wheels;`, a redefinition),
+  directly or through a chain (`part spare : Sport;` with `Sport :> Wheel`),
+  without their types. The element is named as described in
+  <<naming>>, short names included.
+* With an element kind, `sysml-members-list::partUsage[]` lists only the
+  members of that kind, without their types. A kind is a SysML metaclass
+  name, in any letter case: `partUsage`, `PortUsage`, `interfaceUsage`,
+  `attributeUsage`, `partDefinition`, `actionUsage` and so on. The kind
+  must match exactly: interfaces are not listed as `partUsage`, although
+  SysML counts an interface as a kind of part.
 
-The element is found the way SysML names are read from the page's element: a
-qualified name (`Vehicles::Wheel`) as written; otherwise a name inside the page's
-element, then inside each namespace around it; otherwise a name only one
-element in the model has. Standard-library elements the model uses can be named
-too (`ScalarValues::Real`). An unknown or ambiguous name stops the run with an
-error naming the macro and the page.
+A target is read as an element first; only when no element has that name is
+it read as a kind. A name that is neither stops the run with an error naming
+the macro and the page, and so does a name several elements have.
 
 An empty list gives nothing: the macro line is dropped. The list has the role
 `sysml-members-list`, for styling.
 
-Syntax:: `sysml-members-list::[]`, `sysml-members-list::<element>[]`
+Syntax:: `sysml-members-list::[]`, `sysml-members-list::<element>[]`,
+`sysml-members-list::<kind>[]`
 Attributes:: none
 
 Example:
@@ -149,8 +173,8 @@ part def Pump {
 ----
 
 The page of `Pump` lists inlet (FluidPort), flowRate (Real), spare (Wheel) and
-Racing; under "Wheels:" it lists Racing only: `spare` is typed by `Wheel`,
-`Racing` specializes it.
+Racing; under "Wheels:" it lists spare and Racing: `spare` is typed by
+`Wheel`, `Racing` specializes it through `Sport`.
 
 == sysml-metadata-table
 
@@ -174,8 +198,10 @@ The tables are placed in an open block with the role `sysml-metadata-table`,
 for styling.
 
 Syntax:: `sysml-metadata-table::<metadata def>[]`, where the metadata def is
-named by its qualified name (`sysml-metadata-table::Plant::Info[]`) or by its
-name when no other metadata def has it (`sysml-metadata-table::Info[]`)
+named as described in <<naming>>, among metadata defs only: by qualified name
+(`sysml-metadata-table::Plant::Info[]`), by a name relative to the page's
+element, by short name, or by its name when no other metadata def has it
+(`sysml-metadata-table::Info[]`)
 Attributes:: none
 
 A missing, unknown or ambiguous metadata def name stops the run with an error

@@ -54,7 +54,8 @@ internal/tree/              which elements get pages, inheritance, names, paths 
 internal/site/              render pages (asciidoctorg + html/template), titles, write
 internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT) + layout.css
 internal/site/page.html.tmpl
-internal/macros/            the sysml-* AsciiDoc macros, one file per macro
+internal/macros/            the sysml-* AsciiDoc macros, one file per macro;
+                            names.go (element lookup), kinds.go (metaclass names)
 model/                      the user's model (default input)
 testdata/<case>/            fixture models, one folder per test case
 docs/macros.adoc            user reference for the macros
@@ -94,7 +95,7 @@ Everything is in memory until `Site.Write`; a failing run writes nothing.
 ### 5.1 `internal/model`
 
 - `Folder{Dir}.Load` walks the folder for `*.sysml`/`*.kerml` (sorted, so runs
-  are deterministic), parses them **as one model** (`ParseFiles`, so
+  are deterministic; hidden files and folders skipped, DS-2), parses them **as one model** (`ParseFiles`, so
   cross-file references resolve — DS-2), splits diagnostics into errors
   (returned as `*DiagnosticsError`) and warnings, and converts the model to the
   SysML v2 API JSON element array (`Convert(..., FormatAPIJSON)`).
@@ -136,10 +137,10 @@ pages exist live.
 - **Per-node data for macros**: `Docs` (own `doc` bodies, trimmed),
   `ShortName`, `Members` (owned members minus annotations, each with the
   names of its `Types`, library types included).
-- **`Tree.Specializes(specific, general)`**: transitive subclassification
-  or subsetting (redefinition, reference and cross subsetting included),
-  never typing; read from a second graph (`Tree.supers`) filled alongside
-  the inheritance graph. Used by `sysml-members-list`.
+- **`Tree.Specializes(specific, general)`**: transitive typing,
+  subclassification or subsetting (redefinition included), over the same
+  `Tree.generals` graph that representation inheritance walks. Used by
+  `sysml-members-list`.
 - `Href(from, to)` is the one relative-link function (shortest path,
   segments URL-escaped, `+` as `%2B`).
 
@@ -190,6 +191,17 @@ name, like `Node.Name`.
 - `registerText(g, t, name, func(*tree.Node) string)`: an inline short-form
   macro (`name:[]`) returning escaped text. `sysml-name`, `sysml-short-name`
   and `sysml-qualified-name` are one line each on top of it.
+- `nameIndex.resolve(name, page, accept)` (`names.go`): the one element
+  lookup (MC-15), used by `sysml-members-list` and `sysml-metadata-table`.
+  It walks names segment by segment over `ownedMember`, so every segment
+  may be a name or a short name: from the top-level elements, then from
+  the page's element and each owner outward, then library qualified names,
+  then a unique plain name. `accept` narrows the candidates (metadata defs
+  only); an unknown name wraps `errNoSuchName`, so a caller can try another
+  reading (an element kind). Relative lookup sees owned members only, not
+  inherited or imported ones.
+- `kindIndex` (`kinds.go`): metaclass names copied from OpenSysML's
+  internal export tables, plus every `@type` in the model.
 - `passthrough(html)`: wraps finished HTML in `+++…+++` for places where
   AsciiDoc substitutions would otherwise run over model text (list items,
   table cells).
@@ -204,7 +216,7 @@ name, like `Node.Name`.
 | `sysml-short-name:[]` | inline | `Node.ShortName` | empty when none |
 | `sysml-qualified-name:[]` | inline | `Node.QualifiedName` | positional name for unnamed |
 | `sysml-doc::[]` | block | `Node.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block |
-| `sysml-members-list::[<element>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no element: all members with `(types)`; with one: members that subclass/subset it; name resolved qualified → relative → unique plain (`nameIndex`) |
+| `sysml-members-list::[<element or kind>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
 | `sysml-metadata-table::<def>[]` | block | `Tree.Model` | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
 | `sysml-value:<expr>[]` | inline | `Model.Evaluate` | OpenSysML evaluates with the page element as subject; units formatted; composite → `[composite]` + warning |
 
