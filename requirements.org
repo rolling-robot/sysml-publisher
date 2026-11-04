@@ -1,0 +1,98 @@
+* Definitions
+- Model folder :: a directory containing SysML v2 textual notation files
+  (=*.sysml=, =*.kerml=), searched recursively.
+- AsciiDoc representation :: a =TextualRepresentation= element whose
+  =language= is "adoc" or "asciidoc", compared case-insensitively.
+- Inherited representation :: an AsciiDoc representation of a usage or
+  definition that is owned by an element it specializes, directly or
+  transitively. For a usage: its types (definitions), their supertypes, and
+  the features it subsets or redefines. For a definition: its supertypes.
+- Documented element :: an element that owns at least one AsciiDoc
+  representation, or a usage or definition that has at least one inherited
+  representation.
+- Site folder :: the output directory that receives the generated pages.
+
+* Data source
+- DS-1 :: The tool shall obtain model data in one of two ways: by parsing
+  the SysML files itself, or from an external service that serves the
+  SysML v2 API. For the MVP, the tool shall parse files internally only.
+- DS-2 :: The tool shall load every file in the model folder as one model,
+  so references across files resolve.
+- DS-3 :: (Post-MVP) When an external service is used, the user shall give
+  its SysML v2 API base URL and the project to read on the command line.
+
+* Command line
+- CLI-1 :: The tool shall be a command-line program whose single function
+  is to build the page tree from the model folder into the site folder.
+- CLI-2 :: The user may give the model folder path; if omitted, =./model=
+  shall be used.
+- CLI-3 :: The user may give the site folder path; if omitted, =./site=
+  shall be used.
+- CLI-4 :: On each run the tool shall replace the site folder's previous
+  contents, so no page of a removed element remains.
+- CLI-5 :: The tool shall print a summary: number of files and elements
+  loaded, and each page written with its path.
+
+* Pages
+- PG-1 :: The tool shall generate exactly one page per documented element,
+  and one page per ancestor of a documented element (PG-6).
+- PG-2 :: A page shall show the element's name as its title, followed by
+  the body of each AsciiDoc representation it owns, in declaration order,
+  and then its inherited representations (PG-7).
+- PG-3 :: Representation bodies shall be converted to HTML with asciidoctorg.
+- PG-4 :: Representations in other languages shall be ignored with a
+  warning naming the element and the language.
+- PG-5 :: An element without a name that owns an AsciiDoc representation
+  shall get a page titled "Unnamed", and the tool shall report a warning
+  for it.
+- PG-6 :: An element that is not a documented element, but has a documented
+  element among its descendants at any depth, shall get an empty page: its
+  title (as in PG-2 and PG-5) and no body.
+- PG-7 :: On a page, each inherited representation shall be shown
+  once, even when reached through several specializations, under a label
+  naming the element that owns it, nearest specialization first.
+
+* Page tree
+- PT-1 :: Page locations shall follow the model's containment tree: the page
+  of =A::B::C= is =<site>/A/B/C/index.html=.
+- PT-2 :: The page of an element shall stay at the same path when unrelated
+  parts of the model change.
+- PT-3 :: An ancestor that is not a documented element (e.g. a package)
+  shall appear in the tree with its empty page (PG-6).
+- PT-4 :: A branch with no documented element in it shall not appear.
+- PT-5 :: =<site>/index.html= shall be a landing page showing the tree.
+- PT-6 :: The page folder of an unnamed element shall be named =unnamed-N=,
+  where N numbers the unnamed siblings that have pages, starting at 1, in
+  declaration order. These paths are exempt from PT-2: adding or removing an
+  unnamed sibling may renumber them.
+
+* Sidebar
+- SB-1 :: Every page shall have a sidebar on the right showing the whole
+  page tree.
+- SB-2 :: Every element in the sidebar shall link to its page.
+- SB-3 :: The sidebar shall mark the current page.
+
+* Errors
+- ER-1 :: (Post-MVP) If the external service is unreachable, the tool shall
+  exit with a nonzero status and a message naming the URL it tried.
+- ER-2 :: If the model has errors, the tool shall print each as
+  =file:line:col message=, exit with a nonzero status, and write no pages.
+- ER-3 :: If the model folder contains no model files, the tool shall exit
+  with a nonzero status.
+- ER-4 :: If the model has no documented elements, the tool shall warn and
+  exit with status 0, writing only the landing page.
+
+* After MVP
+- AM-1 :: (First step after the MVP.) The =doc= text of an element shall
+  appear on a page only where an AsciiDoc macro in one of the page's
+  representations asks for it; the macro shall be replaced by the doc text.
+  Without the macro, =doc= comments shall not appear. (TBD-7)
+- AM-2 :: (Not in the MVP, not yet scheduled.) AsciiDoc in a representation
+  may link to other elements' pages (=xref:=).
+
+* Open questions
+- TBD-7 :: For AM-1: the macro's name and syntax, and whose doc it inserts.
+  An inherited representation (PG-7) is written on =pd= but shown on the
+  page of =aaaa=. Suggested: a block macro =sysml-doc::[]= inserting the
+  doc of the page's element (=aaaa=), with an optional target naming
+  another element (=sysml-doc::Model::pd[]=).
