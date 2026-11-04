@@ -4,6 +4,7 @@ package tree
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/rolling-robot/sysml-publisher/internal/model"
@@ -39,7 +40,13 @@ type Node struct {
 	Inherited []Rep
 	// Docs are the bodies of the element's own doc comments, in declaration
 	// order (MC-10).
-	Docs     []string
+	Docs []string
+	// ShortName is the element's short name (the <a> of part <a> aaaa), ""
+	// when it has none (MC-11).
+	ShortName string
+	// Members are the element's owned members, in declaration order, without
+	// the annotations: docs, comments, representations, metadata (MC-12).
+	Members  []Member
 	Parent   *Node
 	Children []*Node
 }
@@ -47,6 +54,12 @@ type Node struct {
 // Documented reports whether the element has representations of its own or
 // inherited ones; other nodes are empty ancestor pages (PG-6).
 func (n *Node) Documented() bool { return len(n.Own)+len(n.Inherited) > 0 }
+
+// Member is an owned member of a page's element.
+type Member struct {
+	ID    string
+	Title string // its name, or UnnamedTitle
+}
 
 // Tree is the page tree of a model.
 type Tree struct {
@@ -180,6 +193,8 @@ func (b *builder) addChildren(parent *Node, e model.Element) {
 			Own:       b.reps[id],
 			Inherited: b.inherited(id),
 			Docs:      b.docs[id],
+			ShortName: b.shortName(id),
+			Members:   b.members(child),
 			Parent:    parent,
 		}
 		if n.Unnamed {
@@ -232,6 +247,43 @@ func (b *builder) declaredTitle(id string) string {
 	return ""
 }
 
+// annotations are the metaclasses of owned members that annotate the owner
+// rather than make it up; sysml-members leaves them out (MC-12).
+var annotations = map[string]bool{
+	"Comment": true, "Documentation": true, "TextualRepresentation": true,
+	"MetadataUsage": true, "MetadataFeature": true,
+}
+
+// members are e's owned members other than annotations.
+func (b *builder) members(e model.Element) []Member {
+	var out []Member
+	for _, id := range e.Refs("ownedMember") {
+		m, ok := b.m.Elements[id]
+		if !ok || annotations[m.Type()] {
+			continue
+		}
+		title := b.declaredTitle(id)
+		if title == "" {
+			title = UnnamedTitle
+		}
+		out = append(out, Member{ID: id, Title: title})
+	}
+	return out
+}
+
+// shortName is the element's declared short name, or the short name its
+// owning membership gives it; "" when it has none.
+func (b *builder) shortName(id string) string {
+	e := b.m.Elements[id]
+	if n := e.Str("declaredShortName"); n != "" {
+		return n
+	}
+	if mem, ok := b.m.Elements[e.Ref("owningMembership")]; ok {
+		return mem.Str("memberShortName")
+	}
+	return ""
+}
+
 // name is how an element is identified in messages.
 func (b *builder) name(id string) string {
 	e := b.m.Elements[id]
@@ -270,4 +322,29 @@ func unique(seg string, used map[string]bool) string {
 	}
 	used[strings.ToLower(candidate)] = true
 	return candidate
+}
+
+// Href is a relative link from the page at from to the page of to, each
+// folder name escaped, so the site works from file:// as from a server.
+func Href(from, to *Node) string {
+	src, dst := segments(from.Dir), segments(to.Dir)
+	common := 0
+	for common < len(src) && common < len(dst) && src[common] == dst[common] {
+		common++
+	}
+	var sb strings.Builder
+	sb.WriteString(strings.Repeat("../", len(src)-common))
+	for _, seg := range dst[common:] {
+		sb.WriteString(strings.ReplaceAll(url.PathEscape(seg), "+", "%2B"))
+		sb.WriteByte('/')
+	}
+	sb.WriteString("index.html")
+	return sb.String()
+}
+
+func segments(dir string) []string {
+	if dir == "" {
+		return nil
+	}
+	return strings.Split(dir, "/")
 }

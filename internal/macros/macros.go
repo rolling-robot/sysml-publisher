@@ -26,6 +26,8 @@ func Register(ad *asciidoctor.Asciidoctor, t *tree.Tree) error {
 	g := ad.Extensions().Group("sysml")
 	registerName(g, t)
 	registerQualifiedName(g, t)
+	registerShortName(g, t)
+	registerMembers(g, t)
 	registerDoc(g, t)
 	if err := g.Register(); err != nil {
 		return fmt.Errorf("registering the sysml macros: %w", err)

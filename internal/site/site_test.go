@@ -75,7 +75,7 @@ func TestRenderSmoke(t *testing.T) {
 func TestHrefEscapesSegments(t *testing.T) {
 	from := &tree.Node{Dir: "A/b c"}
 	to := &tree.Node{Dir: "A/x#y"}
-	if got, want := href(from, to), "../x%23y/index.html"; got != want {
+	if got, want := tree.Href(from, to), "../x%23y/index.html"; got != want {
 		t.Errorf("href = %q, want %q", got, want)
 	}
 }

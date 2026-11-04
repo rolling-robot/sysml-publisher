@@ -79,3 +79,48 @@ part mainPump : Pump {
 ----
 
 The page of `mainPump` shows "The main coolant pump.", with "main" in bold.
+
+== sysml-short-name
+
+Inline macro. Replaced by the short name of the page's element: `P-101` for
+`part <'P-101'> mainPump`. An element without a short name gives nothing, so
+the macro disappears.
+
+Syntax:: `sysml-short-name:[]`
+Attributes:: none
+
+Example: `Tag: sysml-short-name:[]` on the page of `part <a> aaaa` reads
+"Tag: a".
+
+== sysml-members
+
+Block macro, on a line of its own. Replaced by a bullet list of the members the
+page's element owns, in the order they are declared: its parts, ports,
+attributes and so on. Each item is the member's name, `Unnamed` for one without
+a name, and links to the member's page when it has one. Annotations are left
+out: `doc` comments, comments, representations and metadata such as `@tag`.
+Inherited members are not listed. An element without members gives nothing.
+
+The list has the role `sysml-members`, for styling.
+
+Syntax:: `sysml-members::[]`
+Attributes:: none
+
+Example:
+
+[source,sysml]
+----
+part def Pump {
+    rep language "asciidoc"
+        /*
+        = sysml-name:[]
+
+        sysml-members::[]
+        */
+    port inlet;
+    port outlet;
+    attribute flowRate;
+}
+----
+
+The page of `Pump` lists inlet, outlet and flowRate.

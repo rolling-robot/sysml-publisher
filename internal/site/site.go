@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -135,7 +134,7 @@ func (r *renderer) body(n *tree.Node) (*body, error) {
 		o := r.owner(rep)
 		rv := repView{HTML: h, FromName: o.Title}
 		if r.t.ByID[rep.Owner] != nil {
-			rv.FromHref = href(n, o)
+			rv.FromHref = tree.Href(n, o)
 		}
 		b.inherited = append(b.inherited, rv)
 	}
@@ -214,31 +213,6 @@ func file(n *tree.Node) string {
 	return n.Dir + "/index.html"
 }
 
-// href is a relative link from the page at from to the page of to, each
-// folder name escaped, so the site works from file:// as from a server.
-func href(from, to *tree.Node) string {
-	src, dst := segments(from.Dir), segments(to.Dir)
-	common := 0
-	for common < len(src) && common < len(dst) && src[common] == dst[common] {
-		common++
-	}
-	var sb strings.Builder
-	sb.WriteString(strings.Repeat("../", len(src)-common))
-	for _, seg := range dst[common:] {
-		sb.WriteString(url.PathEscape(seg))
-		sb.WriteByte('/')
-	}
-	sb.WriteString("index.html")
-	return sb.String()
-}
-
-func segments(dir string) []string {
-	if dir == "" {
-		return nil
-	}
-	return strings.Split(dir, "/")
-}
-
 type repView struct {
 	HTML     template.HTML
 	FromName string // name of the owning element, for inherited ones
@@ -276,8 +250,8 @@ func (r *renderer) page(s *Site, n *tree.Node) error {
 		TitleHTML:  t.HTML,
 		TitleText:  t.Text,
 		SiteTitle:  LandingTitle,
-		AssetsHref: strings.TrimSuffix(href(n, root), "index.html") + "assets/",
-		HomeHref:   href(n, root),
+		AssetsHref: strings.TrimSuffix(tree.Href(n, root), "index.html") + "assets/",
+		HomeHref:   tree.Href(n, root),
 		Landing:    n == root,
 		Empty:      n != root && !n.Documented(),
 		Nav:        r.nav(n, root.Children),
@@ -301,7 +275,7 @@ func (r *renderer) nav(current *tree.Node, nodes []*tree.Node) []navItem {
 	for _, c := range nodes {
 		items = append(items, navItem{
 			Title:    r.titles[c].Text,
-			Href:     href(current, c),
+			Href:     tree.Href(current, c),
 			Current:  c == current,
 			Empty:    !c.Documented(),
 			Children: r.nav(current, c.Children),

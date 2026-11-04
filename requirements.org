@@ -138,6 +138,14 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   comments the page's element owns (MC-2), in declaration order, each parsed
   as AsciiDoc. An element without a =doc= gives nothing, and the macro line
   is dropped.
+- MC-11 :: The inline macro =sysml-short-name:[]= shall be replaced by the
+  short name of the page's element (MC-2), the =a= of =part <a> aaaa=. An
+  element without a short name gives nothing.
+- MC-12 :: The block macro =sysml-members::[]= shall be replaced by a bullet
+  list of the members the page's element owns (MC-2), in declaration order,
+  each shown by its name ("Unnamed" for one without) and linked to its page
+  when it has one. Annotations (=doc=, comments, representations, metadata
+  usages) shall be left out. An element without such members gives nothing.
 
 * Open questions
 - TBD-8 :: For MC-7: besides the warning, what does a failing macro leave on
