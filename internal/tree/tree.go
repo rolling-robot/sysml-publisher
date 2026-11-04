@@ -61,6 +61,10 @@ func (n *Node) Documented() bool { return len(n.Own)+len(n.Inherited) > 0 }
 type Member struct {
 	ID   string
 	Name string // its name, or UnnamedName
+	// Types are the names of the member's types (part w : Wheel gives
+	// Wheel), in declaration order; none for a definition or an untyped
+	// usage. Types a usage gets only through subsetting are not included.
+	Types []string
 }
 
 // Tree is the page tree of a model.
@@ -75,11 +79,44 @@ type Tree struct {
 	ByID map[string]*Node
 	// Warnings are skipped representations (PG-4) and unnamed pages (PG-5).
 	Warnings []string
+
+	// supers are each element's direct generals through subclassification
+	// and subsetting (redefinition and reference subsetting included), not
+	// typing; see Specializes.
+	supers map[string][]string
+}
+
+// subclassOrSubset are the specializations that make an element a subclass
+// or a subset of another; typing (FeatureTyping) is not one of them.
+var subclassOrSubset = map[string]bool{
+	"Subclassification": true, "Subsetting": true, "Redefinition": true,
+	"ReferenceSubsetting": true, "CrossSubsetting": true,
+}
+
+// Specializes reports whether element specific subclasses or subsets element
+// general, directly or through a chain of such relationships (MC-12). Being
+// typed by general is not enough, and no element specializes itself.
+func (t *Tree) Specializes(specific, general string) bool {
+	seen := map[string]bool{specific: true}
+	queue := append([]string(nil), t.supers[specific]...)
+	for len(queue) > 0 {
+		g := queue[0]
+		queue = queue[1:]
+		if g == general {
+			return true
+		}
+		if seen[g] {
+			continue
+		}
+		seen[g] = true
+		queue = append(queue, t.supers[g]...)
+	}
+	return false
 }
 
 // Build computes the page tree of m.
 func Build(m *model.Model) *Tree {
-	b := &builder{m: m, t: &Tree{Model: m, ByID: map[string]*Node{}}}
+	b := &builder{m: m, t: &Tree{Model: m, ByID: map[string]*Node{}, supers: map[string][]string{}}}
 	b.collectReps()
 	b.collectDocs()
 	b.collectGenerals()
@@ -140,7 +177,7 @@ func (b *builder) collectDocs() {
 
 // collectGenerals reads every specialization relationship (typing,
 // subclassification, subsetting, redefinition): each names a specific and a
-// general element.
+// general element. Those other than typing also go to Tree.supers.
 func (b *builder) collectGenerals() {
 	b.generals = map[string][]string{}
 	for _, id := range b.m.Order {
@@ -150,6 +187,9 @@ func (b *builder) collectGenerals() {
 			continue
 		}
 		b.generals[specific] = append(b.generals[specific], general)
+		if subclassOrSubset[e.Type()] {
+			b.t.supers[specific] = append(b.t.supers[specific], general)
+		}
 	}
 }
 
@@ -253,7 +293,7 @@ func (b *builder) declaredName(id string) string {
 }
 
 // annotations are the metaclasses of owned members that annotate the owner
-// rather than make it up; sysml-members leaves them out (MC-12).
+// rather than make it up; sysml-members-list leaves them out (MC-12).
 var annotations = map[string]bool{
 	"Comment": true, "Documentation": true, "TextualRepresentation": true,
 	"MetadataUsage": true, "MetadataFeature": true,
@@ -271,7 +311,17 @@ func (b *builder) members(e model.Element) []Member {
 		if name == "" {
 			name = UnnamedName
 		}
-		out = append(out, Member{ID: id, Name: name})
+		var types []string
+		for _, typ := range m.Refs("type") {
+			tn := b.declaredName(typ)
+			if lib, ok := b.m.Library[typ]; ok && tn == "" {
+				tn = lib.Name() // a library type: Real
+			}
+			if tn != "" {
+				types = append(types, tn)
+			}
+		}
+		out = append(out, Member{ID: id, Name: name, Types: types})
 	}
 	return out
 }

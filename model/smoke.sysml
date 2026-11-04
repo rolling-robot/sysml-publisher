@@ -47,7 +47,7 @@ package Model {
 
             Owned elements:
 
-            sysml-members::[]
+            sysml-members-list::[]
             */
             @m {
                 a := "aa";

@@ -98,6 +98,10 @@ Everything is in memory until `Site.Write`; a failing run writes nothing.
   cross-file references resolve — DS-2), splits diagnostics into errors
   (returned as `*DiagnosticsError`) and warnings, and converts the model to the
   SysML v2 API JSON element array (`Convert(..., FormatAPIJSON)`).
+- `Model.Library` holds the standard-library elements the model refers to
+  (`@id` → qualified name, metaclass), from `Conversion.LibraryReferences`;
+  they are not in `Elements`. `LibraryElement.Name()` is the last segment
+  (`Real` for `ScalarValues::Real`).
 - `Element` is `map[string]any` with helpers `ID`, `Type`, `Str`, `Ref`, `Refs`
   (`Refs` accepts single or multi-valued references, so callers need not know
   the cardinality).
@@ -130,7 +134,12 @@ pages exist live.
   made filesystem-safe; unnamed siblings become `unnamed-N` (PT-6); clashes
   (case-insensitive) get `-2`, `-3`.
 - **Per-node data for macros**: `Docs` (own `doc` bodies, trimmed),
-  `ShortName`, `Members` (owned members minus annotations).
+  `ShortName`, `Members` (owned members minus annotations, each with the
+  names of its `Types`, library types included).
+- **`Tree.Specializes(specific, general)`**: transitive subclassification
+  or subsetting (redefinition, reference and cross subsetting included),
+  never typing; read from a second graph (`Tree.supers`) filled alongside
+  the inheritance graph. Used by `sysml-members-list`.
 - `Href(from, to)` is the one relative-link function (shortest path,
   segments URL-escaped, `+` as `%2B`).
 
@@ -195,7 +204,7 @@ name, like `Node.Name`.
 | `sysml-short-name:[]` | inline | `Node.ShortName` | empty when none |
 | `sysml-qualified-name:[]` | inline | `Node.QualifiedName` | positional name for unnamed |
 | `sysml-doc::[]` | block | `Node.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block |
-| `sysml-members::[]` | block | `Node.Members` | ulist; links to members that have pages |
+| `sysml-members-list::[<element>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no element: all members with `(types)`; with one: members that subclass/subset it; name resolved qualified → relative → unique plain (`nameIndex`) |
 | `sysml-metadata::<def>[]` | block | `Tree.Model` | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
 | `sysml-value:<expr>[]` | inline | `Model.Evaluate` | OpenSysML evaluates with the page element as subject; units formatted; composite → `[composite]` + warning |
 
@@ -348,6 +357,13 @@ Known gaps (from the test review, November 2026):
   representations — harmless for AsciiDoc).
 - `Convert`'s doc comment says "a model of one document"; multi-document
   conversion works in practice (tested in `internal/model`).
+- **Library elements are not in the in-process element array**: a reference
+  to `ScalarValues::Real` is a bare `{"@id": <uuid>}`; the id, qualified
+  name and metaclass come in `Conversion.LibraryReferences` (kept as
+  `Model.Library`). The `sysml -convert api-json` CLI writes them as
+  elements instead, so do not judge the in-process output by the CLI's.
+- A usage's `type` lists only its own typings: a type it gets through
+  subsetting or redefinition (`part front :> wheels;`) is absent.
 - Derived properties (`documentation`, `textualRepresentation`,
   `representedElement`, `inheritedMember`) are absent from the API JSON; use
   `owner` and the specialization relationships instead.

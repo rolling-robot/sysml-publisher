@@ -54,7 +54,7 @@ func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, t *tree.Tree, wa
 	registerName(g, t)
 	registerQualifiedName(g, t)
 	registerShortName(g, t)
-	registerMembers(g, t)
+	registerMembersList(g, t)
 	registerDoc(g, t)
 	registerMetadata(g, t)
 	registerValue(ctx, g, t, warn)

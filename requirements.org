@@ -153,11 +153,24 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
 - MC-11 :: The inline macro =sysml-short-name:[]= shall be replaced by the
   short name of the page's element (MC-2), the =a= of =part <a> aaaa=. An
   element without a short name gives nothing.
-- MC-12 :: The block macro =sysml-members::[]= shall be replaced by a bullet
-  list of the members the page's element owns (MC-2), in declaration order,
-  each shown by its name ("Unnamed" for one without) and linked to its page
-  when it has one. Annotations (=doc=, comments, representations, metadata
-  usages) shall be left out. An element without such members gives nothing.
+- MC-12 :: The block macro =sysml-members-list::[<element>][]= shall be
+  replaced by a bullet list of the members the page's element owns (MC-2),
+  in declaration order, each shown by its name ("Unnamed" for one without)
+  and linked to its page when it has one. Annotations (=doc=, comments,
+  representations, metadata usages) shall be left out.
+  - Without =<element>=, every such member shall be listed, followed by its
+    types in parentheses when it has any: =mass (Real)=,
+    =both (Wheel, Sport)=.
+  - With =<element>=, only the members that subclass or subset it shall be
+    listed, without types: through subclassification or subsetting
+    (redefinition and reference subsetting included), directly or through
+    a chain of them. Being typed by the element does not count.
+  - =<element>= shall be found as a qualified name; else as a name inside
+    the page's element, then inside each enclosing namespace outward; else
+    as a name only one element of the model has (standard-library elements
+    the model refers to included). Otherwise the run shall stop with an
+    error naming the macro and the page.
+  - An empty list gives nothing.
 - MC-13 :: The block macro =sysml-metadata::<metadata def>[]= shall be
   replaced by a table of the attributes of that metadata on the page's
   element (MC-2): one row per attribute of the metadata def and of its

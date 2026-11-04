@@ -75,10 +75,33 @@ type Model struct {
 	// ExperimentalNotice is non-empty when the element form is marked
 	// experimental by the parser, as OpenSysML marks api-json today.
 	ExperimentalNotice string
+	// Library are the standard-library elements the model refers to, by
+	// @id. They are not in Elements: the element array refers to them by
+	// id only.
+	Library map[string]LibraryElement
 
 	// The engine the model was parsed by, kept open for Evaluate until Close.
 	client opensysml.Client
 	parsed *opensysml.Model
+}
+
+// LibraryElement is a standard-library element the model refers to.
+type LibraryElement struct {
+	QualifiedName string // ScalarValues::Real
+	Type          string // its metaclass: DataType
+}
+
+// Name is the library element's own name, the last segment of its
+// qualified name: Real for ScalarValues::Real.
+func (l LibraryElement) Name() string {
+	name := l.QualifiedName
+	if i := strings.LastIndex(name, "::"); i >= 0 {
+		name = name[i+2:]
+	}
+	if len(name) >= 2 && name[0] == '\'' && name[len(name)-1] == '\'' {
+		name = name[1 : len(name)-1]
+	}
+	return name
 }
 
 // Evaluate evaluates a SysML expression with the element named subject (by
@@ -181,6 +204,10 @@ func (f Folder) Load(ctx context.Context) (*Model, error) {
 	}
 	if conv.Experimental {
 		m.ExperimentalNotice = conv.ExperimentalNotice
+	}
+	m.Library = make(map[string]LibraryElement, len(conv.LibraryReferences))
+	for _, r := range conv.LibraryReferences {
+		m.Library[r.ID] = LibraryElement{QualifiedName: r.QualifiedName, Type: r.Type}
 	}
 	var elements []Element
 	if err := json.Unmarshal([]byte(conv.Content), &elements); err != nil {
