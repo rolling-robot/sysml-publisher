@@ -38,6 +38,8 @@ var page = template.Must(template.New("page").Parse(pageTemplate))
 // the site folder.
 type Site struct {
 	Files map[string][]byte
+	// Warnings are the macros' warnings, each once, in the order first seen.
+	Warnings []string
 }
 
 // Render renders every page of t, and the landing page. Representation bodies
@@ -49,7 +51,15 @@ func Render(t *tree.Tree) (*Site, error) {
 		return nil, fmt.Errorf("starting asciidoctorg: %w", err)
 	}
 	defer ad.Close()
-	if err := macros.Register(ad, t); err != nil {
+	s := &Site{Files: map[string][]byte{}}
+	seen := map[string]bool{}
+	warn := func(msg string) {
+		if !seen[msg] {
+			seen[msg] = true
+			s.Warnings = append(s.Warnings, msg)
+		}
+	}
+	if err := macros.Register(ad, t, warn); err != nil {
 		return nil, err
 	}
 
@@ -65,7 +75,6 @@ func Render(t *tree.Tree) (*Site, error) {
 	}
 	r.assignTitles(t.Root)
 
-	s := &Site{Files: map[string][]byte{}}
 	if err := r.page(s, t.Root); err != nil {
 		return nil, err
 	}

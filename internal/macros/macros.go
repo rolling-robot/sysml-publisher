@@ -1,4 +1,4 @@
-// Package macros holds the tool's AsciiDoc macros (requirements MC-1..13).
+// Package macros holds the tool's AsciiDoc macros (requirements MC-1..14).
 // Each macro lives in its own file; Register adds them all to an asciidoctorg
 // instance.
 package macros
@@ -22,8 +22,16 @@ func Attributes(n *tree.Node) asciidoctor.Attributes {
 	return asciidoctor.Attributes{}.Set(AttrElement, n.ID)
 }
 
-// Register adds every macro to ad. The macros read the page tree t.
-func Register(ad *asciidoctor.Asciidoctor, t *tree.Tree) error {
+// Warn receives a warning from a macro, such as a value it cannot show. A
+// nil Warn drops warnings.
+type Warn func(message string)
+
+// Register adds every macro to ad. The macros read the page tree t and
+// report warnings to warn.
+func Register(ad *asciidoctor.Asciidoctor, t *tree.Tree, warn Warn) error {
+	if warn == nil {
+		warn = func(string) {}
+	}
 	g := ad.Extensions().Group("sysml")
 	registerName(g, t)
 	registerQualifiedName(g, t)
@@ -31,6 +39,7 @@ func Register(ad *asciidoctor.Asciidoctor, t *tree.Tree) error {
 	registerMembers(g, t)
 	registerDoc(g, t)
 	registerMetadata(g, t)
+	registerValue(g, t, warn)
 	if err := g.Register(); err != nil {
 		return fmt.Errorf("registering the sysml macros: %w", err)
 	}

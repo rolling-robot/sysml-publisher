@@ -73,6 +73,30 @@ type Model struct {
 	// ExperimentalNotice is non-empty when the element form is marked
 	// experimental by the parser, as OpenSysML marks api-json today.
 	ExperimentalNotice string
+
+	// The engine the model was parsed by, kept open for Evaluate until Close.
+	client opensysml.Client
+	parsed *opensysml.Model
+}
+
+// Evaluate evaluates a SysML expression with the element named subject (by
+// qualified name) as its subject, so a feature reads that element's value:
+// its own, a redefinition's, or one inherited from its types.
+func (m *Model) Evaluate(ctx context.Context, subject, expression string) (opensysml.Value, error) {
+	if m.client == nil {
+		return nil, errors.New("this model cannot evaluate expressions")
+	}
+	return m.client.Evaluate(ctx, m.parsed, expression, opensysml.WithSubject(subject))
+}
+
+// Close releases the engine. The model's elements stay readable.
+func (m *Model) Close() error {
+	if m.client == nil {
+		return nil
+	}
+	err := m.client.Close()
+	m.client, m.parsed = nil, nil
+	return err
 }
 
 // Source is where a model comes from. The MVP reads a folder of files; a
@@ -111,13 +135,20 @@ func (f Folder) Load(ctx context.Context) (*Model, error) {
 	if err != nil {
 		return nil, fmt.Errorf("starting the SysML engine: %w", err)
 	}
-	defer client.Close()
+	// The engine stays open for Evaluate when loading succeeds; the caller
+	// closes it with Model.Close.
+	ok := false
+	defer func() {
+		if !ok {
+			client.Close()
+		}
+	}()
 
 	parsed, err := client.ParseFiles(ctx, files)
 	if err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", f.Dir, err)
 	}
-	m := &Model{Files: files}
+	m := &Model{Files: files, client: client, parsed: parsed}
 	var errs []string
 	for _, d := range parsed.Diagnostics {
 		if d.Severity == opensysml.SeverityError {
@@ -153,6 +184,7 @@ func (f Folder) Load(ctx context.Context) (*Model, error) {
 		}
 		m.Elements[id] = e
 	}
+	ok = true
 	return m, nil
 }
 

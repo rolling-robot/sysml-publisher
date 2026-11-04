@@ -177,3 +177,50 @@ part mainPump : Pump {
 
 The page of `mainPump` shows a table titled Info with the rows owner = pete
 and count = 3.
+
+== sysml-value
+
+Inline macro. Replaced by the value of an attribute of the page's element.
+The attribute is named as a SysML expression on the element: `mass`, or a
+path such as `motor.power`.
+
+The value is evaluated by OpenSysML with the page's element as the subject,
+so it is the element's own value, the value of a redefinition
+(`attribute :>> mass = 7.5 [kg];`), or the one it gets from its definition
+(`attribute mass : ISQ::MassValue default 5 [kg];` on a `part def`).
+Expressions are computed: `10 [km/h] * 2` gives `5.555555555555555 m/s`, since
+the engine computes in SI base units.
+
+* A quantity is shown as its magnitude and unit symbol: `5 kg`, `90 km/h`,
+  `2.5 m³⋅s⁻¹`.
+* A string is shown without quotes, a boolean as `true` or `false`, an
+  enumeration literal as written: `Level::low`.
+* An attribute with no value is shown as `(no value)`.
+* A composite value, one made of attributes of its own (an attribute typed by
+  an attribute def with attributes, such as `attribute position : Position;`),
+  has no single value to show. It is shown as `[composite]`, and the tool
+  prints a warning naming the page and the macro.
+
+Syntax:: `sysml-value:<attribute>[]`
+Attributes:: none
+
+An attribute the element does not have stops the run with an error naming the
+macro and the page.
+
+Example:
+
+[source,sysml]
+----
+part def Pump {
+    rep language "asciidoc"
+        /* The pump weighs sysml-value:mass[]. */
+    attribute mass : ISQ::MassValue default 5 [kg];
+}
+part mainPump : Pump {
+    attribute :>> mass = 7.5 [kg];
+}
+part sparePump : Pump;
+----
+
+The page of `mainPump` reads "The pump weighs 7.5 kg." The page of
+`sparePump` reads "The pump weighs 5 kg."

@@ -56,6 +56,7 @@ func publish(modelDir, outDir string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	defer m.Close()
 	fmt.Fprintf(stdout, "model: %d file(s), %d elements, %d warning(s)\n", len(m.Files), len(m.Elements), len(m.Warnings))
 	if m.ExperimentalNotice != "" {
 		fmt.Fprintln(stderr, "note: the SysML v2 API JSON conversion is experimental in OpenSysML")
@@ -81,6 +82,9 @@ func publish(modelDir, outDir string, stdout, stderr io.Writer) error {
 	s, err := site.Render(t)
 	if err != nil {
 		return err
+	}
+	for _, w := range s.Warnings {
+		fmt.Fprintln(stderr, "warning:", w)
 	}
 	if err := s.Write(outDir); err != nil {
 		return err

@@ -25,7 +25,7 @@ func setup(t *testing.T) (*tree.Tree, *asciidoctor.Asciidoctor) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { ad.Close() })
-	if err := Register(ad, tr); err != nil {
+	if err := Register(ad, tr, nil); err != nil {
 		t.Fatal(err)
 	}
 	return tr, ad
