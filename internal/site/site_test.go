@@ -3,6 +3,8 @@ package site
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,7 +21,7 @@ func render(t *testing.T, fixture string) *Site {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Render(tree.Build(m))
+	s, err := Render(context.Background(), tree.Build(m), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,4 +161,17 @@ func TestPageTitles(t *testing.T) {
 	}
 	// The empty package page keeps the element name (PG-6).
 	mustContain(t, s, "T/index.html", "<h1>T</h1>")
+}
+
+// Starting asciidoctorg replaces the default slog logger (a dependency
+// installs a handler that drops debug records); Render must put it back.
+func TestRenderKeepsTheDefaultLogger(t *testing.T) {
+	previous := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	mine := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	slog.SetDefault(mine)
+	render(t, "smoke")
+	if slog.Default().Handler() != mine.Handler() {
+		t.Errorf("default logger replaced by %T", slog.Default().Handler())
+	}
 }

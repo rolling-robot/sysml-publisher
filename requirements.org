@@ -30,8 +30,14 @@
   shall be used.
 - CLI-4 :: On each run the tool shall replace the site folder's previous
   contents, so no page of a removed element remains.
-- CLI-5 :: The tool shall print a summary: number of files and elements
+- CLI-5 :: The tool shall report a summary: number of files and elements
   loaded, and each page written with its path.
+- CLI-6 :: Everything the tool reports shall go to stderr as structured log
+  records (Go's log/slog): human-readable text by default, JSON with
+  =-log-format json=. =-v= shall add debug records giving the duration of
+  each stage (parse, convert, page tree, each page, render, write).
+- CLI-7 :: Interrupting the tool (Ctrl-C, SIGTERM) shall stop it, write
+  nothing, and exit with status 130.
 
 * Pages
 - PG-1 :: The tool shall generate exactly one page per documented element,
@@ -104,6 +110,9 @@
   =sysml-doc= (MC-10).
 - AM-2 :: (Not in the MVP, not yet scheduled.) AsciiDoc in a representation
   may link to other elements' pages (=xref:=).
+- AM-3 :: (To do, blocked by TBD-9.) The block macro =sysml-view::<view>[]=
+  shall be replaced by the named view as rendered by OpenSysML. The view is
+  named relative to the page's element (MC-2) or by qualified name.
 
 * Macros
 Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
@@ -174,3 +183,20 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
 - TBD-8 :: For MC-7: besides the warning, what does a failing macro leave on
   the page, and should it fail the run? Suggested: a visible placeholder
   naming the problem, and the run still succeeds.
+- TBD-9 :: For AM-3: how a view becomes a picture. OpenSysML's public Go API
+  (=RenderView=) gives only the view's data (nodes, edges, geometry); its
+  DOT and Mermaid writers are in an internal package this tool cannot
+  import. Options:
+  1. Run =sysml -render <view> -render-form dot= and Graphviz =dot -Tsvg=,
+     and put the SVG in the page: static pages, no JavaScript; needs the
+     =sysml= command and Graphviz when building; the model is parsed again
+     for each view.
+  2. Run =sysml -render <view> -render-form mermaid= and draw it in the
+     browser with mermaid.js, shipped with the site or linked: pages need
+     JavaScript.
+  3. Change OpenSysML to make its DOT or Mermaid writer public, and call it
+     in-process: one parse, no extra programs, but a change to OpenSysML
+     first.
+  4. Draw SVG in this tool from the view's data: no extra programs, but a
+     large job, and the layout would be weaker than Graphviz's.
+  Suggested: 1.

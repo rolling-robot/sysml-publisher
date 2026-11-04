@@ -4,6 +4,7 @@
 package macros
 
 import (
+	"context"
 	"fmt"
 	"html"
 	"strings"
@@ -26,9 +27,10 @@ func Attributes(n *tree.Node) asciidoctor.Attributes {
 // nil Warn drops warnings.
 type Warn func(message string)
 
-// Register adds every macro to ad. The macros read the page tree t and
-// report warnings to warn.
-func Register(ad *asciidoctor.Asciidoctor, t *tree.Tree, warn Warn) error {
+// Register adds every macro to ad. The macros read the page tree t, report
+// warnings to warn, and stop evaluating when ctx is cancelled. ctx is the
+// context of the rendering ad is registered for; register again for another.
+func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, t *tree.Tree, warn Warn) error {
 	if warn == nil {
 		warn = func(string) {}
 	}
@@ -39,7 +41,7 @@ func Register(ad *asciidoctor.Asciidoctor, t *tree.Tree, warn Warn) error {
 	registerMembers(g, t)
 	registerDoc(g, t)
 	registerMetadata(g, t)
-	registerValue(g, t, warn)
+	registerValue(ctx, g, t, warn)
 	if err := g.Register(); err != nil {
 		return fmt.Errorf("registering the sysml macros: %w", err)
 	}

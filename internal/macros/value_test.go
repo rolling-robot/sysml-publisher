@@ -31,7 +31,7 @@ func TestValue(t *testing.T) {
 	}
 	defer ad.Close()
 	var warnings []string
-	if err := Register(ad, tr, func(w string) { warnings = append(warnings, w) }); err != nil {
+	if err := Register(context.Background(), ad, tr, func(w string) { warnings = append(warnings, w) }); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,7 +94,7 @@ func TestValueErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ad.Close()
-	if err := Register(ad, tr, nil); err != nil {
+	if err := Register(context.Background(), ad, tr, nil); err != nil {
 		t.Fatal(err)
 	}
 	page := Attributes(pageAt(t, tr, "Values/typical"))

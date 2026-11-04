@@ -21,7 +21,7 @@ const Value = "sysml-value"
 // made of attributes of its own, which has no single value to show.
 const CompositeText = "[composite]"
 
-func registerValue(g *asciidoctor.ExtensionGroup, t *tree.Tree, warn Warn) {
+func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.Tree, warn Warn) {
 	g.InlineMacro(Value, asciidoctor.InlineMacroProcessorFunc(
 		func(parent asciidoctor.Node, target string, _ map[string]any) (*asciidoctor.PhraseNode, error) {
 			n, err := pageElement(parent, t)
@@ -34,7 +34,7 @@ func registerValue(g *asciidoctor.ExtensionGroup, t *tree.Tree, warn Warn) {
 			}
 			// The page's element is the subject, so the attribute reads its
 			// value: its own, a redefinition's, or one from its types.
-			v, err := t.Model.Evaluate(context.Background(), n.Name, target)
+			v, err := t.Model.Evaluate(ctx, n.Name, target)
 			if err != nil {
 				return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.Name, err)
 			}

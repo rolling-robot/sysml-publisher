@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/Open-MBEE/OpenSysML/client/opensysml"
 )
@@ -122,6 +124,15 @@ func (e *DiagnosticsError) Error() string {
 // parsed in-process as one model.
 type Folder struct {
 	Dir string
+	// Logger receives debug records (stage durations); nil uses slog.Default.
+	Logger *slog.Logger
+}
+
+func (f Folder) logger() *slog.Logger {
+	if f.Logger != nil {
+		return f.Logger
+	}
+	return slog.Default()
 }
 
 // Load parses every model file under the folder as one model and converts it
@@ -144,10 +155,12 @@ func (f Folder) Load(ctx context.Context) (*Model, error) {
 		}
 	}()
 
+	start := time.Now()
 	parsed, err := client.ParseFiles(ctx, files)
 	if err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", f.Dir, err)
 	}
+	f.logger().DebugContext(ctx, "model parsed", "files", len(files), "diagnostics", len(parsed.Diagnostics), "duration", time.Since(start))
 	m := &Model{Files: files, client: client, parsed: parsed}
 	var errs []string
 	for _, d := range parsed.Diagnostics {
@@ -161,6 +174,7 @@ func (f Folder) Load(ctx context.Context) (*Model, error) {
 		return nil, &DiagnosticsError{Errors: errs}
 	}
 
+	start = time.Now()
 	conv, err := client.Convert(ctx, parsed, opensysml.FormatAPIJSON)
 	if err != nil {
 		return nil, fmt.Errorf("converting the model to API JSON: %w", err)
@@ -172,6 +186,7 @@ func (f Folder) Load(ctx context.Context) (*Model, error) {
 	if err := json.Unmarshal([]byte(conv.Content), &elements); err != nil {
 		return nil, fmt.Errorf("reading the API JSON element array: %w", err)
 	}
+	f.logger().DebugContext(ctx, "model converted to API JSON", "elements", len(elements), "duration", time.Since(start))
 	m.Elements = make(map[string]Element, len(elements))
 	m.Order = make([]string, 0, len(elements))
 	for _, e := range elements {

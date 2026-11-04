@@ -22,7 +22,7 @@ func TestMembers(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ad.Close()
-	if err := Register(ad, tr, nil); err != nil {
+	if err := Register(context.Background(), ad, tr, nil); err != nil {
 		t.Fatal(err)
 	}
 	convert := func(dir string) string {
