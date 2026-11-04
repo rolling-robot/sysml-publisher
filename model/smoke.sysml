@@ -26,11 +26,14 @@ package Model {
 
             == Properties
 
-            mass: sysml-value:mass[]
-            power: sysml-value:power[]
-            volume flow: sysml-value:volumeFlow[]
-            operating temperature: sysml-value:temperature[]
-            size: sysml-value:size[]
+            [cols="1,1"]
+            |===
+            |mass | sysml-value:mass[]
+            |power | sysml-value:power[]
+            |volume flow | sysml-value:volumeFlow[]
+            |operating temperature | sysml-value:temperature[]
+            |size | sysml-value:size[]
+            |===
             */
         attribute mass : ISQ::MassValue default 12 [kg];
         attribute power : ISQ::PowerValue default 1.5 [kW];
