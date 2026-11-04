@@ -1,0 +1,12 @@
+# Build output
+/bin/
+/sysml-publish
+
+# Generated site (sysml-publish's default -out)
+/site/
+
+# Ad-hoc model dumps
+/*.api.json
+
+# Editor backups
+*~
