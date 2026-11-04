@@ -1,0 +1,3 @@
+package Bad {
+    part x : ;
+}

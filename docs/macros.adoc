@@ -199,7 +199,8 @@ the engine computes in SI base units.
 * A composite value, one made of attributes of its own (an attribute typed by
   an attribute def with attributes, such as `attribute position : Position;`),
   has no single value to show. It is shown as `[composite]`, and the tool
-  prints a warning naming the page and the macro.
+  prints a warning naming the page and the macro: one per page, however
+  often the macro appears there.
 
 Syntax:: `sysml-value:<attribute>[]`
 Attributes:: none

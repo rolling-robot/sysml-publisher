@@ -41,7 +41,7 @@ func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.T
 			text, kind := formatValue(v)
 			switch kind {
 			case valueComposite:
-				warn(fmt.Sprintf("%s: %s: %s is composite; shown as %s", n.Name, macro, target, CompositeText))
+				warn(Warning{Page: n, Macro: macro, Message: fmt.Sprintf("%s is composite; shown as %s", target, CompositeText)})
 				text = CompositeText
 			case valueNone:
 				text = NoValue

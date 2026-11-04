@@ -60,11 +60,19 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 	}
 	defer ad.Close()
 	s := &Site{Files: map[string][]byte{}}
-	seen := map[string]bool{}
-	warn := func(msg string) {
-		if !seen[msg] {
-			seen[msg] = true
-			s.Warnings = append(s.Warnings, msg)
+	// One warning per page and macro (MC-7): a macro written twice on a
+	// page, or shown there by two representations, warns once; every page
+	// that shows it warns on its own.
+	type key struct {
+		page  *tree.Node
+		macro string
+	}
+	seen := map[key]bool{}
+	warn := func(w macros.Warning) {
+		k := key{w.Page, w.Macro}
+		if !seen[k] {
+			seen[k] = true
+			s.Warnings = append(s.Warnings, w.String())
 		}
 	}
 	if err := macros.Register(ctx, ad, t, warn); err != nil {

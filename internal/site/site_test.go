@@ -180,6 +180,21 @@ func TestMacroErrorFailsRender(t *testing.T) {
 	}
 }
 
+// Macro warnings are reported once per page and macro (MC-7); the cases are
+// the // notes in testdata/warnings/warnings.sysml.
+func TestWarningsOncePerPageAndMacro(t *testing.T) {
+	s := render(t, "warnings")
+	var want []string
+	for _, page := range []string{"W::Pump", "W::Tagged", "W::a", "W::b"} {
+		want = append(want,
+			page+": sysml-value:position[]: position is composite; shown as [composite]",
+			page+": sysml-value:home[]: home is composite; shown as [composite]")
+	}
+	if !reflect.DeepEqual(s.Warnings, want) {
+		t.Errorf("warnings:\n got %q\nwant %q", s.Warnings, want)
+	}
+}
+
 // Page titles come from the first representation's document title, with
 // macros resolved; untitled-N and -N suffixes number siblings (PG-8, PG-9).
 func TestPageTitles(t *testing.T) {

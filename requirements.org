@@ -135,7 +135,9 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   its attributes, and an example.
 - MC-7 :: (TBD-8) A macro that cannot do its job, e.g. one naming an element
   the model does not have, shall produce a warning naming the page and the
-  macro.
+  macro. Warnings shall be reported once per page and macro: a macro written
+  more than once on a page, or shown there by more than one representation,
+  warns once; each page that shows it warns on its own.
 - MC-8 :: The inline macro =sysml-name:[]= shall be replaced by the name of
   the page's element (MC-2), "Unnamed" for an element without a name
   (PG-5). It gives the element's name, not the page title (PG-8), so it can

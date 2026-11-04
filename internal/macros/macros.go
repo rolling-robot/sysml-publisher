@@ -23,16 +23,32 @@ func Attributes(n *tree.Node) asciidoctor.Attributes {
 	return asciidoctor.Attributes{}.Set(AttrElement, n.ID)
 }
 
-// Warn receives a warning from a macro, such as a value it cannot show. A
-// nil Warn drops warnings.
-type Warn func(message string)
+// Warning is a problem a macro reports while still producing output, such as
+// a value it cannot show. Its parts are kept apart so the receiver can tell
+// repeats without parsing the text (MC-7: one warning per page and macro).
+type Warning struct {
+	// Page is the page the macro was converted for.
+	Page *tree.Node
+	// Macro is the macro as written: sysml-value:position[].
+	Macro string
+	// Message says what is wrong, without the page or the macro.
+	Message string
+}
+
+// String is the warning as reported: "<page>: <macro>: <message>".
+func (w Warning) String() string {
+	return w.Page.Name + ": " + w.Macro + ": " + w.Message
+}
+
+// Warn receives a warning from a macro. A nil Warn drops warnings.
+type Warn func(Warning)
 
 // Register adds every macro to ad. The macros read the page tree t, report
 // warnings to warn, and stop evaluating when ctx is cancelled. ctx is the
 // context of the rendering ad is registered for; register again for another.
 func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, t *tree.Tree, warn Warn) error {
 	if warn == nil {
-		warn = func(string) {}
+		warn = func(Warning) {}
 	}
 	g := ad.Extensions().Group("sysml")
 	registerName(g, t)
