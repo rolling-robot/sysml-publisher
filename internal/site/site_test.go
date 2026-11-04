@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Open-MBEE/OpenSysML/client/opensysml"
+	asciidoctor "github.com/rolling-robot/asciidoctorg"
 	"github.com/rolling-robot/sysml-publisher/internal/model"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
@@ -130,6 +132,52 @@ func TestRepresentationRendersPerPage(t *testing.T) {
 	mustContain(t, s, "M/pd/index.html", "<p>Name: pd.</p>")
 	mustContain(t, s, "M/a_b/index.html", "<p>Name: a&lt;b.</p>")
 	mustContain(t, s, "M/unnamed-1/index.html", "<p>Name: Unnamed.</p>")
+}
+
+// A macro that fails fails the run: Render returns no site and an error that
+// names the representation's owner, the page and the macro, and still holds
+// the engine's error after the round trip through asciidoctorg's Ruby.
+// This pins today's behaviour as the baseline for TBD-8.
+func TestMacroErrorFailsRender(t *testing.T) {
+	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", "macroerror")}.Load(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { m.Close() })
+	s, err := Render(t.Context(), tree.Build(m), nil)
+	if err == nil {
+		t.Fatal("Render succeeded; want the sysml-value error")
+	}
+	if s != nil {
+		t.Errorf("Render returned a site with %d files alongside the error", len(s.Files))
+	}
+
+	// The first page converted is the usage's, not the owner's.
+	for _, want := range []string{
+		"converting the representation of M::pd on the page of M::a: ",
+		"sysml-value:mas[] on the page of M::a: ",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error lacks %q:\n%v", want, err)
+		}
+	}
+
+	// The macro's Go error survives Ruby as the asciidoctorg error's cause,
+	// so callers can tell what failed without parsing the message.
+	var ae *asciidoctor.Error
+	if !errors.As(err, &ae) {
+		t.Fatalf("error %T does not wrap an *asciidoctor.Error: %v", err, err)
+	}
+	if ae.Cause == nil {
+		t.Errorf("asciidoctorg error has no Go cause: %v", ae)
+	}
+	var fe *opensysml.FailureError
+	if !errors.As(err, &fe) {
+		t.Fatalf("error does not reach the engine's *opensysml.FailureError: %v", err)
+	}
+	if fe.Op != "Evaluate" {
+		t.Errorf("engine failure in %q, want Evaluate", fe.Op)
+	}
 }
 
 // Page titles come from the first representation's document title, with
