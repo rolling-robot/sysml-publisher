@@ -49,8 +49,9 @@
   element among its descendants at any depth, shall get an empty page: its
   title, which is the element's name, and no body.
 - PG-7 :: On a page, each inherited representation shall be shown
-  once, even when reached through several specializations, under a label
-  naming the element that owns it, nearest specialization first.
+  once, even when reached through several specializations, nearest
+  specialization first, looking the same as the element's own
+  representations: with no label naming the element that owns it.
 - PG-8 :: The title of a documented element's page shall be the AsciiDoc
   document title (the ~= Title~ header line) that Asciidoctor produces for
   the first of the page's representations, in page order (PG-2), that has

@@ -16,15 +16,6 @@
 }
 .empty-page { color: rgba(0, 0, 0, .55); font-style: italic; }
 .rep + .rep { margin-top: 1.5rem; }
-.rep.inherited {
-  border-left: 3px solid #dddddf;
-  padding-left: 1rem;
-}
-.rep .from {
-  font-size: .85em;
-  color: rgba(0, 0, 0, .55);
-  margin-bottom: .5rem;
-}
 .sidebar {
   position: sticky;
   top: 0;

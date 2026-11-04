@@ -27,7 +27,6 @@
 {{- end}}
 {{- range .Inherited}}
 <section class="rep inherited">
-<p class="from">From {{if .FromHref}}<a href="{{.FromHref}}">{{.FromName}}</a>{{else}}{{.FromName}}{{end}}</p>
 {{.HTML}}
 </section>
 {{- end}}

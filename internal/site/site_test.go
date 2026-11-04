@@ -51,11 +51,13 @@ func TestRenderSmoke(t *testing.T) {
 		`<p class="qualified-name">Model::pd</p>`,
 		`<div class="paragraph">`, "Textual representation",
 		`href="../../assets/layout.css"`)
-	// aaaa shows pd's representation as inherited, linking to pd's page.
+	// aaaa shows pd's representation as inherited, with no label (PG-7).
 	mustContain(t, s, "Model/aaaa/index.html",
 		`<section class="rep inherited">`,
-		`From <a href="../pd/index.html">pd</a>`,
 		"Textual representation")
+	if strings.Contains(string(s.Files["Model/aaaa/index.html"]), `class="from"`) {
+		t.Error("inherited representation has an owner label (PG-7)")
+	}
 	// The sidebar lists the whole tree, marks the current page, and links
 	// the empty ancestor page too (SB-1..3).
 	mustContain(t, s, "Model/aaaa/index.html",
@@ -124,7 +126,7 @@ func TestWriteReplacesOnlyItsOwnFolder(t *testing.T) {
 func TestRepresentationRendersPerPage(t *testing.T) {
 	s := render(t, "macros")
 	mustContain(t, s, "M/pd/index.html", "<p>Name: pd.</p>")
-	mustContain(t, s, "M/a_b/index.html", "<p>Name: a&lt;b.</p>", `From <a href="../pd/index.html">pd</a>`)
+	mustContain(t, s, "M/a_b/index.html", "<p>Name: a&lt;b.</p>")
 	mustContain(t, s, "M/unnamed-1/index.html", "<p>Name: Unnamed.</p>")
 }
 

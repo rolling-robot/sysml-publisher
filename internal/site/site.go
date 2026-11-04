@@ -140,12 +140,7 @@ func (r *renderer) body(n *tree.Node) (*body, error) {
 		if err != nil {
 			return nil, err
 		}
-		o := r.owner(rep)
-		rv := repView{HTML: h, FromName: o.Title}
-		if r.t.ByID[rep.Owner] != nil {
-			rv.FromHref = tree.Href(n, o)
-		}
-		b.inherited = append(b.inherited, rv)
+		b.inherited = append(b.inherited, repView{HTML: h})
 	}
 	return b, nil
 }
@@ -223,9 +218,7 @@ func file(n *tree.Node) string {
 }
 
 type repView struct {
-	HTML     template.HTML
-	FromName string // name of the owning element, for inherited ones
-	FromHref string
+	HTML template.HTML
 }
 
 type navItem struct {
