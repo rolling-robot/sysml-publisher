@@ -124,3 +124,56 @@ part def Pump {
 ----
 
 The page of `Pump` lists inlet, outlet and flowRate.
+
+== sysml-metadata
+
+Block macro, on a line of its own. Replaced by a table of the attributes of
+the named metadata on the page's element, one row per attribute with its name
+and value. The table is titled with the metadata def's name.
+
+* The value is the one the element binds, as in `@Info { owner = "pete"; }`.
+* Where the element binds none, it is the value the metadata def gives: a
+  default (`attribute count : Integer default 3;`) or a fixed value
+  (`attribute ratio : Real = 0.5;`).
+* Where neither exists, the value is `(no value)`.
+* Strings are shown without quotes. Other values are shown as written in the
+  model: `7`, `true`, `Level::low`, `1 + 2`. Expressions are not evaluated.
+* Attributes of the metadata def's supertypes are included, after its own.
+* Both `@Info` in the element's body and the prefix form `#Info part x;` count.
+* An element without that metadata gives nothing. If it carries the metadata
+  twice, there is one table each.
+
+The tables are placed in an open block with the role `sysml-metadata`, for
+styling.
+
+Syntax:: `sysml-metadata::<metadata def>[]`, where the metadata def is named
+by its qualified name (`sysml-metadata::Plant::Info[]`) or by its name when no
+other metadata def has it (`sysml-metadata::Info[]`)
+Attributes:: none
+
+A missing, unknown or ambiguous metadata def name stops the run with an error
+naming the macro and the page.
+
+Example:
+
+[source,sysml]
+----
+metadata def Info {
+    attribute owner : String default "nobody";
+    attribute count : Integer default 3;
+}
+part def Pump {
+    rep language "asciidoc"
+        /*
+        = sysml-name:[]
+
+        sysml-metadata::Info[]
+        */
+}
+part mainPump : Pump {
+    @Info { owner = "pete"; }
+}
+----
+
+The page of `mainPump` shows a table titled Info with the rows owner = pete
+and count = 3.

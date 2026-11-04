@@ -3,7 +3,6 @@ package macros
 import (
 	"fmt"
 	"html"
-	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
@@ -42,15 +41,11 @@ func registerMembers(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 }
 
 // memberText is a list item's AsciiDoc: the member's name, linked to its
-// page when it has one. List item text goes through AsciiDoc substitutions,
-// which would read markup in a name (a*b*), so the item is an inline
-// passthrough of finished HTML.
+// page when it has one.
 func memberText(page *tree.Node, m tree.Member, t *tree.Tree) string {
-	// A '+' would end the +++ passthrough early; as a reference it is still
-	// a plus sign.
-	name := strings.ReplaceAll(html.EscapeString(m.Title), "+", "&#43;")
+	name := html.EscapeString(m.Title)
 	if target := t.ByID[m.ID]; target != nil {
-		return `+++<a href="` + tree.Href(page, target) + `">` + name + `</a>+++`
+		return passthrough(`<a href="` + tree.Href(page, target) + `">` + name + `</a>`)
 	}
-	return "+++" + name + "+++"
+	return passthrough(name)
 }

@@ -146,6 +146,17 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   each shown by its name ("Unnamed" for one without) and linked to its page
   when it has one. Annotations (=doc=, comments, representations, metadata
   usages) shall be left out. An element without such members gives nothing.
+- MC-13 :: The block macro =sysml-metadata::<metadata def>[]= shall be
+  replaced by a table of the attributes of that metadata on the page's
+  element (MC-2): one row per attribute of the metadata def and of its
+  supertypes (its own first), with the attribute's name and value. The value
+  is the one the element binds; where it binds none, the value the metadata
+  def gives (a default or a fixed value); where neither exists, "(no value)".
+  Strings are shown without quotes, other values as written in the model.
+  The metadata def is named by qualified name, or by name when that is
+  unique. An element without that metadata gives nothing. A name that is
+  missing, unknown or ambiguous shall stop the run with an error naming the
+  macro and the page (until TBD-8 decides otherwise).
 
 * Open questions
 - TBD-8 :: For MC-7: besides the warning, what does a failing macro leave on

@@ -63,7 +63,10 @@ type Member struct {
 
 // Tree is the page tree of a model.
 type Tree struct {
-	Root *Node
+	// Model is the model the tree was built from, for macros that read
+	// elements without pages.
+	Model *model.Model
+	Root  *Node
 	// Pages are every node but the root, in pre-order.
 	Pages []*Node
 	// ByID finds a page by element id.
@@ -74,7 +77,7 @@ type Tree struct {
 
 // Build computes the page tree of m.
 func Build(m *model.Model) *Tree {
-	b := &builder{m: m, t: &Tree{ByID: map[string]*Node{}}}
+	b := &builder{m: m, t: &Tree{Model: m, ByID: map[string]*Node{}}}
 	b.collectReps()
 	b.collectDocs()
 	b.collectGenerals()

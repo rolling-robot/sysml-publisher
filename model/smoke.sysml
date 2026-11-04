@@ -1,6 +1,13 @@
 package Model {
+    private import ScalarValues::*;
+
     metadata def m {
         attribute a default "a";
+        attribute owner : String default "nobody";
+        attribute revision : Integer default 1;
+        attribute reviewed : Boolean default false;
+        attribute process : String = "ISO 15288";
+        attribute note : String;
     }
     part def pd {
         rep language "asciidoc"
@@ -9,6 +16,7 @@ package Model {
             
             sysml-doc::[]
 
+            sysml-metadata::m[]
             */
     }
         part <a> aaaa : pd {
@@ -21,12 +29,14 @@ package Model {
             */
             @m {
                 a := "aa";
+                owner = "pete";
+                reviewed = true;
             }
             port p;
             port p1;
             port p2;
         }
-        part <b> bbb : pd {
+        #m part <b> bbb : pd {
             doc /* This is sysml-name:[] part */
             port p;
         }

@@ -1,4 +1,4 @@
-// Package macros holds the tool's AsciiDoc macros (requirements MC-1..8).
+// Package macros holds the tool's AsciiDoc macros (requirements MC-1..13).
 // Each macro lives in its own file; Register adds them all to an asciidoctorg
 // instance.
 package macros
@@ -6,6 +6,7 @@ package macros
 import (
 	"fmt"
 	"html"
+	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
@@ -29,6 +30,7 @@ func Register(ad *asciidoctor.Asciidoctor, t *tree.Tree) error {
 	registerShortName(g, t)
 	registerMembers(g, t)
 	registerDoc(g, t)
+	registerMetadata(g, t)
 	if err := g.Register(); err != nil {
 		return fmt.Errorf("registering the sysml macros: %w", err)
 	}
@@ -61,4 +63,12 @@ func registerText(g *asciidoctor.ExtensionGroup, t *tree.Tree, name string, text
 			// SysML names may contain <, > and &.
 			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(text(n)), nil, nil)
 		}), &asciidoctor.MacroOptions{Format: "short"})
+}
+
+// passthrough is AsciiDoc for finished HTML: an inline passthrough, which
+// AsciiDoc substitutions leave alone. Text in list items and table cells
+// goes through substitutions, which would read markup in a name (a*b*).
+// A '+' would end the passthrough early; as a reference it is still a plus.
+func passthrough(html string) string {
+	return "+++" + strings.ReplaceAll(html, "+", "&#43;") + "+++"
 }
