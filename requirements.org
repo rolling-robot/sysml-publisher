@@ -171,7 +171,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
     the model refers to included). Otherwise the run shall stop with an
     error naming the macro and the page.
   - An empty list gives nothing.
-- MC-13 :: The block macro =sysml-metadata::<metadata def>[]= shall be
+- MC-13 :: The block macro =sysml-metadata-table::<metadata def>[]= shall be
   replaced by a table of the attributes of that metadata on the page's
   element (MC-2): one row per attribute of the metadata def and of its
   supertypes (its own first), with the attribute's name and value. The value

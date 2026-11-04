@@ -1,4 +1,4 @@
-// Fixture for the block macro sysml-metadata::<metadata def>[], which shows
+// Fixture for the block macro sysml-metadata-table::<metadata def>[], which shows
 // the attributes of the named metadata on the page's element: each
 // attribute's name and value, the metadata def's default where the element
 // does not bind one. The // notes give the expected tables.
@@ -36,9 +36,9 @@ package Meta {
             /*
             = sysml-name:[]
 
-            sysml-metadata::Info[]
+            sysml-metadata-table::Info[]
 
-            sysml-metadata::Derived[]
+            sysml-metadata-table::Derived[]
             */
     }
 

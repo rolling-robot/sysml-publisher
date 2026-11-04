@@ -152,7 +152,7 @@ The page of `Pump` lists inlet (FluidPort), flowRate (Real), spare (Wheel) and
 Racing; under "Wheels:" it lists Racing only: `spare` is typed by `Wheel`,
 `Racing` specializes it.
 
-== sysml-metadata
+== sysml-metadata-table
 
 Block macro, on a line of its own. Replaced by a table of the attributes of
 the named metadata on the page's element, one row per attribute with its name
@@ -170,12 +170,12 @@ and value. The table is titled with the metadata def's name.
 * An element without that metadata gives nothing. If it carries the metadata
   twice, there is one table each.
 
-The tables are placed in an open block with the role `sysml-metadata`, for
-styling.
+The tables are placed in an open block with the role `sysml-metadata-table`,
+for styling.
 
-Syntax:: `sysml-metadata::<metadata def>[]`, where the metadata def is named
-by its qualified name (`sysml-metadata::Plant::Info[]`) or by its name when no
-other metadata def has it (`sysml-metadata::Info[]`)
+Syntax:: `sysml-metadata-table::<metadata def>[]`, where the metadata def is
+named by its qualified name (`sysml-metadata-table::Plant::Info[]`) or by its
+name when no other metadata def has it (`sysml-metadata-table::Info[]`)
 Attributes:: none
 
 A missing, unknown or ambiguous metadata def name stops the run with an error
@@ -194,7 +194,7 @@ part def Pump {
         /*
         = sysml-name:[]
 
-        sysml-metadata::Info[]
+        sysml-metadata-table::Info[]
         */
 }
 part mainPump : Pump {

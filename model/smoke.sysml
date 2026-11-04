@@ -22,7 +22,7 @@ package Model {
             
             sysml-doc::[]
 
-            sysml-metadata::m[]
+            sysml-metadata-table::m[]
 
             == Properties
 

@@ -205,7 +205,7 @@ name, like `Node.Name`.
 | `sysml-qualified-name:[]` | inline | `Node.QualifiedName` | positional name for unnamed |
 | `sysml-doc::[]` | block | `Node.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block |
 | `sysml-members-list::[<element>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no element: all members with `(types)`; with one: members that subclass/subset it; name resolved qualified → relative → unique plain (`nameIndex`) |
-| `sysml-metadata::<def>[]` | block | `Tree.Model` | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
+| `sysml-metadata-table::<def>[]` | block | `Tree.Model` | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
 | `sysml-value:<expr>[]` | inline | `Model.Evaluate` | OpenSysML evaluates with the page element as subject; units formatted; composite → `[composite]` + warning |
 
 Error policy today: a macro that cannot resolve what the user wrote (unknown
@@ -425,11 +425,11 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    observed, not specified. An OpenSysML upgrade can change pages silently.
 2. **Rendering cost scales with pages × inherited representations ×
    macros.** Every page re-converts every representation it shows (MC-3),
-   and `sysml-value` calls the evaluator per macro per page; `sysml-metadata`
+   and `sysml-value` calls the evaluator per macro per page; `sysml-metadata-table`
    scans the whole model to resolve a def name on every call. Fine for small
    models; a definition shared by hundreds of usages multiplies all of it.
 3. **Macros reach into two data sources.** Most read `tree.Node` fields;
-   `sysml-metadata` reads raw `model.Element`s and `sysml-value` calls the
+   `sysml-metadata-table` reads raw `model.Element`s and `sysml-value` calls the
    engine. The tree is no longer the single view model, and `Tree.Model` plus
    an open engine handle couple rendering to the parser's lifetime.
 4. **Error policy is harsh and the messages are poor.** User mistakes in

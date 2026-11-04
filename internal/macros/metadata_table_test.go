@@ -58,10 +58,10 @@ func tables(out string) map[string][]string {
 
 const noValueHTML = `<span class="no-value">(no value)</span>`
 
-// The expectations are the // notes in testdata/metadata/metadata.sysml.
-func TestMetadata(t *testing.T) {
-	tr, ad := setupFixture(t, "metadata")
-	src := "sysml-metadata::Info[]\n\nsysml-metadata::Derived[]"
+// The expectations are the // notes in testdata/metadata-table/metadata-table.sysml.
+func TestMetadataTable(t *testing.T) {
+	tr, ad := setupFixture(t, "metadata-table")
+	src := "sysml-metadata-table::Info[]\n\nsysml-metadata-table::Derived[]"
 	cases := map[string]map[string][]string{
 		"Meta/bound": {"Info": {
 			"owner = pete", "count = 7", "ratio = 0.5", "ok = true",
@@ -89,9 +89,9 @@ func TestMetadata(t *testing.T) {
 	}
 }
 
-func TestMetadataByQualifiedName(t *testing.T) {
-	tr, ad := setupFixture(t, "metadata")
-	out, err := ad.Convert("sysml-metadata::Meta::Derived[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "Meta/specialized"))})
+func TestMetadataTableByQualifiedName(t *testing.T) {
+	tr, ad := setupFixture(t, "metadata-table")
+	out, err := ad.Convert("sysml-metadata-table::Meta::Derived[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "Meta/specialized"))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,12 +100,12 @@ func TestMetadataByQualifiedName(t *testing.T) {
 	}
 }
 
-func TestMetadataErrors(t *testing.T) {
-	tr, ad := setupFixture(t, "metadata")
+func TestMetadataTableErrors(t *testing.T) {
+	tr, ad := setupFixture(t, "metadata-table")
 	page := Attributes(pageAt(t, tr, "Meta/bound"))
 	for src, want := range map[string]string{
-		"sysml-metadata::Missing[]": `no metadata def "Missing"`,
-		"sysml-metadata::[]":        "no metadata def named",
+		"sysml-metadata-table::Missing[]": `no metadata def "Missing"`,
+		"sysml-metadata-table::[]":        "no metadata def named",
 	} {
 		_, err := ad.Convert(src, &asciidoctor.Options{Attributes: page})
 		if err == nil || !strings.Contains(err.Error(), want) {

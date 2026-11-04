@@ -56,7 +56,7 @@ func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, t *tree.Tree, wa
 	registerShortName(g, t)
 	registerMembersList(g, t)
 	registerDoc(g, t)
-	registerMetadata(g, t)
+	registerMetadataTable(g, t)
 	registerValue(ctx, g, t, warn)
 	if err := g.Register(); err != nil {
 		return fmt.Errorf("registering the sysml macros: %w", err)

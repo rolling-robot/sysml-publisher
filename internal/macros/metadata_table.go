@@ -10,29 +10,29 @@ import (
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
-// Metadata is the block macro sysml-metadata::<metadata def>[], replaced by
-// a table of the attributes of that metadata on the page's element: each
-// attribute's name and value, the metadata def's value where the element
-// binds none (MC-13).
-const Metadata = "sysml-metadata"
+// MetadataTable is the block macro sysml-metadata-table::<metadata def>[],
+// replaced by a table of the attributes of that metadata on the page's
+// element: each attribute's name and value, the metadata def's value where
+// the element binds none (MC-13).
+const MetadataTable = "sysml-metadata-table"
 
-// MetadataRole is the role of the block holding the tables, for styling.
-const MetadataRole = "sysml-metadata"
+// MetadataTableRole is the role of the block holding the tables, for styling.
+const MetadataTableRole = "sysml-metadata-table"
 
 // NoValue is shown for an attribute that has no value.
 const NoValue = "(no value)"
 
-func registerMetadata(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
+func registerMetadataTable(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 	md := newMetadataIndex(t.Model)
-	g.BlockMacro(Metadata, asciidoctor.BlockMacroProcessorFunc(
+	g.BlockMacro(MetadataTable, asciidoctor.BlockMacroProcessorFunc(
 		func(parent asciidoctor.StructuralNode, target string, _ map[string]any) (asciidoctor.StructuralNode, error) {
 			n, err := pageElement(parent, t)
 			if err != nil {
-				return nil, fmt.Errorf("%s: %w", Metadata, err)
+				return nil, fmt.Errorf("%s: %w", MetadataTable, err)
 			}
 			def, err := md.definition(target)
 			if err != nil {
-				return nil, fmt.Errorf("%s::%s[] on the page of %s: %w", Metadata, target, n.QualifiedName, err)
+				return nil, fmt.Errorf("%s::%s[] on the page of %s: %w", MetadataTable, target, n.QualifiedName, err)
 			}
 			usages := md.usages(n.ID, def)
 			if len(usages) == 0 {
@@ -41,14 +41,14 @@ func registerMetadata(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 			attrs := md.attributes(def)
 			// One table per usage; an element rarely carries the same
 			// metadata twice, so they share an open block.
-			block, err := asciidoctor.CreateOpenBlock(parent, nil, asciidoctor.Attributes{"role": MetadataRole}, nil)
+			block, err := asciidoctor.CreateOpenBlock(parent, nil, asciidoctor.Attributes{"role": MetadataTableRole}, nil)
 			if err != nil {
 				return nil, err
 			}
 			for _, u := range usages {
 				tbl, err := md.table(block, def, u, attrs)
 				if err != nil {
-					return nil, fmt.Errorf("%s: %w", Metadata, err)
+					return nil, fmt.Errorf("%s: %w", MetadataTable, err)
 				}
 				block.Append(tbl)
 			}
@@ -80,7 +80,7 @@ func newMetadataIndex(m *model.Model) *metadataIndex {
 // name when only one metadata def has it.
 func (md *metadataIndex) definition(target string) (model.Element, error) {
 	if target == "" {
-		return nil, fmt.Errorf("no metadata def named; write %s::<metadata def>[]", Metadata)
+		return nil, fmt.Errorf("no metadata def named; write %s::<metadata def>[]", MetadataTable)
 	}
 	var byName []model.Element
 	for _, id := range md.m.Order {
