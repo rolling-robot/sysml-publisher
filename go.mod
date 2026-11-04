@@ -3,8 +3,8 @@ module github.com/rolling-robot/sysml-publisher
 go 1.27.2
 
 require (
-	github.com/Open-MBEE/OpenSysML v0.0.0
-	github.com/rolling-robot/asciidoctorg v0.0.0
+	github.com/Open-MBEE/OpenSysML v0.12.0
+	github.com/rolling-robot/asciidoctorg v0.1.0
 )
 
 require (
@@ -415,7 +415,3 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 	modernc.org/sqlite v1.60.1 // indirect
 )
-
-replace github.com/Open-MBEE/OpenSysML => /home/pete/projects/sysmlv2/OpenSysML
-
-replace github.com/rolling-robot/asciidoctorg => /home/pete/projects/asciidoctor-go/asciidoctor-go

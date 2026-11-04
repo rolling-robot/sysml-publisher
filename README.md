@@ -15,10 +15,10 @@ that opens straight from disk.
 
 ## Quick start
 
-Build the tool (see [Requirements and building](#requirements-and-building)):
+Install the tool (see [Requirements and building](#requirements-and-building)):
 
 ```sh
-go build -o bin/sysml-publish ./cmd/sysml-publish
+go install github.com/rolling-robot/sysml-publisher/cmd/sysml-publish@latest
 ```
 
 Put a model in `./model`. This one is a shortened `model/aircraft.sysml`, the
@@ -98,7 +98,7 @@ package Model {
 Run it and open the result:
 
 ```sh
-bin/sysml-publish            # reads ./model, writes ./site
+sysml-publish                # reads ./model, writes ./site
 xdg-open site/index.html     # or open it in any browser
 ```
 
@@ -149,29 +149,34 @@ repository browser such as GitHub shows HTML files as source, not as pages.
 After changing the model or the tool, regenerate them with:
 
 ```sh
-bin/sysml-publish -model model -out docs/example
+go run ./cmd/sysml-publish -model model -out docs/example   # in a clone
 ```
 
 ## Requirements and building
 
-- Go 1.27.2 or newer.
-- Local checkouts of the two libraries. `go.mod` points at them with `replace`
-  directives:
+You need Go 1.27.2 or newer. Everything else, including OpenSysML and
+asciidoctorg, is fetched by Go.
 
-  ```
-  replace github.com/Open-MBEE/OpenSysML => /home/pete/projects/sysmlv2/OpenSysML
-  replace github.com/rolling-robot/asciidoctorg => /home/pete/projects/asciidoctor-go/asciidoctor-go
-  ```
-
-  Clone both and change these paths to where they are on your machine.
-  asciidoctorg cannot be fetched as an ordinary module version yet.
-
-Then:
+Install the command:
 
 ```sh
+go install github.com/rolling-robot/sysml-publisher/cmd/sysml-publish@latest
+```
+
+This puts `sysml-publish` in `$(go env GOPATH)/bin`; make sure that folder is
+on your `PATH`.
+
+Or build it from a clone:
+
+```sh
+git clone https://github.com/rolling-robot/sysml-publisher.git
+cd sysml-publisher
 go build -o bin/sysml-publish ./cmd/sysml-publish
 go test ./...        # optional: runs the test suite on the fixture models
 ```
+
+The binary is large (about 250 MB): it embeds a Ruby interpreter with
+Asciidoctor and the SysML engine, so it needs nothing else at run time.
 
 ## Documenting the model
 

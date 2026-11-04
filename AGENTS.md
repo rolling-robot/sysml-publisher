@@ -34,13 +34,37 @@ go test ./...                           # parses and renders the fixture models
 go vet ./...
 ```
 
-- **Dependencies are local checkouts**, wired with `replace` in `go.mod`:
-  OpenSysML at `/home/pete/projects/sysmlv2/OpenSysML` and asciidoctorg at
-  `/home/pete/projects/asciidoctor-go/asciidoctor-go`. asciidoctorg's `master`
-  cannot be fetched as a module (Ruby sources are git submodules), so do not
-  replace the `replace` with a pseudo-version.
-- **Offline builds** work once the module cache is filled (`go mod tidy` with
-  network, once). In a sandbox without DNS, run Go with `GOPROXY=off`.
+- **Dependencies are published tags** in `go.mod`: OpenSysML `v0.12.0` and
+  asciidoctorg `v0.1.0`; `go install …/cmd/sysml-publish@latest` must work,
+  so `go.mod` never carries `replace` directives.
+- **asciidoctorg is installable only from a release tag.** Its `master` keeps
+  the Asciidoctor and CodeRay Ruby sources as git submodules, which Go module
+  downloads leave out, so `//go:embed` in `rubysrc/rubysrc.go` finds no files
+  and the build fails; its tags (`v0.1.0`) commit the sources as plain
+  folders. Never require an asciidoctorg pseudo-version (`@master`, a commit).
+  A newer asciidoctorg API needs a new asciidoctorg tag first.
+- **Local development against checkouts** uses an untracked `go.work`
+  (ignored by `.gitignore`) with `use .` and two `replace` lines pointing at
+  the checkouts:
+
+  ```
+  go 1.27.2
+
+  use .
+
+  replace github.com/Open-MBEE/OpenSysML => ../OpenSysML
+  replace github.com/rolling-robot/asciidoctorg => ../asciidoctorg
+  ```
+
+  Use `replace`, not
+  `use`, for them: `use` makes them main modules, which needs every
+  dependency's `go.mod` in the cache, including versions MVS does not pick.
+  Check the published versions with `GOWORK=off go build ./...` before a
+  release.
+- **Offline builds** work once the module cache is filled (`go mod download`
+  with network, once). In a sandbox without DNS, run Go with `GOPROXY=off`;
+  the Go tool resolves names itself, so a sandbox that lets `git` and `curl`
+  through can still block it.
 - **Toolchain**: Go 1.27.2+ (asciidoctorg's minimum).
 - `bin/`, `site/`, the root `sysml-publish` binary, `*.api.json` dumps and
   `*~` backups are build output or scratch, ignored by `.gitignore`.
@@ -467,9 +491,10 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    quotes; rationals become floats) are reasonable but unspecified for units
    with spaces or for values beyond float precision.
 7. **`Site.Write` is not atomic** (remove, then write).
-8. **Hard-coded environment**: `replace` directives point at absolute paths
-   on one machine; the project cannot be built elsewhere without editing
-   `go.mod`.
+8. **Pinned to old library tags**: `go.mod` uses OpenSysML `v0.12.0` and
+   asciidoctorg `v0.1.0`; fixes on asciidoctorg's `master` (three unpushed
+   commits as of November 2026, e.g. stopping Ruby threads on `Close`) reach
+   users only with a new asciidoctorg tag.
 9. **Repository hygiene**: commits have missed files (a commit referenced
    `registerMetadata` without `metadata.go`; tests were committed for a
    while before their `testdata/` fixtures). Before committing, check
@@ -493,9 +518,8 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    per-page conversion for representations that contain no `sysml-` macro
    (a cheap substring check), which restores sharing for the common case.
 5. **Make `Write` atomic**: render into a sibling temp folder, then swap.
-6. **Make dependencies portable**: a `go.work` file (untracked) for local
-   checkouts instead of absolute `replace` paths in `go.mod`, once
-   asciidoctorg tags a release with the needed API.
+6. **Tag asciidoctorg releases** whenever this project needs its newer code
+   (and push its local commits), then bump `go.mod`.
 7. **Resolve TBD-9** (view rendering) — the recommended path (sysml CLI → DOT
    → Graphviz SVG) introduces the first external programs; isolate it behind
    an interface so option 3 (public OpenSysML writer) can replace it.

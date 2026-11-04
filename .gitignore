@@ -10,3 +10,8 @@
 
 # Editor backups
 *~
+
+# Local Go workspace: builds against local checkouts of the dependencies
+# (see AGENTS.md); not part of the published module.
+/go.work
+/go.work.sum
