@@ -10,5 +10,5 @@ import (
 const QualifiedName = "sysml-qualified-name"
 
 func registerQualifiedName(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	registerText(g, t, QualifiedName, func(n *tree.Node) string { return n.Name })
+	registerText(g, t, QualifiedName, func(n *tree.Node) string { return n.QualifiedName })
 }

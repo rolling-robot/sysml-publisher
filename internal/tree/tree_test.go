@@ -38,13 +38,13 @@ func page(t *testing.T, tr *Tree, dir string) *Node {
 	return nil
 }
 
-// bodies are the trimmed bodies of reps, and from their owners' titles.
+// bodies are the trimmed bodies of reps, each prefixed by its owner's name.
 func bodies(tr *Tree, reps []Rep) []string {
 	var out []string
 	for _, r := range reps {
 		s := strings.TrimSpace(r.Body)
 		if n := tr.ByID[r.Owner]; n != nil {
-			s = n.Title + ": " + s
+			s = n.Name + ": " + s
 		}
 		out = append(out, s)
 	}
@@ -124,8 +124,8 @@ func TestUnnamedElements(t *testing.T) {
 		t.Fatalf("pages = %v, want %v", got, want)
 	}
 	for _, dir := range []string{"U/unnamed-1", "U/unnamed-2"} {
-		if n := page(t, tr, dir); n.Title != UnnamedTitle || !n.Unnamed {
-			t.Errorf("%s title = %q unnamed = %v", dir, n.Title, n.Unnamed)
+		if n := page(t, tr, dir); n.Name != UnnamedName || !n.Unnamed {
+			t.Errorf("%s name = %q unnamed = %v", dir, n.Name, n.Unnamed)
 		}
 	}
 	if len(tr.Warnings) != 2 {

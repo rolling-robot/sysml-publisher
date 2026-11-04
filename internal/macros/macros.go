@@ -37,7 +37,7 @@ type Warning struct {
 
 // String is the warning as reported: "<page>: <macro>: <message>".
 func (w Warning) String() string {
-	return w.Page.Name + ": " + w.Macro + ": " + w.Message
+	return w.Page.QualifiedName + ": " + w.Macro + ": " + w.Message
 }
 
 // Warn receives a warning from a macro. A nil Warn drops warnings.

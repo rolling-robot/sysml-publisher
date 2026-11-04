@@ -10,8 +10,9 @@ import (
 	"github.com/rolling-robot/sysml-publisher/internal/model"
 )
 
-// UnnamedTitle is the title of the page of an element without a name (PG-5).
-const UnnamedTitle = "Unnamed"
+// UnnamedName stands in for the name of an element without one, wherever
+// its name is shown, page title included (PG-5).
+const UnnamedName = "Unnamed"
 
 // Rep is an AsciiDoc textual representation.
 type Rep struct {
@@ -23,14 +24,15 @@ type Rep struct {
 // Node is one page of the site, or the site root.
 type Node struct {
 	ID string // @id; empty for the root
-	// Title is the element's name, UnnamedTitle, or empty for the root. The
-	// page title shown to readers is decided when the page is rendered.
-	Title string
+	// Name is the element's name, UnnamedName, or empty for the root. It is
+	// not the page title, which is decided when the page is rendered (PG-8).
+	Name string
 	// Unnamed is set when the element has no name (PG-5, PT-6).
 	Unnamed bool
-	// Name is how the element is named in messages: its qualified name, or
-	// its positional name when it has none.
-	Name string
+	// QualifiedName identifies the element in messages and to the
+	// evaluator: its qualified name, or its positional name (M::@2) when it
+	// has none.
+	QualifiedName string
 	// Dir is the page's folder relative to the site, slash-separated; empty
 	// for the root. The page itself is Dir + "/index.html".
 	Dir string
@@ -57,8 +59,8 @@ func (n *Node) Documented() bool { return len(n.Own)+len(n.Inherited) > 0 }
 
 // Member is an owned member of a page's element.
 type Member struct {
-	ID    string
-	Title string // its name, or UnnamedTitle
+	ID   string
+	Name string // its name, or UnnamedName
 }
 
 // Tree is the page tree of a model.
@@ -119,7 +121,7 @@ func (b *builder) collectReps() {
 		owner := e.Ref("owner")
 		if !isAsciiDoc(e.Str("language")) {
 			b.t.Warnings = append(b.t.Warnings, fmt.Sprintf(
-				"%s: skipped representation in language %q", b.name(owner), e.Str("language")))
+				"%s: skipped representation in language %q", b.qualifiedName(owner), e.Str("language")))
 			continue
 		}
 		b.reps[owner] = append(b.reps[owner], Rep{ID: id, Owner: owner, Body: e.Str("body")})
@@ -187,21 +189,21 @@ func (b *builder) addChildren(parent *Node, e model.Element) {
 		if !ok {
 			continue
 		}
-		title := b.declaredTitle(id)
+		name := b.declaredName(id)
 		n := &Node{
-			ID:        id,
-			Title:     title,
-			Unnamed:   title == "",
-			Name:      b.name(id),
-			Own:       b.reps[id],
-			Inherited: b.inherited(id),
-			Docs:      b.docs[id],
-			ShortName: b.shortName(id),
-			Members:   b.members(child),
-			Parent:    parent,
+			ID:            id,
+			Name:          name,
+			Unnamed:       name == "",
+			QualifiedName: b.qualifiedName(id),
+			Own:           b.reps[id],
+			Inherited:     b.inherited(id),
+			Docs:          b.docs[id],
+			ShortName:     b.shortName(id),
+			Members:       b.members(child),
+			Parent:        parent,
 		}
 		if n.Unnamed {
-			n.Title = UnnamedTitle
+			n.Name = UnnamedName
 		}
 		b.addChildren(n, child)
 		if n.Documented() || len(n.Children) > 0 {
@@ -220,9 +222,9 @@ func (b *builder) walk(parent *Node) {
 			unnamed++
 			seg = fmt.Sprintf("unnamed-%d", unnamed)
 			b.t.Warnings = append(b.t.Warnings, fmt.Sprintf(
-				"%s: element has no name; its page is titled %q", n.Name, UnnamedTitle))
+				"%s: element has no name; its page is titled %q", n.QualifiedName, UnnamedName))
 		} else {
-			seg = segment(n.Title)
+			seg = segment(n.Name)
 		}
 		seg = unique(seg, used)
 		if parent.Dir == "" {
@@ -236,10 +238,10 @@ func (b *builder) walk(parent *Node) {
 	}
 }
 
-// declaredTitle is the element's name: its declared name, or the name its
+// declaredName is the element's name: its declared name, or the name its
 // owning membership gives it (a redefining feature borrows one); "" when it
 // has none.
-func (b *builder) declaredTitle(id string) string {
+func (b *builder) declaredName(id string) string {
 	e := b.m.Elements[id]
 	if n := e.Str("declaredName"); n != "" {
 		return n
@@ -265,11 +267,11 @@ func (b *builder) members(e model.Element) []Member {
 		if !ok || annotations[m.Type()] {
 			continue
 		}
-		title := b.declaredTitle(id)
-		if title == "" {
-			title = UnnamedTitle
+		name := b.declaredName(id)
+		if name == "" {
+			name = UnnamedName
 		}
-		out = append(out, Member{ID: id, Title: title})
+		out = append(out, Member{ID: id, Name: name})
 	}
 	return out
 }
@@ -287,8 +289,9 @@ func (b *builder) shortName(id string) string {
 	return ""
 }
 
-// name is how an element is identified in messages.
-func (b *builder) name(id string) string {
+// qualifiedName is how an element is identified in messages: its qualified
+// name, its positional name when it has none, else its id.
+func (b *builder) qualifiedName(id string) string {
 	e := b.m.Elements[id]
 	for _, key := range []string{"qualifiedName", "sysx:positionalName"} {
 		if s := e.Str(key); s != "" {

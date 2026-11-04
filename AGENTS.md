@@ -42,8 +42,8 @@ go vet ./...
 - **Offline builds** work once the module cache is filled (`go mod tidy` with
   network, once). In a sandbox without DNS, run Go with `GOPROXY=off`.
 - **Toolchain**: Go 1.27.2+ (asciidoctorg's minimum).
-- `bin/`, `site/` and the root `sysml-publish` binary are build output and
-  should not be committed (there is no `.gitignore` yet).
+- `bin/`, `site/`, the root `sysml-publish` binary, `*.api.json` dumps and
+  `*~` backups are build output or scratch, ignored by `.gitignore`.
 
 ## 3. Layout
 
@@ -134,9 +134,12 @@ pages exist live.
 - `Href(from, to)` is the one relative-link function (shortest path,
   segments URL-escaped, `+` as `%2B`).
 
-Naming wart: `Node.Title` holds the element's **name** and `Node.Name` holds
-the **qualified name** (or positional name `M::@2` for unnamed elements). The
-page title is decided later in `site` and is not stored on the node.
+Three names, kept apart: `Node.Name` is the element's **name** (`Unnamed`,
+the constant `UnnamedName`, when it has none); `Node.QualifiedName` is the
+**qualified name**, or the positional name `M::@2` for an unnamed element, and
+is what messages and `Evaluate` use; the **page title** is decided later in
+`site` (PG-8) and is not stored on the node. `Member.Name` is a member's
+name, like `Node.Name`.
 
 ### 5.3 `internal/site`
 
@@ -181,12 +184,16 @@ page title is decided later in `site` and is not stored on the node.
 - `passthrough(html)`: wraps finished HTML in `+++…+++` for places where
   AsciiDoc substitutions would otherwise run over model text (list items,
   table cells).
+- `Warning{Page, Macro, Message}` and `Warn`: how a macro reports a problem
+  while still producing output. The macro fills the fields and never
+  formats the page or macro into `Message`; `Warning.String()` builds the
+  reported line, and `site.Render` deduplicates on (page, macro) (MC-7).
 
 | Macro | Form | Reads | Notes |
 |---|---|---|---|
-| `sysml-name:[]` | inline | `Node.Title` | escaped text |
+| `sysml-name:[]` | inline | `Node.Name` | escaped text |
 | `sysml-short-name:[]` | inline | `Node.ShortName` | empty when none |
-| `sysml-qualified-name:[]` | inline | `Node.Name` | positional name for unnamed |
+| `sysml-qualified-name:[]` | inline | `Node.QualifiedName` | positional name for unnamed |
 | `sysml-doc::[]` | block | `Node.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block |
 | `sysml-members::[]` | block | `Node.Members` | ulist; links to members that have pages |
 | `sysml-metadata::<def>[]` | block | `Tree.Model` | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
@@ -194,7 +201,12 @@ page title is decided later in `site` and is not stored on the node.
 
 Error policy today: a macro that cannot resolve what the user wrote (unknown
 metadata def, unknown attribute) returns an error, which fails the whole run
-(TBD-8 is still open on whether to degrade to a placeholder + warning).
+(TBD-8 is still open on whether to degrade to a placeholder + warning). The
+error keeps its Go chain through asciidoctorg's Ruby: `site.convert` wraps an
+`*asciidoctor.Error` whose `Cause` is the macro's error, so `errors.As` reaches
+e.g. `*opensysml.FailureError` (`Op == "Evaluate"`). Identify errors by type,
+not by message. `TestMacroErrorFailsRender` pins this behaviour and is the
+test to change deliberately when TBD-8 is implemented.
 
 ### 5.5 `cmd/sysml-publish`
 
@@ -243,11 +255,13 @@ metadata def, unknown attribute) returns an error, which fails the whole run
    parses: `bin/sysml-publish -model testdata/<case> -out bin/x`.
 3. Create `internal/macros/<name>.go` with a `const` for the name and a
    `register<Name>(g, t[, warn])`; call it from `Register`.
+   - Warn with `warn(Warning{Page: n, Macro: <macro as written>, Message: ...})`;
+     `Message` must not repeat the page or the macro.
    - Inline text from a node field: use `registerText`.
    - Block content: return a block (`CreateOpenBlock` + `ParseContent`,
      `CreateList`, `CreateTable`), or `nil` to drop the macro line.
    - Needs elements without pages: use `t.Model`; needs evaluation: use
-     `t.Model.Evaluate` with `n.Name` as subject.
+     `t.Model.Evaluate` with `n.QualifiedName` as subject.
    - If the macro needs new per-element data, prefer adding a field to
      `tree.Node` filled in `tree.Build` over scanning the model per call.
 4. Test in `internal/macros/<name>_test.go`: convert a snippet with
@@ -260,17 +274,70 @@ metadata def, unknown attribute) returns an error, which fails the whole run
 
 ## 8. Testing conventions
 
+What the suite is:
+
 - Tests go through the real stack: fixtures are parsed by OpenSysML in
-  process, rendered by asciidoctorg. No mocks.
+  process, rendered by asciidoctorg. No mocks, no build tags: nothing leaves
+  the process, and the whole suite runs in a few seconds (about 0.2 s of each
+  macro or site test is parsing and starting asciidoctorg).
 - One folder per fixture under `testdata/`; expected results live as `//`
-  notes in the fixture or as tables in the test.
+  notes in the fixture or as tables in the test. Fixtures must be committed
+  with the tests that use them.
 - `tree` tests assert page paths and representation lists; `site` tests
-  assert HTML fragments (`mustContain`); `macros` tests parse rendered HTML
-  with small regexps.
-- `testdata/smoke` is a copy of `model/smoke.sysml` at some point; the user's
-  `model/` is not a test input.
-- Test helpers create a new OpenSysML client and asciidoctorg instance per
-  test and rarely close the client; fine for tests, not a pattern to copy.
+  assert HTML fragments (`mustContain`) or exact `Site.Warnings`; `macros`
+  tests parse rendered HTML with small regexps; `cmd/sysml-publish` tests run
+  `run(...)` and assert log records, exit codes and files written.
+- `testdata/smoke` is a frozen copy of an older `model/smoke.sysml`; the
+  user's `model/` is not a test input and has since diverged.
+- `go test -race -shuffle=on ./...` passes; keep it that way.
+
+Rules for new tests:
+
+- Use `t.Context()`, not `context.Background()`, and close what you open
+  (`t.Cleanup(func() { m.Close() })` for a loaded model).
+- Table-driven tests use a slice of named cases and `t.Run(name, ...)`, never
+  a map (random order) or a bare loop (the first `Fatal` hides the rest).
+- Assert exact values where they are known (`reflect.DeepEqual` /
+  `slices.Equal` on lists, full warning lines), not counts or substrings that
+  also match something else. Negative checks must be able to fail: never
+  depend on Asciidoctor's whitespace.
+- Do not pin the wording of OpenSysML or asciidoctorg messages; pin ours and
+  check theirs by type (`errors.As`).
+- After writing a test for a rule, break the rule once in the code (drop the
+  `%w`, remove the dedup) and see the test fail.
+- `TestRenderKeepsTheDefaultLogger` changes the global logger: it must not
+  run in parallel with anything. Do not add `t.Parallel()` until separate
+  asciidoctorg instances are known to be safe to use concurrently.
+
+Known gaps (from the test review, November 2026):
+
+1. **Untested behaviour**: cancellation *during* rendering (the between-pages
+   check in `Render` and the check before `Write` in `publish`; the CLI test
+   cancels before parsing); `Site.Write` into an existing empty folder or onto
+   a file; the refused replacement at CLI level; cycle safety of inheritance;
+   `-h` and the usage-error text; the examples in `docs/macros.adoc`.
+2. **Weak assertions**: the whitespace-dependent `"<h1>Second</h1>\n<div"`
+   check in `TestPageTitles`; `Contains(out, "tag")` in `TestMembers`;
+   count-only checks in `TestUnnamedElements` and
+   `TestMetadataByQualifiedName`; `de.Errors[0]` (panics if empty) in
+   `TestLoadReportsErrorsWithLocation`; the `""` sentinel in
+   `TestValueErrors`.
+3. **No subtests**: about ten table tests loop without `t.Run`
+   (`TestInheritance`, `TestName`, `TestQualifiedName`, `TestShortName`,
+   `TestPageTitles`, `TestMetadata`, `TestSegment`, `TestUsageErrors`, ...).
+4. **`tree` is pure but tested only through the parser.** Hand-built
+   `model.Model{Elements: ...}` tests would cover cycles, missing owners and
+   single- vs multi-valued `Refs` in microseconds. `TestHrefEscapesSegments`
+   lives in `site_test.go`, so `tree.Href` shows 0% coverage in `tree`, and
+   its shortest-path cases are only checked through sidebar HTML.
+5. **Duplicated setup**: fixture loading is written about seven times
+   (`build`, `load`, `render`, `setup`, `setupFixture`, inline in
+   `TestMembers`/`TestValue`/`TestValueErrors`; `page` and `pageAt` are the
+   same function), and most loads never close the engine. A shared helper
+   package (`internal/testfixture`: `Load(t, name)` with cleanup) fixes both.
+6. **Not yet written**: a golden-file test of the rendered smoke site
+   (`-update` flag), fuzz targets for `segment`/`unique`, `formatUnit`,
+   `Href`.
 
 ## 9. Dependencies and their quirks
 
@@ -301,6 +368,9 @@ metadata def, unknown attribute) returns an error, which fails the whole run
   (easy to trip over in tests).
 - An inline macro in long form needs a target: `sysml-value:[]` is left as
   plain text, not an error.
+- An error returned by an extension comes back as `*asciidoctor.Error`:
+  message `asciidoctor: <Go error text> (RuntimeError)`, with the Go error in
+  `Cause` (reachable with `errors.Is`/`As`).
 - **`asciidoctor.New()` replaces the process-wide default slog logger** with
   a `*log.ConfdHandler` from its `confd` dependency, which drops Debug
   records. `site.newAsciidoctor` restores the previous default
@@ -346,47 +416,53 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    `sysml-metadata` reads raw `model.Element`s and `sysml-value` calls the
    engine. The tree is no longer the single view model, and `Tree.Model` plus
    an open engine handle couple rendering to the parser's lifetime.
-4. **Error policy is inconsistent and harsh.** User mistakes in macros fail
-   the whole run, the messages arrive wrapped in Asciidoctor's
-   `FAILED: <stdin>: Failed to load AsciiDoc document -` prefix, and the
-   failing file/line in the model is not reported. TBD-8 is open.
-5. **Confusing names**: `Node.Title` (element name) vs `Node.Name` (qualified
-   name) vs the rendered page title. Easy to pick the wrong one.
-6. **CLI tests cover the main paths** (normal, JSON + timings, model errors,
-   usage, interruption), but macro examples in the docs are still checked
-   by hand.
-7. **Value formatting heuristics** (`formatUnit` strips package prefixes and
+4. **Error policy is harsh and the messages are poor.** User mistakes in
+   macros fail the whole run at the first failing page, so other pages with
+   the same mistake go unreported. A message such as `converting the
+   representation of M::pd on the page of M::pd: asciidoctor:
+   sysml-value:mas[] on the page of M::pd: … (RuntimeError)` repeats the
+   element, carries Ruby leftovers (`asciidoctor:`, `(RuntimeError)`), and
+   gives no file and line in the model. TBD-8 is open.
+5. **Test gaps** (§8): the main paths are covered (normal run, JSON +
+   timings, model errors, ER-4, macro errors, warnings, usage,
+   interruption), but several stated rules are not (cancellation during
+   rendering, `Write` edge cases, inheritance cycles), table tests have no
+   subtests, some assertions cannot fail, and the docs' macro examples are
+   checked by hand.
+6. **Value formatting heuristics** (`formatUnit` strips package prefixes and
    quotes; rationals become floats) are reasonable but unspecified for units
    with spaces or for values beyond float precision.
-8. **`Site.Write` is not atomic** (remove, then write).
-9. **Hard-coded environment**: `replace` directives point at absolute paths
+7. **`Site.Write` is not atomic** (remove, then write).
+8. **Hard-coded environment**: `replace` directives point at absolute paths
    on one machine; the project cannot be built elsewhere without editing
    `go.mod`.
-10. **Repository hygiene**: no `.gitignore`; commits so far have mixed or
-    missed files (a commit referenced `registerMetadata` without including
-    `metadata.go`). Run `go build ./... && go test ./...` on the staged tree
-    before committing.
+9. **Repository hygiene**: commits have missed files (a commit referenced
+   `registerMetadata` without `metadata.go`; tests were committed for a
+   while before their `testdata/` fixtures). Before committing, check
+   `git status` for untracked files the change needs, and run
+   `go build ./... && go test ./...` on the staged tree.
 
 ### Recommendations (in priority order)
 
 1. **Decide TBD-8** and implement one macro failure path: placeholder on the
    page + warning with page, macro and source location, optional
    `-strict` flag to turn warnings into a failing exit code for CI. Strip
-   Asciidoctor's wrapper from error messages.
-2. **Add a `.gitignore`** (`bin/`, `site/`, `/sysml-publish`).
-3. **Rename tree fields**: `Title` → `Name`, `Name` → `QualifiedName`
-   (mechanical; touches tree, site, macros).
-4. **Move model reading behind the tree**: precompute what macros need
+   Asciidoctor's wrapper from error messages (`asciidoctor.Error.Cause` holds
+   the original), name the element once, and report every failing page, not
+   just the first.
+2. **Close the test gaps of §8**, cheapest first: subtests and weak
+   assertions, then a shared fixture helper, then the untested rules.
+3. **Move model reading behind the tree**: precompute what macros need
    (metadata defs by name, metadata usages per element) in `tree.Build` or a
    small index built once, so macros never scan the model.
-5. **Cache by (page, representation) only where it matters**, or skip
+4. **Cache by (page, representation) only where it matters**, or skip
    per-page conversion for representations that contain no `sysml-` macro
    (a cheap substring check), which restores sharing for the common case.
-6. **Make `Write` atomic**: render into a sibling temp folder, then swap.
-7. **Make dependencies portable**: a `go.work` file (untracked) for local
+5. **Make `Write` atomic**: render into a sibling temp folder, then swap.
+6. **Make dependencies portable**: a `go.work` file (untracked) for local
    checkouts instead of absolute `replace` paths in `go.mod`, once
    asciidoctorg tags a release with the needed API.
-8. **Resolve TBD-9** (view rendering) — the recommended path (sysml CLI → DOT
+7. **Resolve TBD-9** (view rendering) — the recommended path (sysml CLI → DOT
    → Graphviz SVG) introduces the first external programs; isolate it behind
    an interface so option 3 (public OpenSysML writer) can replace it.
 
@@ -396,3 +472,12 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
   run.
 - **TBD-9 / AM-3** — how `sysml-view::<view>[]` turns a view into a picture.
 - **AM-2** — `xref:` links between pages (not scheduled).
+
+## 12. Upstream issues (to report or fix in the dependencies)
+
+- **asciidoctorg**: `asciidoctor.New()` replaces the process-wide default
+  slog logger (via `confd`). Worked around in `site.newAsciidoctor`; a
+  library should not change a program's global logger.
+- **OpenSysML**: the cancellation error does not wrap `context.Canceled`;
+  the unit `m^3/h` is rejected with "Must be a valid feature" (cause not
+  investigated); view rendering (DOT/Mermaid) is not public API (TBD-9).

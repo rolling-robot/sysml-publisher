@@ -92,7 +92,7 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 			return nil, err
 		}
 		r.bodies[n] = b
-		logger.DebugContext(ctx, "page converted", "element", n.Name,
+		logger.DebugContext(ctx, "page converted", "element", n.QualifiedName,
 			"representations", len(n.Own)+len(n.Inherited), "duration", time.Since(start))
 	}
 	r.assignTitles(t.Root)
@@ -186,7 +186,7 @@ func (r *renderer) convert(n *tree.Node, rep tree.Rep, b *body) (template.HTML, 
 	}
 	doc, out, err := r.ad.ConvertDocument(rep.Body, &asciidoctor.Options{Attributes: attrs})
 	if err != nil {
-		return "", fmt.Errorf("converting the representation of %s on the page of %s: %w", r.owner(rep).Name, n.Name, err)
+		return "", fmt.Errorf("converting the representation of %s on the page of %s: %w", r.owner(rep).QualifiedName, n.QualifiedName, err)
 	}
 	if b.docTitle == nil && doc.HasHeader() {
 		// Both are asciidoctorg output: the converted title, and the same
@@ -213,7 +213,7 @@ func (r *renderer) assignTitles(parent *tree.Node) {
 		var t title
 		switch b := r.bodies[c]; {
 		case !c.Documented():
-			t = plainTitle(c.Title)
+			t = plainTitle(c.Name)
 		case b != nil && b.docTitle != nil:
 			t = *b.docTitle
 		default:
@@ -237,7 +237,7 @@ func (r *renderer) owner(rep tree.Rep) *tree.Node {
 	if n := r.t.ByID[rep.Owner]; n != nil {
 		return n
 	}
-	return &tree.Node{Title: rep.Owner, Name: rep.Owner}
+	return &tree.Node{Name: rep.Owner, QualifiedName: rep.Owner}
 }
 
 // file is where node n's page is written.
@@ -277,7 +277,7 @@ func (r *renderer) page(s *Site, n *tree.Node) error {
 		t, ok = plainTitle(LandingTitle), true
 	}
 	if !ok {
-		return fmt.Errorf("no title assigned to %s", n.Name)
+		return fmt.Errorf("no title assigned to %s", n.QualifiedName)
 	}
 	v := pageView{
 		TitleHTML:  t.HTML,
@@ -290,7 +290,7 @@ func (r *renderer) page(s *Site, n *tree.Node) error {
 		Nav:        r.nav(n, root.Children),
 	}
 	if !v.Landing && !n.Unnamed {
-		v.QualifiedName = n.Name
+		v.QualifiedName = n.QualifiedName
 	}
 	if b := r.bodies[n]; b != nil {
 		v.Own, v.Inherited = b.own, b.inherited

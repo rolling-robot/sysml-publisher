@@ -30,7 +30,7 @@ func registerDoc(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 			}
 			for _, doc := range n.Docs {
 				if err := asciidoctor.ParseContent(block, doc, nil); err != nil {
-					return nil, fmt.Errorf("%s: parsing the doc of %s: %w", Doc, n.Name, err)
+					return nil, fmt.Errorf("%s: parsing the doc of %s: %w", Doc, n.QualifiedName, err)
 				}
 			}
 			return block, nil

@@ -32,7 +32,7 @@ func registerMetadata(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 			}
 			def, err := md.definition(target)
 			if err != nil {
-				return nil, fmt.Errorf("%s::%s[] on the page of %s: %w", Metadata, target, n.Name, err)
+				return nil, fmt.Errorf("%s::%s[] on the page of %s: %w", Metadata, target, n.QualifiedName, err)
 			}
 			usages := md.usages(n.ID, def)
 			if len(usages) == 0 {

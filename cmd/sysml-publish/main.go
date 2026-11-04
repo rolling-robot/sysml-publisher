@@ -176,7 +176,7 @@ func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir string) 
 	logger.DebugContext(ctx, "site written", "files", len(s.Files), "duration", time.Since(stage))
 	for _, n := range t.Pages {
 		logger.InfoContext(ctx, "page written",
-			"element", n.Name, "empty", !n.Documented(),
+			"element", n.QualifiedName, "empty", !n.Documented(),
 			"path", filepath.Join(outDir, filepath.FromSlash(n.Dir), "index.html"))
 	}
 	logger.InfoContext(ctx, "site published",

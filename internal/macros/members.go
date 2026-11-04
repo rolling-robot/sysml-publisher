@@ -43,7 +43,7 @@ func registerMembers(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 // memberText is a list item's AsciiDoc: the member's name, linked to its
 // page when it has one.
 func memberText(page *tree.Node, m tree.Member, t *tree.Tree) string {
-	name := html.EscapeString(m.Title)
+	name := html.EscapeString(m.Name)
 	if target := t.ByID[m.ID]; target != nil {
 		return passthrough(`<a href="` + tree.Href(page, target) + `">` + name + `</a>`)
 	}

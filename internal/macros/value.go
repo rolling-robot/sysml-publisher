@@ -30,13 +30,13 @@ func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.T
 			}
 			macro := fmt.Sprintf("%s:%s[]", Value, target)
 			if target == "" {
-				return nil, fmt.Errorf("%s on the page of %s: no attribute named; write %s:<attribute>[]", macro, n.Name, Value)
+				return nil, fmt.Errorf("%s on the page of %s: no attribute named; write %s:<attribute>[]", macro, n.QualifiedName, Value)
 			}
 			// The page's element is the subject, so the attribute reads its
 			// value: its own, a redefinition's, or one from its types.
-			v, err := t.Model.Evaluate(ctx, n.Name, target)
+			v, err := t.Model.Evaluate(ctx, n.QualifiedName, target)
 			if err != nil {
-				return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.Name, err)
+				return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
 			}
 			text, kind := formatValue(v)
 			switch kind {

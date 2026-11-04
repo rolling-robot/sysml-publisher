@@ -10,5 +10,5 @@ import (
 const Name = "sysml-name"
 
 func registerName(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	registerText(g, t, Name, func(n *tree.Node) string { return n.Title })
+	registerText(g, t, Name, func(n *tree.Node) string { return n.Name })
 }
