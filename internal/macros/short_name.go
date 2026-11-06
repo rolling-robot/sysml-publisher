@@ -5,10 +5,14 @@ import (
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
-// ShortName is the inline macro sysml-short-name:[], replaced by the short
-// name of the page's element, or by nothing when it has none (MC-11).
+// ShortName is the inline macro sysml-short-name:[<element>], replaced by the
+// short name of the page's element, or of the element the target names
+// (read as sysml-name reads it), or by nothing when it has none (MC-11,
+// MC-15).
 const ShortName = "sysml-short-name"
 
 func registerShortName(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	registerText(g, t, ShortName, func(n *tree.Node) string { return n.ShortName })
+	registerText(g, t, ShortName,
+		func(n *tree.Node) string { return n.ShortName },
+		func(_ *metadataIndex, id string) string { return t.ShortName(id) })
 }

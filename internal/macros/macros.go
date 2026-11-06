@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"html"
+	"regexp"
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
@@ -78,19 +79,42 @@ func pageElement(parent asciidoctor.Node, t *tree.Tree) (*tree.Node, error) {
 	return n, nil
 }
 
-// registerText registers an inline macro name:[] replaced by the text that
-// text gives for the page's element.
-func registerText(g *asciidoctor.ExtensionGroup, t *tree.Tree, name string, text func(*tree.Node) string) {
+// optionalTargetRx is the pattern of an inline macro whose target is
+// optional, name:[] or name:<target>[]: Asciidoctor's own inline forms take
+// a target always (long) or never (short). A target runs up to "[" without
+// spaces, except inside a quoted segment: name:M::'top speed'[]. A leading
+// backslash escapes the macro, as for every inline macro.
+func optionalTargetRx(name string) string {
+	return `\\?` + regexp.QuoteMeta(name) + `:((?:'(?:[^'\\]|\\.)*'|[^\s\['])*)\[(|.*?[^\\])\]`
+}
+
+// registerText registers the inline macro name:[<element>], replaced by text
+// about an element: ofPage gives it for the page's element when there is no
+// target; ofElement for the element a target names, read by nameTarget
+// (MC-15, MC-8).
+func registerText(g *asciidoctor.ExtensionGroup, t *tree.Tree, name string, ofPage func(*tree.Node) string, ofElement func(md *metadataIndex, id string) string) {
+	md := newMetadataIndex(t.Model)
 	g.InlineMacro(name, asciidoctor.InlineMacroProcessorFunc(
-		func(parent asciidoctor.Node, _ string, _ map[string]any) (*asciidoctor.PhraseNode, error) {
+		func(parent asciidoctor.Node, target string, _ map[string]any) (*asciidoctor.PhraseNode, error) {
 			n, err := pageElement(parent, t)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", name, err)
 			}
+			// Inline macros run after special characters are escaped, so
+			// M::'a<b' arrives as M::'a&lt;b'.
+			target = html.UnescapeString(target)
+			text := ofPage(n)
+			if target != "" {
+				id, err := nameTarget(target, n, md)
+				if err != nil {
+					return nil, fmt.Errorf("%s:%s[] on the page of %s: %w", name, target, n.QualifiedName, err)
+				}
+				text = ofElement(md, id)
+			}
 			// An unquoted phrase is written out verbatim, so escape the text:
 			// SysML names may contain <, > and &.
-			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(text(n)), nil, nil)
-		}), &asciidoctor.MacroOptions{Format: "short"})
+			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(text), nil, nil)
+		}), &asciidoctor.MacroOptions{Regexp: optionalTargetRx(name)})
 }
 
 // passthrough is AsciiDoc for finished HTML: an inline passthrough, which

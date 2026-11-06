@@ -28,3 +28,25 @@ func TestShortName(t *testing.T) {
 		}
 	}
 }
+
+// With a target, the element it names, read as sysml-name reads it (MC-15).
+func TestShortNameTarget(t *testing.T) {
+	tr, ad := setup(t)
+	cases := []struct{ name, page, target, want string }{
+		{"another element's short name", "M/a_b", "pd", "SN: (P)."},
+		{"by its own short name", "M/a_b", "P", "SN: (P)."},
+		{"an element without a short name", "M/pd", "'a<b'", "SN: ()."},
+		{"an element without a page", "M/pd", "Other", "SN: ()."},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := ad.Convert("SN: (sysml-short-name:"+c.target+"[]).", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "<p>" + c.want + "</p>"; !strings.Contains(out, want) {
+				t.Errorf("output %q does not contain %q", out, want)
+			}
+		})
+	}
+}

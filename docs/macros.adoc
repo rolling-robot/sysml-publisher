@@ -125,7 +125,11 @@ SysML writes it: `Model::pd`, or `Model::'my part'` for a quoted name. An
 element without a qualified name, such as an unnamed one, gives its positional
 name, like `Model::@2`.
 
-Syntax:: `sysml-qualified-name:[]`
+With a target, it gives the qualified name of the element the target names,
+read as for `sysml-name` (see <<naming>>): `sysml-qualified-name:ap[]` gives
+`Model::AircraftPart`.
+
+Syntax:: `sysml-qualified-name:[]`, `sysml-qualified-name:<element>[]`
 Attributes:: none
 
 Example: `Defined as sysml-qualified-name:[].` on the page of `mainPump` in
@@ -141,10 +145,15 @@ Only the page's element's own `doc` comments are used: in a representation
 inherited from `Pump`, it shows the doc of `mainPump` on `mainPump`'s page, not
 the doc of `Pump`.
 
+With a target, it shows the `doc` comments of the element the target names,
+read as for `sysml-name` (see <<naming>>), whether that element has a page or
+not: `sysml-doc::engine[]`. Macros inside those comments still describe the
+page's element, not the named one.
+
 The documentation is placed in an open block with the role `sysml-doc`, for
 styling.
 
-Syntax:: `sysml-doc::[]`
+Syntax:: `sysml-doc::[]`, `sysml-doc::<element>[]`
 Attributes:: none
 
 Example:
@@ -172,7 +181,11 @@ Inline macro. Replaced by the short name of the page's element: `P-101` for
 `part <'P-101'> mainPump`. An element without a short name gives nothing, so
 the macro disappears.
 
-Syntax:: `sysml-short-name:[]`
+With a target, it gives the short name of the element the target names, read
+as for `sysml-name` (see <<naming>>): `sysml-short-name:AircraftPart[]` gives
+`ap`.
+
+Syntax:: `sysml-short-name:[]`, `sysml-short-name:<element>[]`
 Attributes:: none
 
 Example: `Tag: sysml-short-name:[]` on the page of `part <a> aaaa` reads

@@ -2,7 +2,6 @@ package macros
 
 import (
 	"fmt"
-	"html"
 	"slices"
 	"strings"
 
@@ -19,37 +18,10 @@ import (
 // with a path before the @, another one (wing::@m::owner).
 const Name = "sysml-name"
 
-// nameMacroRx matches sysml-name with an optional target: Asciidoctor's own
-// inline forms take a target always (long) or never (short). A target is
-// any run of characters up to "[" without spaces, except inside a quoted
-// segment: sysml-name:M::'top speed'[]. A leading backslash escapes the
-// macro, as for every inline macro.
-const nameMacroRx = `\\?sysml-name:((?:'(?:[^'\\]|\\.)*'|[^\s\['])*)\[(|.*?[^\\])\]`
-
 func registerName(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	md := newMetadataIndex(t.Model)
-	names := md.names
-	g.InlineMacro(Name, asciidoctor.InlineMacroProcessorFunc(
-		func(parent asciidoctor.Node, target string, _ map[string]any) (*asciidoctor.PhraseNode, error) {
-			n, err := pageElement(parent, t)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", Name, err)
-			}
-			name := n.Name
-			// Inline macros run after special characters are escaped, so
-			// M::'a<b' arrives as M::'a&lt;b'.
-			target = html.UnescapeString(target)
-			if target != "" {
-				id, err := nameTarget(target, n, md)
-				if err != nil {
-					return nil, fmt.Errorf("%s:%s[] on the page of %s: %w", Name, target, n.QualifiedName, err)
-				}
-				name = names.name(id)
-			}
-			// An unquoted phrase is written out verbatim, so escape the text:
-			// SysML names may contain <, > and &.
-			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(name), nil, nil)
-		}), &asciidoctor.MacroOptions{Regexp: nameMacroRx})
+	registerText(g, t, Name,
+		func(n *tree.Node) string { return n.Name },
+		func(md *metadataIndex, id string) string { return md.names.name(id) })
 }
 
 // nameTarget is the element a sysml-name target names: an element (MC-15),

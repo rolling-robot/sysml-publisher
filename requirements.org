@@ -154,17 +154,21 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   document title. A target that names no element, or several, or metadata
   the element does not carry, or an attribute the metadata does not have,
   shall stop the run with an error naming the macro and the page.
-- MC-9 :: The inline macro =sysml-qualified-name:[]= shall be replaced by
-  the qualified name of the page's element (MC-2), as SysML writes it
-  (=Model::'a<b'=). An element without a qualified name, such as an unnamed
-  one, gives its positional name (=Model::@2=).
-- MC-10 :: The block macro =sysml-doc::[]= shall be replaced by the =doc=
-  comments the page's element owns (MC-2), in declaration order, each parsed
-  as AsciiDoc. An element without a =doc= gives nothing, and the macro line
-  is dropped.
-- MC-11 :: The inline macro =sysml-short-name:[]= shall be replaced by the
-  short name of the page's element (MC-2), the =a= of =part <a> aaaa=. An
-  element without a short name gives nothing.
+- MC-9 :: The inline macro =sysml-qualified-name:[<element>]= shall be
+  replaced by the qualified name of the page's element (MC-2), or of the
+  element the target names, read as for =sysml-name= (MC-8, MC-15), as SysML
+  writes it (=Model::'a<b'=). An element without a qualified name, such as
+  an unnamed one, gives its positional name (=Model::@2=).
+- MC-10 :: The block macro =sysml-doc::[<element>][]= shall be replaced by
+  the =doc= comments the page's element owns (MC-2), or the element the
+  target names (read as for =sysml-name=, MC-8, MC-15), in declaration
+  order, each parsed as AsciiDoc; macros in them still describe the page's
+  element. An element without a =doc= gives nothing, and the macro line is
+  dropped.
+- MC-11 :: The inline macro =sysml-short-name:[<element>]= shall be
+  replaced by the short name of the page's element (MC-2), or of the element
+  the target names (read as for =sysml-name=, MC-8, MC-15), the =a= of
+  =part <a> aaaa=. An element without a short name gives nothing.
 - MC-12 :: The block macro =sysml-members-list::[<element or kind>][]= shall be
   replaced by a bullet list of the members the page's element owns (MC-2),
   in declaration order, each shown by its name ("Unnamed" for one without)

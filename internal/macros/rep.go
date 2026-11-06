@@ -17,10 +17,6 @@ import (
 // plain text, not read as AsciiDoc.
 const Rep = "sysml-rep"
 
-// repMacroRx is sysml-name's pattern for sysml-rep: an optional target that
-// may hold quoted names with spaces.
-const repMacroRx = `\\?sysml-rep:((?:'(?:[^'\\]|\\.)*'|[^\s\['])*)\[(|.*?[^\\])\]`
-
 func registerRep(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 	md := newMetadataIndex(t.Model)
 	reps := repsByOwner(t.Model)
@@ -55,7 +51,7 @@ func registerRep(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 				return nil, fmt.Errorf("%s on the page of %s: %s has no representation in language %q", macro, n.QualifiedName, name, language)
 			}
 			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(strings.Join(bodies, "\n")), nil, nil)
-		}), &asciidoctor.MacroOptions{Regexp: repMacroRx, PositionalAttributes: []string{"language"}})
+		}), &asciidoctor.MacroOptions{Regexp: optionalTargetRx(Rep), PositionalAttributes: []string{"language"}})
 }
 
 // repsByOwner are the textual representations of every element, in any

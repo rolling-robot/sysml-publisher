@@ -213,16 +213,19 @@ name, like `Node.Name`.
   `parent.Document()` and looks it up in `tree.ByID`. This is how every macro
   knows the page's element (MC-2, MC-5). A missing or unknown id is a
   renderer bug and returns an error.
-- `registerText(g, t, name, func(*tree.Node) string)`: an inline short-form
-  macro (`name:[]`) returning escaped text. `sysml-short-name` and
-  `sysml-qualified-name` are one line each on top of it; `sysml-name` has
-  its own registration because it takes an optional target.
-- **Inline targets** (`name.go`, `value.go`): Asciidoctor's inline forms
+- `registerText(g, t, name, ofPage, ofElement)`: an inline macro
+  `name:[<element>]` returning escaped text: `ofPage(node)` without a
+  target, `ofElement(md, id)` for the element `nameTarget` resolves.
+  `sysml-name`, `sysml-qualified-name` and `sysml-short-name` are a few
+  lines each on top of it; `Tree.QualifiedName`, `Tree.ShortName` and
+  `Tree.Docs` answer for any element, page or not.
+- **Inline targets** (`macros.go`, `value.go`): Asciidoctor's inline forms
   take a target always (long) or never (short), and the target stops at a
-  space. `sysml-name` and `sysml-value` set `MacroOptions.Regexp`
-  (`nameMacroRx`, `valueMacroRx`): an optional or required target that may
-  contain quoted segments with spaces. Targets arrive HTML-escaped (`<` as
-  `&lt;`), so both `html.UnescapeString` the target first.
+  space. `optionalTargetRx(name)` (used by `registerText` and `sysml-rep`)
+  and `valueMacroRx` set `MacroOptions.Regexp`: an optional or required
+  target that may contain quoted segments with spaces. Targets arrive
+  HTML-escaped (`<` as `&lt;`), so they are `html.UnescapeString`ed first.
+  Block macro targets (`sysml-doc`) arrive as written.
 - `nameIndex.resolve(name, page, accept)` (`names.go`): the one element
   lookup (MC-15), used by `sysml-members-list` and `sysml-metadata-table`.
   It walks names segment by segment over `ownedMember`, so every segment
@@ -246,9 +249,9 @@ name, like `Node.Name`.
 |---|---|---|---|
 | `sysml-name:[<element>]` | inline | `Node.Name`, `nameIndex`, `metadataIndex` | escaped text; no target: page's element; target resolved by MC-15; `[<element>::]@<metadata>[::<attribute>]` gives the metadata def's or attribute's name (`nameTarget`) |
 | `sysml-rep:[<element>][<language>]` | inline | `Tree.Model` (`repsByOwner`), `nameTarget` | body of the element's own representation in that language (case-insensitive, several joined), escaped plain text; target as `sysml-name` |
-| `sysml-short-name:[]` | inline | `Node.ShortName` | empty when none |
-| `sysml-qualified-name:[]` | inline | `Node.QualifiedName` | positional name for unnamed |
-| `sysml-doc::[]` | block | `Node.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block |
+| `sysml-short-name:[<element>]` | inline | `Node.ShortName`, `Tree.ShortName` | empty when none; target as `sysml-name` |
+| `sysml-qualified-name:[<element>]` | inline | `Node.QualifiedName`, `Tree.QualifiedName` | positional name for unnamed; target as `sysml-name` |
+| `sysml-doc::[<element>][]` | block | `Node.Docs`, `Tree.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block; target as `sysml-name`; macros in the docs still see the page's element |
 | `sysml-members-list::[<element or kind>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
 | `sysml-metadata-table::<def>[]` | block | `Tree.Model` | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
 | `sysml-value:<expr>[]` | inline | `Model.Evaluate` | OpenSysML evaluates with the page element as subject; units formatted; composite → `[composite]` + warning |

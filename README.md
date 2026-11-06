@@ -280,20 +280,23 @@ the element that owns the representation.
 
 | Macro | Kind | Replaced by |
 |---|---|---|
-| `sysml-name:[]` | inline | the element's name |
-| `sysml-name:<element>[]` | inline | another element's name, by qualified or relative name |
+| `sysml-name:[<element>]` | inline | the element's name |
 | `sysml-name:@<metadata>::<attribute>[]` | inline | the name of metadata on the element, or of its attribute |
-| `sysml-qualified-name:[]` | inline | its qualified name, `Model::aircraft::wing` |
-| `sysml-short-name:[]` | inline | its short name, the `<W>` in `part def <W> Wheel` |
+| `sysml-qualified-name:[<element>]` | inline | its qualified name, `Model::aircraft::wing` |
+| `sysml-short-name:[<element>]` | inline | its short name, the `<W>` in `part def <W> Wheel` |
 | `sysml-rep:[<element>][<language>]` | inline | the body of the element's representation in another language, as plain text |
 | `sysml-value:<attribute>[]` | inline | the attribute's value with its unit, `9 kg`; also another element's attribute (`Model::aircraft::engine::mass`) or an expression (`mass*2`) |
-| `sysml-doc::[]` | block | the element's `doc` comments |
+| `sysml-doc::[<element>][]` | block | the element's `doc` comments |
 | `sysml-members-list::[]` | block | a list of its members with their types |
 | `sysml-members-list::<element>[]` | block | its members typed by, subclassing or subsetting `<element>` |
 | `sysml-members-list::<kind>[]` | block | its members of one kind: `partUsage`, `interfaceUsage`, ... |
 | `sysml-metadata-table::<metadata def>[]` | block | a table of that metadata's attributes on the element |
 
 Inline macros go anywhere in text; block macros go on a line of their own.
+Without a target, `sysml-name`, `sysml-qualified-name`, `sysml-short-name`,
+`sysml-doc` and `sysml-rep` describe the page's element; give them an element
+(`sysml-name:engine[]`, `sysml-doc::Model::AircraftPart[]`) to describe that
+one instead.
 Where a macro takes an element, name it as SysML would: by qualified name,
 by a name relative to the page's element, or by a name only one element has;
 short names work in every part of a name (`Model::ap` for `Model::AircraftPart`).

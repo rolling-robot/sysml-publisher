@@ -44,3 +44,41 @@ func TestDocumentation(t *testing.T) {
 		t.Errorf("M/unnamed-1: want only the surrounding paragraphs, got %q", out)
 	}
 }
+
+// With a target, the docs of the element it names, read as sysml-name reads
+// it (MC-15), whether it has a page or not.
+func TestDocumentationTarget(t *testing.T) {
+	tr, ad := setup(t)
+	page := Attributes(pageAt(t, tr, "M/pd"))
+	cases := []struct {
+		name, target string
+		want         []string // paragraphs in the doc block; nil: no block
+	}{
+		{"element with a page", "'a<b'", []string{"The <strong>a&lt;b</strong> part.", "Second doc."}},
+		{"element without a page", "Other", []string{"Other&#8217;s documentation."}},
+		{"element without docs", "A", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := ad.Convert("sysml-doc::"+c.target+"[]\n\nAfter.", &asciidoctor.Options{Attributes: page})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(out, "pd documentation.") {
+				t.Errorf("shows the page's own doc: %q", out)
+			}
+			if has := strings.Contains(out, `<div class="openblock sysml-doc">`); has != (c.want != nil) {
+				t.Errorf("doc block present = %v, want %v: %q", has, c.want != nil, out)
+			}
+			for _, w := range c.want {
+				if !strings.Contains(out, "<p>"+w+"</p>") {
+					t.Errorf("output %q lacks paragraph %q", out, w)
+				}
+			}
+		})
+	}
+	_, err := ad.Convert("sysml-doc::Nothing[]", &asciidoctor.Options{Attributes: page})
+	if want := `sysml-doc::Nothing[] on the page of M::pd: the model has no element named "Nothing"`; err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("err = %v, want one containing %q", err, want)
+	}
+}

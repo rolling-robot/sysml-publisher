@@ -84,6 +84,42 @@ type Tree struct {
 	// specialization (typing, subclassification, subsetting, redefinition),
 	// in declaration order; shared by inheritance and Specializes.
 	generals map[string][]string
+	// docs are each element's doc comment bodies, trimmed, in declaration
+	// order; see Docs.
+	docs map[string][]string
+}
+
+// Docs are the bodies of the doc comments element id owns, trimmed, in
+// declaration order (MC-10); for a page, the same as Node.Docs.
+func (t *Tree) Docs(id string) []string { return t.docs[id] }
+
+// ShortName is element id's declared short name, or the short name its
+// owning membership gives it; "" when it has none (MC-11).
+func (t *Tree) ShortName(id string) string {
+	e := t.Model.Elements[id]
+	if n := e.Str("declaredShortName"); n != "" {
+		return n
+	}
+	if mem, ok := t.Model.Elements[e.Ref("owningMembership")]; ok {
+		return mem.Str("memberShortName")
+	}
+	return ""
+}
+
+// QualifiedName is how element id is identified (MC-9): its qualified name,
+// its positional name when it has none, a library element's qualified name,
+// else its id.
+func (t *Tree) QualifiedName(id string) string {
+	if lib, ok := t.Model.Library[id]; ok {
+		return lib.QualifiedName
+	}
+	e := t.Model.Elements[id]
+	for _, key := range []string{"qualifiedName", "sysx:positionalName"} {
+		if s := e.Str(key); s != "" {
+			return s
+		}
+	}
+	return id
 }
 
 // Specializes reports whether element specific is typed by, subclasses or
@@ -128,8 +164,7 @@ func Build(m *model.Model) *Tree {
 type builder struct {
 	m    *model.Model
 	t    *Tree
-	reps map[string][]Rep    // owner id → its AsciiDoc representations
-	docs map[string][]string // owner id → its doc comment bodies
+	reps map[string][]Rep // owner id → its AsciiDoc representations
 }
 
 // isAsciiDoc reports whether a representation's language is AsciiDoc.
@@ -159,11 +194,11 @@ func (b *builder) collectReps() {
 }
 
 func (b *builder) collectDocs() {
-	b.docs = map[string][]string{}
+	b.t.docs = map[string][]string{}
 	for _, id := range b.m.Order {
 		if e := b.m.Elements[id]; e.Type() == "Documentation" {
 			owner := e.Ref("owner")
-			b.docs[owner] = append(b.docs[owner], strings.TrimSpace(e.Str("body")))
+			b.t.docs[owner] = append(b.t.docs[owner], strings.TrimSpace(e.Str("body")))
 		}
 	}
 }
@@ -227,7 +262,7 @@ func (b *builder) addChildren(parent *Node, e model.Element) {
 			QualifiedName: b.qualifiedName(id),
 			Own:           b.reps[id],
 			Inherited:     b.inherited(id),
-			Docs:          b.docs[id],
+			Docs:          b.t.docs[id],
 			ShortName:     b.shortName(id),
 			Members:       b.members(child),
 			Parent:        parent,
@@ -316,30 +351,9 @@ func (b *builder) members(e model.Element) []Member {
 	return out
 }
 
-// shortName is the element's declared short name, or the short name its
-// owning membership gives it; "" when it has none.
-func (b *builder) shortName(id string) string {
-	e := b.m.Elements[id]
-	if n := e.Str("declaredShortName"); n != "" {
-		return n
-	}
-	if mem, ok := b.m.Elements[e.Ref("owningMembership")]; ok {
-		return mem.Str("memberShortName")
-	}
-	return ""
-}
+func (b *builder) shortName(id string) string { return b.t.ShortName(id) }
 
-// qualifiedName is how an element is identified in messages: its qualified
-// name, its positional name when it has none, else its id.
-func (b *builder) qualifiedName(id string) string {
-	e := b.m.Elements[id]
-	for _, key := range []string{"qualifiedName", "sysx:positionalName"} {
-		if s := e.Str(key); s != "" {
-			return s
-		}
-	}
-	return id
-}
+func (b *builder) qualifiedName(id string) string { return b.t.QualifiedName(id) }
 
 // segment makes a name usable as one folder name on any filesystem.
 func segment(name string) string {
