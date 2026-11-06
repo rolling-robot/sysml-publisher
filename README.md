@@ -290,6 +290,7 @@ the element that owns the representation.
 | `sysml-members-list::[]` | block | a list of its members with their types |
 | `sysml-members-list::<element>[]` | block | its members typed by, subclassing or subsetting `<element>` |
 | `sysml-members-list::<kind>[]` | block | its members of one kind: `partUsage`, `interfaceUsage`, ... |
+| `sysml-iface-ends::[<interface>][depth=<n>\|all]` | block | the ends of an interface or connection, source first: `source: engine.air`; `depth` shows the last n segments of the port's qualified path (`engine::air`), `all` all of it |
 | `sysml-metadata-table::<metadata def>[]` | block | a table of that metadata's attributes on the element |
 
 Inline macros go anywhere in text; block macros go on a line of their own.

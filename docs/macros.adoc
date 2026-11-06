@@ -256,6 +256,74 @@ The page of `Pump` lists inlet (FluidPort), flowRate (Real), spare (Wheel) and
 Racing; under "Wheels:" it lists spare and Racing: `spare` is typed by
 `Wheel`, `Racing` specializes it through `Sport`.
 
+== sysml-iface-ends
+
+Block macro, on a line of its own. Replaced by a bullet list of the ends of an
+interface, or of any connection: the page's element with
+`sysml-iface-ends::[]`, or the element a target names
+(`sysml-iface-ends::airDuct[]`), named as described in <<naming>>.
+
+Each item is the end's name and the feature it connects, the segments of the
+feature linked to their pages when they have one: `source: engine.air`.
+
+* `connect a to b` and `connect (a, b)` give ends named `source` and
+  `target`.
+* Ends named by an interface def keep its names: `supplier: x.p`.
+* The unnamed ends of an n-ary `connect (a, b, c)` show the feature only.
+* The ends of an interface def connect nothing, so they show their names
+  only.
+
+The source end comes first, then the other ends in the order they are
+declared. An element without ends stops the run with an error naming the
+macro and the page. The list has the role `sysml-iface-ends`, for styling.
+
+The attribute `depth` chooses how much of the connected feature's path is
+shown. Its path is the qualified name of the part it is on followed by the
+feature: `Model::aircraft::engine::air`. `depth` keeps that many segments
+from the end, joined by `::`; `all` keeps the whole path. Every segment
+whose element has a page is a link.
+
+[cols="1,2"]
+|===
+|Written |Item
+
+|`sysml-iface-ends::airDuct[]` |`source: engine.air` (the chain as written)
+|`sysml-iface-ends::airDuct[depth=1]` |`source: air`
+|`sysml-iface-ends::airDuct[depth=2]` |`source: engine::air`
+|`sysml-iface-ends::airDuct[depth=3]` |`source: aircraft::engine::air`
+|`sysml-iface-ends::airDuct[depth=all]` |`source: Model::aircraft::engine::air`
+|===
+
+`[2]` is the same as `[depth=2]`. A depth longer than the path shows the
+whole path. Names that need quotes are quoted, as in a qualified name:
+`wing::'de-icing fluid'`. A depth that is neither a positive number nor
+`all` stops the run with an error.
+
+Syntax:: `sysml-iface-ends::[]`, `sysml-iface-ends::<element>[]`,
+`sysml-iface-ends::<element>[depth=<n>|all]`
+Attributes:: `depth` (also the first positional attribute): a positive
+number or `all`
+
+Example:
+
+[source,sysml]
+----
+part aircraft {
+    rep language "asciidoc"
+        /*
+        Air duct:
+
+        sysml-iface-ends::airDuct[]
+        */
+    part engine { out port air; }
+    part airConditioner { in port air; }
+    interface airDuct connect engine.air to airConditioner.air;
+}
+----
+
+The page of `aircraft` lists source: engine.air and target:
+airConditioner.air.
+
 == sysml-metadata-table
 
 Block macro, on a line of its own. Replaced by a table of the attributes of

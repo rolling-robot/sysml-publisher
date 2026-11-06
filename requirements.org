@@ -244,6 +244,27 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   as AsciiDoc. Inherited representations do not count. A missing language,
   or an element without a representation in it, shall stop the run with an
   error naming the macro and the page.
+
+- MC-17 :: The block macro =sysml-iface-ends::[<element>][]= shall be
+  replaced by a bullet list of the ends of an interface or connection: the
+  page's element without a target, else the element the target names, read
+  as for =sysml-name= (MC-8, MC-15). Each item shall be the end's name and
+  the feature it connects (=source: engine.air=), each segment of the
+  feature linked to its page when it has one; an end without a name shows
+  the feature only, an end that connects nothing (an interface def's) its
+  name only. The source end (the end named =source=, as in =connect a to b=
+  and =connect (a, b)=) shall come first, the other ends in declaration
+  order. An element without ends shall stop the run with an error naming the
+  macro and the page.
+  The attribute =depth= (=[depth=2]= or =[2]=) shall choose how much of the
+  connected feature's path is shown: its qualified path (the owners of the
+  feature chain's first element, then the chain), cut to its last =depth=
+  segments and joined by =::= (1: =air=, 2: =engine::air=), or the whole
+  path for =all= (=Model::aircraft::engine::air=), names quoted as in a
+  qualified name. A depth longer than the path shows the whole path.
+  Without =depth= the chain is shown as written (=engine.air=). A depth that
+  is neither a positive number nor =all= shall stop the run with an error
+  naming the macro and the page.
 * Open questions
 - TBD-8 :: For MC-7: besides the warning, what does a failing macro leave on
   the page, and should it fail the run? Suggested: a visible placeholder
