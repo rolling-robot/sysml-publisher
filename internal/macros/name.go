@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
+	"github.com/rolling-robot/sysml-publisher/internal/model"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
@@ -26,18 +27,44 @@ func registerName(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 
 // nameTarget is the element a sysml-name target names: an element (MC-15),
 // or metadata applied to an element and one of its attributes, written
-// [<element>::]@<metadata>[::<attribute>] (MC-8). The element defaults to
-// the page's; the metadata is a metadata def's name or short name; the
-// attribute is one of the def's attributes, its supertypes' included.
+// [<element>::]@<metadata>[::<attribute>] (MC-8): the metadata def, or the
+// attribute.
 func nameTarget(target string, n *tree.Node, md *metadataIndex) (string, error) {
+	ref, err := parseMetadataRef(target, n, md)
+	switch {
+	case err != nil:
+		return "", err
+	case ref == nil:
+		return md.names.resolve(target, n, nil)
+	case ref.attr != nil:
+		return ref.attr.ID(), nil
+	}
+	return ref.def.ID(), nil
+}
+
+// metadataRef is what a target [<element>::]@<metadata>[::<attribute>]
+// names: metadata applied to an element, and one of its attributes.
+type metadataRef struct {
+	element string          // the element carrying the metadata
+	def     model.Element   // the metadata def
+	usages  []model.Element // the element's usages of def, at least one
+	attr    model.Element   // nil when the target names no attribute
+}
+
+// parseMetadataRef reads a target of the form
+// [<element>::]@<metadata>[::<attribute>]; it is nil, without error, for a
+// target with no @ segment. The element defaults to the page's; the metadata
+// is a metadata def's name or short name; the attribute is one of the def's
+// attributes, its supertypes' included, by name or short name.
+func parseMetadataRef(target string, n *tree.Node, md *metadataIndex) (*metadataRef, error) {
 	segs := splitQualified(target)
 	at := slices.IndexFunc(segs, func(s string) bool { return strings.HasPrefix(s, "@") })
 	if at < 0 {
-		return md.names.resolve(target, n, nil)
+		return nil, nil
 	}
 	meta := strings.TrimPrefix(segs[at], "@")
 	if meta == "" || len(segs) > at+2 {
-		return "", fmt.Errorf("write [<element>::]@<metadata>[::<attribute>]")
+		return nil, fmt.Errorf("write [<element>::]@<metadata>[::<attribute>]")
 	}
 	element, elementName := n.ID, n.QualifiedName
 	if at > 0 {
@@ -47,25 +74,27 @@ func nameTarget(target string, n *tree.Node, md *metadataIndex) (string, error) 
 		}
 		id, err := md.names.resolve(strings.Join(quoted, "::"), n, nil)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		element, elementName = id, md.names.qualifiedName(id)
 	}
 	def, err := md.definition(meta, n)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if len(md.usages(element, def)) == 0 {
-		return "", fmt.Errorf("%s has no @%s metadata", elementName, md.names.name(def.ID()))
+	ref := &metadataRef{element: element, def: def, usages: md.usages(element, def)}
+	if len(ref.usages) == 0 {
+		return nil, fmt.Errorf("%s has no @%s metadata", elementName, md.names.name(def.ID()))
 	}
 	if at == len(segs)-1 {
-		return def.ID(), nil
+		return ref, nil
 	}
 	attr := segs[at+1]
 	for _, a := range md.attributes(def) {
 		if slices.Contains(md.names.names(a.ID()), attr) {
-			return a.ID(), nil
+			ref.attr = a
+			return ref, nil
 		}
 	}
-	return "", fmt.Errorf("metadata def %s has no attribute %q", md.names.name(def.ID()), attr)
+	return nil, fmt.Errorf("metadata def %s has no attribute %q", md.names.name(def.ID()), attr)
 }

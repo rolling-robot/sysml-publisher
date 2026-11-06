@@ -200,3 +200,55 @@ func TestFormatValue(t *testing.T) {
 		}
 	}
 }
+
+// A target [<element>::]@<metadata>::<attribute> gives the value of a
+// metadata attribute as sysml-metadata-table shows it: bound, else the
+// def's, as written in the model (MC-14). The expected values are the //
+// notes in testdata/metadata-table.
+func TestValueMetadata(t *testing.T) {
+	tr, ad := setupFixture(t, "metadata-table")
+	page := Attributes(pageAt(t, tr, "Meta/bound"))
+	cases := []struct{ name, target, want string }{
+		{"bound string, without quotes", "@Info::owner", "pete"},
+		{"bound integer", "@Info::count", "7"},
+		{"fixed value of the def", "@Info::ratio", "0.5"},
+		{"default enumeration literal", "@Info::level", "Level::low"},
+		{"default expression, as written", "@Info::sum", "1 + 2"},
+		{"no value", "@Info::note", NoValue},
+		{"another element, relative", "overridden::@Info::owner", "ann"},
+		{"another element, qualified, prefix form #Info", "Meta::defaults::@Info::owner", "nobody"},
+		{"short name of the def, supertype's attribute", "specialized::@drv::origin", "here"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := ad.Convert("V: sysml-value:"+c.target+"[].", &asciidoctor.Options{Attributes: page})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "<p>V: " + c.want + ".</p>"; !strings.Contains(out, want) {
+				t.Errorf("output %q does not contain %q", out, want)
+			}
+		})
+	}
+}
+
+func TestValueMetadataErrors(t *testing.T) {
+	tr, ad := setupFixture(t, "metadata-table")
+	page := Attributes(pageAt(t, tr, "Meta/bound"))
+	cases := []struct{ name, target, want string }{
+		{"no attribute", "@Info", "no attribute named; write sysml-value:[<element>::]@<metadata>::<attribute>[]"},
+		{"unknown attribute", "@Info::missing", `metadata def Info has no attribute "missing"`},
+		{"element without the metadata", "plain::@Info::owner", "Meta::plain has no @Info metadata"},
+		{"unknown metadata def", "@Nope::owner", `the model has no metadata def "Nope"`},
+		{"too many segments", "@Info::owner::x", "write [<element>::]@<metadata>[::<attribute>]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := ad.Convert("V: sysml-value:"+c.target+"[].", &asciidoctor.Options{Attributes: page})
+			want := "sysml-value:" + c.target + "[] on the page of Meta::bound: " + c.want
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("err = %v, want one containing %q", err, want)
+			}
+		})
+	}
+}

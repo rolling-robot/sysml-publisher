@@ -217,6 +217,16 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   report a warning naming the page and the macro. An attribute the element
   does not have shall stop the run with an error naming the macro and the
   page.
+  A target =[<element>::]@<metadata>::<attribute>= (=@Info::owner=,
+  =wing::@m::owner=) shall give the value of that attribute of the metadata
+  applied to the element (the page's element when no element is written):
+  the value the metadata usage binds, else the metadata def's, as
+  =sysml-metadata-table= shows it (MC-13), written as in the model; several
+  usages of the same metadata give their values joined by ", ". The element
+  and metadata def are named as MC-15 says, the attribute by name or short
+  name. An element without that metadata, an unknown attribute, or a target
+  naming no attribute (=@Info=) shall stop the run with an error naming the
+  macro and the page.
 
 - MC-15 :: A macro that names an element shall find it by trying, in turn:
   a qualified name from the top of the model; a name inside the page's

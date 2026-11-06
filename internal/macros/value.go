@@ -18,7 +18,9 @@ import (
 // an expression: a feature of the page's element (mass, motor.power), a
 // qualified name (Values::custom::count) or a name relative to the page's
 // element (custom::count). It is evaluated with the page's element as its
-// subject.
+// subject. A target [<element>::]@<metadata>::<attribute> gives the value of
+// an attribute of metadata applied to an element (@Info::owner), read as
+// sysml-metadata-table reads it (MC-14, MC-13).
 const Value = "sysml-value"
 
 // featureRefRx is what a sysml-value target may be: names, plain or quoted,
@@ -36,6 +38,7 @@ const valueMacroRx = `\\?sysml-value:((?:'(?:[^'\\]|\\.)*'|[^\s\['])+)\[(|.*?[^\
 const CompositeText = "[composite]"
 
 func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.Tree, warn Warn) {
+	md := newMetadataIndex(t.Model)
 	g.InlineMacro(Value, asciidoctor.InlineMacroProcessorFunc(
 		func(parent asciidoctor.Node, target string, _ map[string]any) (*asciidoctor.PhraseNode, error) {
 			n, err := pageElement(parent, t)
@@ -48,6 +51,16 @@ func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.T
 			macro := fmt.Sprintf("%s:%s[]", Value, target)
 			if target == "" {
 				return nil, fmt.Errorf("%s on the page of %s: no feature named; write %s:<feature>[]", macro, n.QualifiedName, Value)
+			}
+			ref, err := parseMetadataRef(target, n, md)
+			if err != nil {
+				return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
+			}
+			if ref != nil {
+				if ref.attr == nil {
+					return nil, fmt.Errorf("%s on the page of %s: no attribute named; write %s:[<element>::]@<metadata>::<attribute>[]", macro, n.QualifiedName, Value)
+				}
+				return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(md.attributeValue(ref)), nil, nil)
 			}
 			if !featureRefRx.MatchString(target) {
 				return nil, fmt.Errorf("%s on the page of %s: %q is not a feature name; write a name, a qualified name (A::b) or a feature chain (a.b), not an expression", macro, n.QualifiedName, target)
@@ -68,6 +81,21 @@ func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.T
 			}
 			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(text), nil, nil)
 		}), &asciidoctor.MacroOptions{Regexp: valueMacroRx})
+}
+
+// attributeValue is the value of the metadata attribute ref names, as
+// sysml-metadata-table shows it: the value the usage binds, else the
+// metadata def's, written as in the model, else NoValue. An element carrying
+// the metadata more than once gives each usage's value, joined by ", ".
+func (md *metadataIndex) attributeValue(ref *metadataRef) string {
+	values := make([]string, len(ref.usages))
+	for i, u := range ref.usages {
+		values[i] = NoValue
+		if v := md.value(u, ref.attr); v != nil {
+			values[i] = valueText(v)
+		}
+	}
+	return strings.Join(values, ", ")
 }
 
 type valueKind int

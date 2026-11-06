@@ -350,7 +350,8 @@ the engine computes in SI base units.
   prints a warning naming the page and the macro: one per page, however
   often the macro appears there.
 
-Syntax:: `sysml-value:<feature>[]`
+Syntax:: `sysml-value:<feature>[]` or
+`sysml-value:[<element>::]@<metadata>::<attribute>[]`
 Attributes:: none
 
 An attribute the element does not have stops the run with an error naming the
@@ -373,3 +374,39 @@ part sparePump : Pump;
 
 The page of `mainPump` reads "The pump weighs 7.5 kg." The page of
 `sparePump` reads "The pump weighs 5 kg."
+
+=== Metadata values
+
+A target `@<metadata>::<attribute>` gives the value of an attribute of
+metadata applied to the page's element, so metadata values can go into a
+table you write yourself, next to rows of your own. Put an element before
+the `@` for another element's metadata: `wing::@m::owner`. The value is the
+one `sysml-metadata-table` shows: the one the element binds, else the
+metadata def's default, written as in the model (`"Petr"` as `Petr`,
+`9.5 [kg]` as written, not formatted), else `(no value)`.
+
+[source,sysml]
+----
+metadata def m {
+    attribute owner : String default "nobody";
+    attribute reviewed : Boolean default false;
+}
+part wing {
+    @m { owner = "Petr"; }
+}
+----
+
+[source,asciidoc]
+----
+[cols="1,1"]
+|===
+|Owner    | sysml-value:@m::owner[]
+|Reviewed | sysml-value:@m::reviewed[]
+|Status   | approved
+|===
+----
+
+On the page of `wing` this gives the rows Owner = Petr, Reviewed = false and
+Status = approved. An element without that metadata, an attribute the
+metadata def does not have, or a target without an attribute (`@m`) stops
+the run with an error.
