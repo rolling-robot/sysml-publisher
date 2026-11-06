@@ -285,7 +285,7 @@ the element that owns the representation.
 | `sysml-qualified-name:[<element>]` | inline | its qualified name, `Model::aircraft::wing` |
 | `sysml-short-name:[<element>]` | inline | its short name, the `<W>` in `part def <W> Wheel` |
 | `sysml-rep:[<element>][<language>]` | inline | the body of the element's representation in another language, as plain text |
-| `sysml-value:<attribute>[]` | inline | the attribute's value with its unit, `9 kg`; also another element's attribute (`Model::aircraft::engine::mass`) or an expression (`mass*2`) |
+| `sysml-value:<attribute>[]` | inline | the attribute's value with its unit, `9 kg`; also another element's attribute (`Model::aircraft::engine::mass`) by a qualified or relative name, or a feature chain (`engine.mass`) |
 | `sysml-doc::[<element>][]` | block | the element's `doc` comments |
 | `sysml-members-list::[]` | block | a list of its members with their types |
 | `sysml-members-list::<element>[]` | block | its members typed by, subclassing or subsetting `<element>` |

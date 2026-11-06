@@ -13,13 +13,18 @@ import (
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
-// Value is the inline macro sysml-value:<attribute>[], replaced by the value
-// of that attribute of the page's element, units included (MC-14). The
-// target is a SysML expression evaluated with the page's element as its
-// subject, so it may be an attribute of the page's element (mass,
-// motor.power), a qualified name (Values::custom::count) or a name relative
-// to the page's element (custom::count), and arithmetic on them.
+// Value is the inline macro sysml-value:<feature>[], replaced by the value
+// of that feature, units included (MC-14). The target names a feature, not
+// an expression: a feature of the page's element (mass, motor.power), a
+// qualified name (Values::custom::count) or a name relative to the page's
+// element (custom::count). It is evaluated with the page's element as its
+// subject.
 const Value = "sysml-value"
+
+// featureRefRx is what a sysml-value target may be: names, plain or quoted,
+// joined by :: or by the feature chain dot. Anything else (operators,
+// literals, calls) is an expression and is refused.
+var featureRefRx = regexp.MustCompile(`^(?:[A-Za-z_][A-Za-z0-9_]*|'(?:[^'\\]|\\.)*')(?:(?:::|\.)(?:[A-Za-z_][A-Za-z0-9_]*|'(?:[^'\\]|\\.)*'))*$`)
 
 // valueMacroRx is Asciidoctor's long inline form with a target that may
 // hold quoted names with spaces: sysml-value:Pump::'top speed'[]. The target
@@ -38,13 +43,16 @@ func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.T
 				return nil, fmt.Errorf("%s: %w", Value, err)
 			}
 			// Inline macros run after special characters are escaped, so
-			// count<5 arrives as count&lt;5.
+			// 'a<b' arrives as 'a&lt;b'.
 			target = html.UnescapeString(target)
 			macro := fmt.Sprintf("%s:%s[]", Value, target)
 			if target == "" {
-				return nil, fmt.Errorf("%s on the page of %s: no attribute named; write %s:<attribute>[]", macro, n.QualifiedName, Value)
+				return nil, fmt.Errorf("%s on the page of %s: no feature named; write %s:<feature>[]", macro, n.QualifiedName, Value)
 			}
-			// The page's element is the subject, so the attribute reads its
+			if !featureRefRx.MatchString(target) {
+				return nil, fmt.Errorf("%s on the page of %s: %q is not a feature name; write a name, a qualified name (A::b) or a feature chain (a.b), not an expression", macro, n.QualifiedName, target)
+			}
+			// The page's element is the subject, so the feature reads its
 			// value: its own, a redefinition's, or one from its types.
 			v, err := t.Model.Evaluate(ctx, n.QualifiedName, target)
 			if err != nil {

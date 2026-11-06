@@ -202,13 +202,14 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   element without that metadata gives nothing. A name that is
   missing, unknown or ambiguous shall stop the run with an error naming the
   macro and the page (until TBD-8 decides otherwise).
-- MC-14 :: The inline macro =sysml-value:<attribute>[]= shall be replaced
-  by the value of that attribute of the page's element (MC-2), the attribute
-  named as a SysML expression with the page's element as its subject: an
-  attribute of the element (=mass=, =motor.power=), a qualified name
-  (=Values::custom::count=) or a name relative to the page's element
-  (=custom::count=), quoted names included (='rated power'=), and
-  operators on them (=count*2=, =count<5=). The value is evaluated: the
+- MC-14 :: The inline macro =sysml-value:<feature>[]= shall be replaced
+  by the value of the feature it names, read with the page's element (MC-2)
+  as subject: a feature of the element (=mass=, a chain =motor.power=), a
+  qualified name (=Values::custom::count=) or a name relative to the page's
+  element (=custom::count=), quoted names included (='rated power'=). The
+  target shall name a feature, not an expression: a target with operators,
+  literals or calls (=count*2=) shall stop the run with an error naming the
+  macro and the page. The value is evaluated: the
   element's own, a redefinition's, or one from its types. A quantity shall be shown as magnitude and unit symbol (=5 kg=,
   =2.5 m³⋅s⁻¹=); a string without quotes; an enumeration literal as written
   (=Level::low=); no value as "(no value)". A composite value (one made of

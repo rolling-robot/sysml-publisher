@@ -82,9 +82,9 @@ func TestValue(t *testing.T) {
 	}
 }
 
-// The target is an expression with the page's element as subject: its
+// The target names a feature, with the page's element as subject: its
 // attributes, qualified or relative names of other elements' attributes,
-// quoted names with spaces, and operators, < included (MC-14).
+// feature chains and quoted names with spaces (MC-14).
 func TestValueTargets(t *testing.T) {
 	tr, ad := setupFixture(t, "values")
 	page := Attributes(pageAt(t, tr, "Values/typical"))
@@ -95,8 +95,6 @@ func TestValueTargets(t *testing.T) {
 		{"relative name, another element", "custom::count", "4"},
 		{"feature chain, another element", "custom.count", "4"},
 		{"quoted segment in a qualified name", "Values::Pump::'rated power'", "2 kW"},
-		{"arithmetic", "count*2", "6"},
-		{"comparison with <, escaped by Asciidoctor before the macro", "count<5", "true"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -106,6 +104,31 @@ func TestValueTargets(t *testing.T) {
 			}
 			if want := "<p>V: " + c.want + ".</p>"; !strings.Contains(out, want) {
 				t.Errorf("output %q does not contain %q", out, want)
+			}
+		})
+	}
+}
+
+// The target is a feature, not an expression: operators, literals and
+// calls are refused with our error, before OpenSysML evaluates anything
+// (MC-14). count<5 also checks that the escaped < is read back as <.
+func TestValueRejectsExpressions(t *testing.T) {
+	tr, ad := setupFixture(t, "values")
+	page := Attributes(pageAt(t, tr, "Values/typical"))
+	cases := []struct{ name, target string }{
+		{"arithmetic", "count*2"},
+		{"comparison with <, escaped by Asciidoctor before the macro", "count<5"},
+		{"sum of two features", "count+custom::count"},
+		{"literal", "5"},
+		{"call", "size(count)"},
+		{"trailing separator", "custom::"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := ad.Convert("V: sysml-value:"+c.target+"[].", &asciidoctor.Options{Attributes: page})
+			want := "sysml-value:" + c.target + "[] on the page of Values::typical: \"" + c.target + "\" is not a feature name"
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("err = %v, want one containing %q", err, want)
 			}
 		})
 	}

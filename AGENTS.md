@@ -254,7 +254,7 @@ name, like `Node.Name`.
 | `sysml-doc::[<element>][]` | block | `Node.Docs`, `Tree.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block; target as `sysml-name`; macros in the docs still see the page's element |
 | `sysml-members-list::[<element or kind>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
 | `sysml-metadata-table::<def>[]` | block | `Tree.Model` | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
-| `sysml-value:<expr>[]` | inline | `Model.Evaluate` | OpenSysML evaluates with the page element as subject; units formatted; composite → `[composite]` + warning |
+| `sysml-value:<feature>[]` | inline | `Model.Evaluate` | target must be a feature reference (`featureRefRx`: names, `::`, `.`), not an expression; OpenSysML evaluates it with the page element as subject; units formatted; composite → `[composite]` + warning |
 
 Error policy today: a macro that cannot resolve what the user wrote (unknown
 metadata def, unknown attribute) returns an error, which fails the whole run
@@ -440,7 +440,7 @@ Known gaps (from the test review, November 2026):
   group: target, second: attributes) for optional targets or targets with
   spaces.
 - **Inline macros run after the special-characters substitution**, so their
-  target arrives HTML-escaped: `count<5` as `count&lt;5`. Unescape it.
+  target arrives HTML-escaped: `'a<b'` as `'a&lt;b'`. Unescape it.
 - An error returned by an extension comes back as `*asciidoctor.Error`:
   message `asciidoctor: <Go error text> (RuntimeError)`, with the Go error in
   `Cause` (reachable with `errors.Is`/`As`).

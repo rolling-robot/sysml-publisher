@@ -313,16 +313,20 @@ and count = 3.
 
 == sysml-value
 
-Inline macro. Replaced by the value of an attribute. The target is a SysML
-expression evaluated with the page's element as its subject, so it can be:
+Inline macro. Replaced by the value of an attribute. The target names a
+feature, read with the page's element as its subject, so it can be:
 
 * an attribute of the page's element: `mass`, or a path such as
   `motor.power`;
 * an attribute of another element, by qualified name
   (`Values::custom::count`) or by a name relative to the page's element
   (`custom::count`, `custom.count`);
-* a quoted name, which may contain spaces: `'rated power'`;
-* arithmetic and comparisons on them: `count*2`, `count<5`.
+* a quoted name, which may contain spaces: `'rated power'`.
+
+The target is a name, not an expression: operators, literals and calls
+(`count*2`, `count<5`, `5`) stop the run with an error. To show a computed
+value, give it an attribute in the model (`attribute doubled = count*2;`) and
+name that attribute.
 
 The target cannot contain a space outside quotes or a `[`, so literal
 quantities such as `10 [kg]` cannot be written in it. A target is required:
@@ -332,7 +336,7 @@ The value is evaluated by OpenSysML with the page's element as the subject,
 so it is the element's own value, the value of a redefinition
 (`attribute :>> mass = 7.5 [kg];`), or the one it gets from its definition
 (`attribute mass : ISQ::MassValue default 5 [kg];` on a `part def`).
-Expressions are computed: `10 [km/h] * 2` gives `5.555555555555555 m/s`, since
+An attribute's value expression in the model is computed: `10 [km/h] * 2` gives `5.555555555555555 m/s`, since
 the engine computes in SI base units.
 
 * A quantity is shown as its magnitude and unit symbol: `5 kg`, `90 km/h`,
@@ -346,7 +350,7 @@ the engine computes in SI base units.
   prints a warning naming the page and the macro: one per page, however
   often the macro appears there.
 
-Syntax:: `sysml-value:<expression>[]`
+Syntax:: `sysml-value:<feature>[]`
 Attributes:: none
 
 An attribute the element does not have stops the run with an error naming the
