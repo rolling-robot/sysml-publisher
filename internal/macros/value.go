@@ -14,8 +14,17 @@ import (
 )
 
 // Value is the inline macro sysml-value:<attribute>[], replaced by the value
-// of that attribute of the page's element, units included (MC-14).
+// of that attribute of the page's element, units included (MC-14). The
+// target is a SysML expression evaluated with the page's element as its
+// subject, so it may be an attribute of the page's element (mass,
+// motor.power), a qualified name (Values::custom::count) or a name relative
+// to the page's element (custom::count), and arithmetic on them.
 const Value = "sysml-value"
+
+// valueMacroRx is Asciidoctor's long inline form with a target that may
+// hold quoted names with spaces: sysml-value:Pump::'top speed'[]. The target
+// still ends at the first "[" or space outside quotes.
+const valueMacroRx = `\\?sysml-value:((?:'(?:[^'\\]|\\.)*'|[^\s\['])+)\[(|.*?[^\\])\]`
 
 // CompositeText is shown for an attribute whose value is composite: one
 // made of attributes of its own, which has no single value to show.
@@ -28,6 +37,9 @@ func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.T
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", Value, err)
 			}
+			// Inline macros run after special characters are escaped, so
+			// count<5 arrives as count&lt;5.
+			target = html.UnescapeString(target)
 			macro := fmt.Sprintf("%s:%s[]", Value, target)
 			if target == "" {
 				return nil, fmt.Errorf("%s on the page of %s: no attribute named; write %s:<attribute>[]", macro, n.QualifiedName, Value)
@@ -47,7 +59,7 @@ func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.T
 				text = NoValue
 			}
 			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(text), nil, nil)
-		}), nil)
+		}), &asciidoctor.MacroOptions{Regexp: valueMacroRx})
 }
 
 type valueKind int

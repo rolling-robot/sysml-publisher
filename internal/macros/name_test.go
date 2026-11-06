@@ -44,23 +44,50 @@ func pageAt(t *testing.T, tr *tree.Tree, dir string) *tree.Node {
 
 func TestName(t *testing.T) {
 	tr, ad := setup(t)
-	cases := []struct{ dir, want string }{
-		// The element that owns the representation.
-		{"M/pd", "Name: pd."},
-		// Inherited from pd: the page's element, not the owner (MC-2).
-		{"M/a_b", "Name: a&lt;b."},
-		// An element without a name (PG-5).
-		{"M/unnamed-1", "Name: Unnamed."},
+	cases := []struct{ name, page, src, want string }{
+		// No target: the page's element.
+		{"own element", "M/pd", "sysml-name:[]", "pd"},
+		{"inherited representation: the page's element (MC-2)", "M/a_b", "sysml-name:[]", "a&lt;b"},
+		{"element without a name (PG-5)", "M/unnamed-1", "sysml-name:[]", "Unnamed"},
+		// A target (MC-15), looked up from the page of a<b.
+		{"qualified name", "M/a_b", "sysml-name:M::pd[]", "pd"},
+		{"relative name", "M/a_b", "sysml-name:pd[]", "pd"},
+		{"short name", "M/a_b", "sysml-name:P[]", "pd"},
+		{"qualified, short last segment", "M/a_b", "sysml-name:M::P[]", "pd"},
+		{"quoted segment, escaped", "M/pd", "sysml-name:M::'a<b'[]", "a&lt;b"},
+		{"element without a page, quoted name with a space", "M/pd", "sysml-name:M::Other::'top speed'[]", "top speed"},
+		{"relative, quoted name with a space", "M/pd", "sysml-name:Other::'top speed'[]", "top speed"},
+		{"escaped macro stays text", "M/pd", `\sysml-name:pd[]`, "sysml-name:pd[]"},
 	}
 	for _, c := range cases {
-		n := pageAt(t, tr, c.dir)
-		out, err := ad.Convert("Name: sysml-name:[].", &asciidoctor.Options{Attributes: Attributes(n)})
-		if err != nil {
-			t.Fatalf("%s: %v", c.dir, err)
-		}
-		if !strings.Contains(out, "<p>"+c.want+"</p>") {
-			t.Errorf("%s: output %q does not contain %q", c.dir, out, c.want)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			out, err := ad.Convert("Name: "+c.src+".", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "<p>Name: " + c.want + ".</p>"; !strings.Contains(out, want) {
+				t.Errorf("output %q does not contain %q", out, want)
+			}
+		})
+	}
+}
+
+func TestNameErrors(t *testing.T) {
+	tr, ad := setup(t)
+	page := Attributes(pageAt(t, tr, "M/pd"))
+	cases := []struct{ name, src, want string }{
+		{"unknown element", "sysml-name:Nothing[]",
+			`sysml-name:Nothing[] on the page of M::pd: the model has no element named "Nothing"`},
+		{"ambiguous plain name", "sysml-name:x[]",
+			`"x" names several elements (M::A::x, M::B::x); use a qualified name`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := ad.Convert(c.src, &asciidoctor.Options{Attributes: page})
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Errorf("err = %v, want one containing %q", err, c.want)
+			}
+		})
 	}
 }
 
@@ -68,5 +95,53 @@ func TestNameWithoutPageFails(t *testing.T) {
 	_, ad := setup(t)
 	if _, err := ad.Convert("sysml-name:[]", nil); err == nil {
 		t.Error("converting without the page attribute should fail")
+	}
+}
+
+// sysml-name:[<element>::]@<metadata>[::<attribute>][]: the names of
+// metadata applied to an element and of its attributes (MC-8). The cases
+// use testdata/metadata-table.
+func TestNameMetadata(t *testing.T) {
+	tr, ad := setupFixture(t, "metadata-table")
+	cases := []struct{ name, page, target, want string }{
+		{"metadata on the page's element", "Meta/bound", "@Info", "Info"},
+		{"its attribute", "Meta/bound", "@Info::owner", "owner"},
+		{"short name of the metadata def", "Meta/specialized", "@drv", "Derived"},
+		{"attribute of a supertype of the metadata def", "Meta/specialized", "@drv::origin", "origin"},
+		{"metadata on another element, qualified", "Meta/specialized", "Meta::bound::@Info::count", "count"},
+		{"metadata on another element, relative", "Meta/specialized", "bound::@Info::count", "count"},
+		{"prefix form #Info", "Meta/defaults", "@Info::sum", "sum"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := ad.Convert("N: sysml-name:"+c.target+"[].", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "<p>N: " + c.want + ".</p>"; !strings.Contains(out, want) {
+				t.Errorf("output %q does not contain %q", out, want)
+			}
+		})
+	}
+}
+
+func TestNameMetadataErrors(t *testing.T) {
+	tr, ad := setupFixture(t, "metadata-table")
+	page := Attributes(pageAt(t, tr, "Meta/bound"))
+	cases := []struct{ name, target, want string }{
+		{"metadata the element does not carry", "@Derived", "Meta::bound has no @Derived metadata"},
+		{"unknown attribute", "@Info::nothing", `metadata def Info has no attribute "nothing"`},
+		{"unknown metadata def", "@Missing", `the model has no metadata def "Missing"`},
+		{"too many segments", "@Info::owner::x", "write [<element>::]@<metadata>[::<attribute>]"},
+		{"no metadata name", "@::owner", "write [<element>::]@<metadata>[::<attribute>]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := ad.Convert("sysml-name:"+c.target+"[]", &asciidoctor.Options{Attributes: page})
+			want := "sysml-name:" + c.target + "[] on the page of Meta::bound: " + c.want
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("err = %v, want one containing %q", err, want)
+			}
+		})
 	}
 }

@@ -82,6 +82,35 @@ func TestValue(t *testing.T) {
 	}
 }
 
+// The target is an expression with the page's element as subject: its
+// attributes, qualified or relative names of other elements' attributes,
+// quoted names with spaces, and operators, < included (MC-14).
+func TestValueTargets(t *testing.T) {
+	tr, ad := setupFixture(t, "values")
+	page := Attributes(pageAt(t, tr, "Values/typical"))
+	cases := []struct{ name, target, want string }{
+		{"own attribute", "count", "3"},
+		{"quoted name with a space", "'rated power'", "2 kW"},
+		{"qualified name, another element", "Values::custom::count", "4"},
+		{"relative name, another element", "custom::count", "4"},
+		{"feature chain, another element", "custom.count", "4"},
+		{"quoted segment in a qualified name", "Values::Pump::'rated power'", "2 kW"},
+		{"arithmetic", "count*2", "6"},
+		{"comparison with <, escaped by Asciidoctor before the macro", "count<5", "true"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := ad.Convert("V: sysml-value:"+c.target+"[].", &asciidoctor.Options{Attributes: page})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "<p>V: " + c.want + ".</p>"; !strings.Contains(out, want) {
+				t.Errorf("output %q does not contain %q", out, want)
+			}
+		})
+	}
+}
+
 func TestValueErrors(t *testing.T) {
 	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", "values")}.Load(context.Background())
 	if err != nil {

@@ -48,6 +48,8 @@ package Values {
         attribute speed : ISQ::SpeedValue default 90 [km/h];
         attribute topSpeed : ISQ::SpeedValue default 10 [km/h] * 2;
         attribute count : Integer default 3;
+        // A quoted name with a space: sysml-value:'rated power'[] gives 2 kW.
+        attribute 'rated power' : ISQ::PowerValue default 2 [kW];
         attribute ratio : Real default 0.25;
         attribute label : String default "P-1";
         attribute ok : Boolean default true;

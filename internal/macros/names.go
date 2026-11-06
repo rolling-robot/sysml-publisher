@@ -10,9 +10,19 @@ import (
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
-// errNoSuchName is wrapped by resolve when nothing is called that name, so a
-// caller can try another reading of it (an element kind, for one).
+// errNoSuchName matches (errors.Is) the error resolve returns when nothing
+// is called that name, so a caller can try another reading of it (an
+// element kind, for one).
 var errNoSuchName = errors.New("no such name")
+
+// unknownNameError is that error; its text is the message for the reader.
+type unknownNameError struct{ name string }
+
+func (e unknownNameError) Error() string {
+	return fmt.Sprintf("the model has no element named %q", e.name)
+}
+
+func (e unknownNameError) Is(target error) bool { return target == errNoSuchName }
 
 // nameIndex finds the element a macro names, the way a SysML reference is
 // read: every segment of a qualified name may be a name or a short name.
@@ -80,7 +90,7 @@ func (x *nameIndex) names(id string) []string {
 //  4. as a plain name or short name only one element has.
 //
 // Each segment of a qualified name may be a name or a short name, quoted or
-// not. An unknown name gives an error wrapping errNoSuchName.
+// not. An unknown name gives an error matching errNoSuchName.
 func (x *nameIndex) resolve(name string, n *tree.Node, accept func(model.Element) bool) (string, error) {
 	if accept == nil {
 		accept = func(model.Element) bool { return true }
@@ -117,7 +127,7 @@ func (x *nameIndex) resolve(name string, n *tree.Node, accept func(model.Element
 			return "", fmt.Errorf("%q names several elements (%s); use a qualified name", name, strings.Join(qns, ", "))
 		}
 	}
-	return "", fmt.Errorf("%w: the model has no element named %q", errNoSuchName, name)
+	return "", unknownNameError{name}
 }
 
 // acceptLibrary applies accept to a library element, which has no element
@@ -147,6 +157,23 @@ func (x *nameIndex) walk(start, segs []string) []string {
 		}
 	}
 	return nil
+}
+
+// name is the element's name as declared, without quotes: its declared
+// name, or the one its owning membership gives it; a library element's last
+// segment (Real); UnnamedName when it has none.
+func (x *nameIndex) name(id string) string {
+	if lib, ok := x.m.Library[id]; ok {
+		return lib.Name()
+	}
+	e := x.m.Elements[id]
+	if n := e.Str("declaredName"); n != "" {
+		return n
+	}
+	if n := x.m.Elements[e.Ref("owningMembership")].Str("memberName"); n != "" {
+		return n
+	}
+	return tree.UnnamedName
 }
 
 func (x *nameIndex) qualifiedName(id string) string {

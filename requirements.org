@@ -140,10 +140,20 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   macro. Warnings shall be reported once per page and macro: a macro written
   more than once on a page, or shown there by more than one representation,
   warns once; each page that shows it warns on its own.
-- MC-8 :: The inline macro =sysml-name:[]= shall be replaced by the name of
-  the page's element (MC-2), "Unnamed" for an element without a name
-  (PG-5). It gives the element's name, not the page title (PG-8), so it can
-  be used inside a document title.
+- MC-8 :: The inline macro =sysml-name:[<element>]= shall be replaced by
+  an element's name, as declared and without quotes: without a target, the
+  name of the page's element (MC-2), "Unnamed" for an element without a name
+  (PG-5); with a target, the name of the element it names (MC-15), such as
+  =sysml-name:Model::AircraftPart[]=, =sysml-name:ap[]=. A target of the
+  form =[<element>::]@<metadata>[::<attribute>]= names metadata applied to
+  the page's element (or to =<element>=) and one of its attributes:
+  =sysml-name:@m[]= gives the metadata def's name, =sysml-name:@m::owner[]=
+  the attribute's name; the element shall carry that metadata, and the
+  attribute shall be one of the def's or its supertypes'. It gives the
+  element's name, not the page title (PG-8), so it can be used inside a
+  document title. A target that names no element, or several, or metadata
+  the element does not carry, or an attribute the metadata does not have,
+  shall stop the run with an error naming the macro and the page.
 - MC-9 :: The inline macro =sysml-qualified-name:[]= shall be replaced by
   the qualified name of the page's element (MC-2), as SysML writes it
   (=Model::'a<b'=). An element without a qualified name, such as an unnamed
@@ -190,9 +200,12 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   macro and the page (until TBD-8 decides otherwise).
 - MC-14 :: The inline macro =sysml-value:<attribute>[]= shall be replaced
   by the value of that attribute of the page's element (MC-2), the attribute
-  named as a SysML expression on the element (=mass=, =motor.power=). The
-  value is evaluated: the element's own, a redefinition's, or one from its
-  types. A quantity shall be shown as magnitude and unit symbol (=5 kg=,
+  named as a SysML expression with the page's element as its subject: an
+  attribute of the element (=mass=, =motor.power=), a qualified name
+  (=Values::custom::count=) or a name relative to the page's element
+  (=custom::count=), quoted names included (='rated power'=), and
+  operators on them (=count*2=, =count<5=). The value is evaluated: the
+  element's own, a redefinition's, or one from its types. A quantity shall be shown as magnitude and unit symbol (=5 kg=,
   =2.5 m³⋅s⁻¹=); a string without quotes; an enumeration literal as written
   (=Level::low=); no value as "(no value)". A composite value (one made of
   attributes of its own) shall be shown as =[composite]=, and the tool shall
@@ -207,6 +220,15 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   element of the model has. Each segment of a name may be the element's
   name or its short name, quoted or not. When several elements answer in
   the same step, the name is ambiguous.
+- MC-16 :: The inline macro =sysml-rep:[<element>][<language>]= shall be
+  replaced by the body of the textual representation in =<language>= that
+  the element owns: the page's element without a target, else the element
+  the target names, read as for =sysml-name= (MC-8, MC-15). The language is
+  compared in any letter case; several representations in it are joined in
+  declaration order. The body is inserted as plain text, escaped, not read
+  as AsciiDoc. Inherited representations do not count. A missing language,
+  or an element without a representation in it, shall stop the run with an
+  error naming the macro and the page.
 * Open questions
 - TBD-8 :: For MC-7: besides the warning, what does a failing macro leave on
   the page, and should it fail the run? Suggested: a visible placeholder

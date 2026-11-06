@@ -29,12 +29,33 @@ nothing answers to is an error too.
 
 == sysml-name
 
-Inline macro. Replaced by the name of the page's element. An element without
-a name gives `Unnamed`. It gives the element's name, not the page title, so it
-can be used in a document title: `= Element: sysml-name:[]` titles each page
-showing the representation with that page's element.
+Inline macro. Replaced by an element's name, as declared and without quotes.
 
-Syntax:: `sysml-name:[]`
+* `sysml-name:[]` gives the name of the page's element. An element without
+  a name gives `Unnamed`.
+* `sysml-name:<element>[]` gives the name of the element the target names,
+  read as described in <<naming>>: `sysml-name:Model::AircraftPart[]`,
+  `sysml-name:ap[]` (a short name), `sysml-name:Pump::'rated power'[]` (a
+  quoted name, which may contain spaces). A target that names no element,
+  or several, stops the run with an error naming the macro and the page.
+* `sysml-name:@<metadata>[]` and `sysml-name:@<metadata>::<attribute>[]`
+  give the name of metadata applied to the page's element, and of one of its
+  attributes. Put an element before the `@` for metadata on another element:
+  `sysml-name:wing::@m::owner[]`. The metadata is named by its metadata
+  def's name or short name. The element must carry that metadata, and the
+  attribute must be one of the def's or its supertypes'; otherwise the run
+  stops with an error.
++
+For `part wing : ap { @m { owner = "Petr"; } }`, on `wing`'s page
+`sysml-name:@m[]` gives `m` and `sysml-name:@m::owner[]` gives `owner`. To
+show the attributes' values, use `sysml-metadata-table::m[]`.
+
+It gives the element's name, not the page title, so it can be used in a
+document title: `= Element: sysml-name:[]` titles each page showing the
+representation with that page's element.
+
+Syntax:: `sysml-name:[]`, `sysml-name:<element>[]`,
+`sysml-name:[<element>::]@<metadata>[::<attribute>][]`
 Attributes:: none
 
 Example:
@@ -50,6 +71,52 @@ part mainPump : Pump;
 
 The page of `Pump` reads "The Pump pump moves coolant." The page of
 `mainPump` reads "The mainPump pump moves coolant."
+
+== sysml-rep
+
+Inline macro. Replaced by the body of an element's textual representation
+in another language than AsciiDoc: a formula in LaTeX, a constraint in OCL,
+a snippet of code.
+
+* `sysml-rep:[<language>]` gives the representation in that language that
+  the page's element owns.
+* `sysml-rep:<element>[<language>]` gives the one the named element owns.
+  The element is read as for `sysml-name`, see <<naming>>: qualified or
+  relative names, short names, quoted names, and
+  `[<element>::]@<metadata>[::<attribute>]`.
+
+The language is compared in any letter case and may be quoted:
+`sysml-rep:["python"]`. If the element owns several representations in the
+language, they are joined in the order they are declared. Only the
+element's own representations count, not inherited ones. The body is
+inserted as plain text: it is escaped and not read as AsciiDoc.
+
+A missing language, or an element without a representation in it, stops the
+run with an error naming the macro and the page.
+
+Representations in other languages are still reported by the warning
+"skipped representation in language ...", since they get no page of their
+own.
+
+Syntax:: `sysml-rep:[<language>]`, `sysml-rep:<element>[<language>]`
+Attributes:: the language, first and only positional attribute
+
+Example:
+
+[source,sysml]
+----
+part def Engine {
+    rep language "asciidoc"
+        /*
+        Power: `sysml-rep:[python]`
+        */
+    rep language "python"
+        /* power = torque * speed */
+}
+----
+
+The page of `Engine` reads "Power: `power = torque * speed`", the backquotes
+setting it in a monospace font.
 
 == sysml-qualified-name
 
@@ -233,9 +300,20 @@ and count = 3.
 
 == sysml-value
 
-Inline macro. Replaced by the value of an attribute of the page's element.
-The attribute is named as a SysML expression on the element: `mass`, or a
-path such as `motor.power`.
+Inline macro. Replaced by the value of an attribute. The target is a SysML
+expression evaluated with the page's element as its subject, so it can be:
+
+* an attribute of the page's element: `mass`, or a path such as
+  `motor.power`;
+* an attribute of another element, by qualified name
+  (`Values::custom::count`) or by a name relative to the page's element
+  (`custom::count`, `custom.count`);
+* a quoted name, which may contain spaces: `'rated power'`;
+* arithmetic and comparisons on them: `count*2`, `count<5`.
+
+The target cannot contain a space outside quotes or a `[`, so literal
+quantities such as `10 [kg]` cannot be written in it. A target is required:
+`sysml-value:[]` is left as plain text.
 
 The value is evaluated by OpenSysML with the page's element as the subject,
 so it is the element's own value, the value of a redefinition
@@ -255,7 +333,7 @@ the engine computes in SI base units.
   prints a warning naming the page and the macro: one per page, however
   often the macro appears there.
 
-Syntax:: `sysml-value:<attribute>[]`
+Syntax:: `sysml-value:<expression>[]`
 Attributes:: none
 
 An attribute the element does not have stops the run with an error naming the

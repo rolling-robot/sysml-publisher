@@ -52,6 +52,7 @@ func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, t *tree.Tree, wa
 	}
 	g := ad.Extensions().Group("sysml")
 	registerName(g, t)
+	registerRep(g, t)
 	registerQualifiedName(g, t)
 	registerShortName(g, t)
 	registerMembersList(g, t)

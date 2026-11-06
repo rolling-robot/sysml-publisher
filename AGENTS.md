@@ -214,8 +214,15 @@ name, like `Node.Name`.
   knows the page's element (MC-2, MC-5). A missing or unknown id is a
   renderer bug and returns an error.
 - `registerText(g, t, name, func(*tree.Node) string)`: an inline short-form
-  macro (`name:[]`) returning escaped text. `sysml-name`, `sysml-short-name`
-  and `sysml-qualified-name` are one line each on top of it.
+  macro (`name:[]`) returning escaped text. `sysml-short-name` and
+  `sysml-qualified-name` are one line each on top of it; `sysml-name` has
+  its own registration because it takes an optional target.
+- **Inline targets** (`name.go`, `value.go`): Asciidoctor's inline forms
+  take a target always (long) or never (short), and the target stops at a
+  space. `sysml-name` and `sysml-value` set `MacroOptions.Regexp`
+  (`nameMacroRx`, `valueMacroRx`): an optional or required target that may
+  contain quoted segments with spaces. Targets arrive HTML-escaped (`<` as
+  `&lt;`), so both `html.UnescapeString` the target first.
 - `nameIndex.resolve(name, page, accept)` (`names.go`): the one element
   lookup (MC-15), used by `sysml-members-list` and `sysml-metadata-table`.
   It walks names segment by segment over `ownedMember`, so every segment
@@ -237,7 +244,8 @@ name, like `Node.Name`.
 
 | Macro | Form | Reads | Notes |
 |---|---|---|---|
-| `sysml-name:[]` | inline | `Node.Name` | escaped text |
+| `sysml-name:[<element>]` | inline | `Node.Name`, `nameIndex`, `metadataIndex` | escaped text; no target: page's element; target resolved by MC-15; `[<element>::]@<metadata>[::<attribute>]` gives the metadata def's or attribute's name (`nameTarget`) |
+| `sysml-rep:[<element>][<language>]` | inline | `Tree.Model` (`repsByOwner`), `nameTarget` | body of the element's own representation in that language (case-insensitive, several joined), escaped plain text; target as `sysml-name` |
 | `sysml-short-name:[]` | inline | `Node.ShortName` | empty when none |
 | `sysml-qualified-name:[]` | inline | `Node.QualifiedName` | positional name for unnamed |
 | `sysml-doc::[]` | block | `Node.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block |
@@ -425,7 +433,11 @@ Known gaps (from the test review, November 2026):
 - A line of the form `[...]` on its own is a block attribute line, not text
   (easy to trip over in tests).
 - An inline macro in long form needs a target: `sysml-value:[]` is left as
-  plain text, not an error.
+  plain text, not an error. `MacroOptions.Regexp` replaces the pattern (first
+  group: target, second: attributes) for optional targets or targets with
+  spaces.
+- **Inline macros run after the special-characters substitution**, so their
+  target arrives HTML-escaped: `count<5` as `count&lt;5`. Unescape it.
 - An error returned by an extension comes back as `*asciidoctor.Error`:
   message `asciidoctor: <Go error text> (RuntimeError)`, with the Go error in
   `Cause` (reachable with `errors.Is`/`As`).

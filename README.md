@@ -281,9 +281,12 @@ the element that owns the representation.
 | Macro | Kind | Replaced by |
 |---|---|---|
 | `sysml-name:[]` | inline | the element's name |
+| `sysml-name:<element>[]` | inline | another element's name, by qualified or relative name |
+| `sysml-name:@<metadata>::<attribute>[]` | inline | the name of metadata on the element, or of its attribute |
 | `sysml-qualified-name:[]` | inline | its qualified name, `Model::aircraft::wing` |
 | `sysml-short-name:[]` | inline | its short name, the `<W>` in `part def <W> Wheel` |
-| `sysml-value:<attribute>[]` | inline | the attribute's value with its unit, `9 kg` |
+| `sysml-rep:[<element>][<language>]` | inline | the body of the element's representation in another language, as plain text |
+| `sysml-value:<attribute>[]` | inline | the attribute's value with its unit, `9 kg`; also another element's attribute (`Model::aircraft::engine::mass`) or an expression (`mass*2`) |
 | `sysml-doc::[]` | block | the element's `doc` comments |
 | `sysml-members-list::[]` | block | a list of its members with their types |
 | `sysml-members-list::<element>[]` | block | its members typed by, subclassing or subsetting `<element>` |
