@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -14,37 +15,32 @@ func load(t *testing.T, dir string) (*Model, error) {
 	return Folder{Dir: filepath.Join("..", "..", "testdata", dir)}.Load(context.Background())
 }
 
-// A model of two files converts as one: the usage in top.sysml is typed by
-// the definition in lib.sysml, and the definition's representation is there.
+// A model of two files is read as one: the usage in top.sysml is typed by
+// the definition in lib.sysml. Load counts the elements and finds the
+// top-level ones in file order.
 func TestLoadCrossFileModel(t *testing.T) {
-	m, err := load(t, "crossfile")
-	if err != nil {
-		t.Fatal(err)
-	}
+	m := loadOpen(t, "crossfile")
 	if len(m.Files) != 2 {
 		t.Fatalf("files = %v, want 2", m.Files)
 	}
-	x, ok := m.Elements["Top__x"]
-	if !ok {
-		t.Fatal("Top::x missing from the element array")
+	types, err := m.Types(t.Context(), "Top::x")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got := x.Refs("type"); len(got) != 1 || got[0] != "Lib__pd" {
-		t.Errorf("Top::x type = %v, want [Lib__pd]", got)
+	if len(types) != 1 || types[0].ID != "Lib__pd" {
+		t.Errorf("Top::x types = %+v, want [Lib::pd]", types)
 	}
-	var rep Element
-	for _, id := range m.Order {
-		if e := m.Elements[id]; e.Type() == "TextualRepresentation" {
-			rep = e
-		}
+	if got := ids(m.Tops); !slices.Equal(got, []string{"Lib", "Top"}) {
+		t.Errorf("tops = %v, want [Lib Top]", got)
 	}
-	if rep == nil {
-		t.Fatal("no TextualRepresentation in the element array")
+	// What a query returns: Lib, Lib::pd, its representation, Top and
+	// Top::x; relationships (the import, the memberships, the typing) and
+	// the implicit multiplicity are not among them.
+	if m.ElementCount != 5 {
+		t.Errorf("element count = %d, want 5", m.ElementCount)
 	}
-	if rep.Ref("owner") != "Lib__pd" || rep.Str("language") != "asciidoc" || strings.TrimSpace(rep.Str("body")) != "From lib" {
-		t.Errorf("representation = owner %q language %q body %q", rep.Ref("owner"), rep.Str("language"), rep.Str("body"))
-	}
-	if m.ExperimentalNotice == "" {
-		t.Error("expected the experimental notice for api-json")
+	if !m.Contains("Lib__pd") {
+		t.Error("Contains(Lib__pd) = false, want true")
 	}
 }
 

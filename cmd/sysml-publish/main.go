@@ -131,11 +131,8 @@ func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir string) 
 	}
 	defer m.Close()
 	logger.InfoContext(ctx, "model loaded",
-		"folder", modelDir, "files", len(m.Files), "elements", len(m.Elements),
+		"folder", modelDir, "files", len(m.Files), "elements", m.ElementCount,
 		"warnings", len(m.Warnings), "duration", time.Since(stage))
-	if m.ExperimentalNotice != "" {
-		logger.InfoContext(ctx, "the SysML v2 API JSON conversion is experimental in OpenSysML")
-	}
 	for _, w := range m.Warnings {
 		logger.WarnContext(ctx, "model warning", "diagnostic", w)
 	}

@@ -62,7 +62,7 @@ func TestJSONLogWithTimings(t *testing.T) {
 		msgs[rec["msg"].(string)] = rec
 	}
 	// The debug records time every stage.
-	for _, msg := range []string{"model parsed", "model queried", "model converted to API JSON", "page tree built", "page converted", "pages rendered", "site written", "site published"} {
+	for _, msg := range []string{"model parsed", "model queried", "page tree built", "page converted", "pages rendered", "site written", "site published"} {
 		rec, ok := msgs[msg]
 		if !ok {
 			t.Errorf("no %q record", msg)
