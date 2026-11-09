@@ -34,7 +34,7 @@ go test ./...                           # parses and renders the fixture models
 go vet ./...
 ```
 
-- **Dependencies are published tags** in `go.mod`: OpenSysML `v0.12.0` and
+- **Dependencies are published tags** in `go.mod`: OpenSysML `v0.12.1` and
   asciidoctorg `v0.1.0`; `go install …/cmd/sysml-publish@latest` must work,
   so `go.mod` never carries `replace` directives.
 - **asciidoctorg is installable only from a release tag.** Its `master` keeps
@@ -507,7 +507,7 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    quotes; rationals become floats) are reasonable but unspecified for units
    with spaces or for values beyond float precision.
 7. **`Site.Write` is not atomic** (remove, then write).
-8. **Pinned to old library tags**: `go.mod` uses OpenSysML `v0.12.0` and
+8. **Pinned to old library tags**: `go.mod` uses OpenSysML `v0.12.1` and
    asciidoctorg `v0.1.0`; fixes on asciidoctorg's `master` (three unpushed
    commits as of November 2026, e.g. stopping Ruby threads on `Close`) reach
    users only with a new asciidoctorg tag.
