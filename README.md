@@ -392,8 +392,9 @@ This is a first version.
 - There is no macro yet for diagrams of SysML views (`sysml-view` is planned).
 - A failing macro stops the whole run; whether it should instead leave a
   placeholder and warn is undecided.
-- The tool relies on OpenSysML's SysML v2 API JSON export, which OpenSysML
-  marks as experimental (the tool says so on every run).
+- The tool reads models through OpenSysML's SysML v2 API queries and element
+  reads, which are not in an OpenSysML release yet: it is built against a
+  development commit of OpenSysML.
 
 ## Further reading
 

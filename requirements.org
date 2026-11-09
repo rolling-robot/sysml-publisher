@@ -22,6 +22,12 @@
   ignored.
 - DS-3 :: (Post-MVP) When an external service is used, the user shall give
   its SysML v2 API base URL and the project to read on the command line.
+- DS-4 :: The tool shall read model data the way the SysML v2 API serves
+  it: by element queries, reads of one element's properties, and
+  expression evaluation, not by exporting the whole model. It shall find
+  the page tree by querying for the textual representations, then grow it
+  from their owners: the elements that inherit them, and the owners of
+  both up to the top of the model.
 
 * Command line
 - CLI-1 :: The tool shall be a command-line program whose single function
@@ -37,7 +43,9 @@
 - CLI-6 :: Everything the tool reports shall go to stderr as structured log
   records (Go's log/slog): human-readable text by default, JSON with
   =-log-format json=. =-v= shall add debug records giving the duration of
-  each stage (parse, convert, page tree, each page, render, write).
+  each stage (parse, query, page tree, each page, render, write), and the
+  page tree record shall count the model's queries, element reads and
+  cache hits (DS-4).
 - CLI-7 :: Interrupting the tool (Ctrl-C, SIGTERM) shall stop it, write
   nothing, and exit with status 130.
 

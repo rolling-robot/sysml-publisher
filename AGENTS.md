@@ -36,8 +36,8 @@ go vet ./...
 
 - **Dependencies are versions anyone can download** in `go.mod`: OpenSysML
   at a `develop` commit (`v0.12.2-0.20261109213743-e074d3f40c95`, for the
-  query properties `body`, `language` and `textualRepresentation`, which no
-  tag has yet; move to the next tag when it is released) and asciidoctorg
+  query properties `body`, `language` and `textualRepresentation` and for
+  `Client.ElementProperties`, which no tag has yet; move to the next tag when it is released) and asciidoctorg
   `v0.1.0`; `go install …/cmd/sysml-publish@latest` must work, so `go.mod`
   never carries `replace` directives. OpenSysML pseudo-versions work: it
   has no submodules.
@@ -77,8 +77,8 @@ go vet ./...
 
 ```
 cmd/sysml-publish/main.go   CLI: flags, wiring, messages, exit codes
-internal/model/             load + parse (OpenSysML in-process) -> API JSON elements; Evaluate
-internal/tree/              which elements get pages, inheritance, names, paths  (pure)
+internal/model/             load + parse (OpenSysML in-process); Query, Props (cached element reads), Evaluate
+internal/tree/              which elements get pages, inheritance, names, paths (reads the model, writes nothing)
 internal/site/              render pages (asciidoctorg + html/template), titles, write
 internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT) + layout.css
 internal/site/page.html.tmpl
@@ -98,10 +98,13 @@ requirements.org            requirements, decisions, open questions
         │  model.Folder.Load
         ▼
  opensysml.New() ─ ParseFiles (one model, all files) ─ diagnostics: errors stop the run (ER-2)
-        │  Convert(api-json)                          (engine kept open for Evaluate)
+        │  Query(all elements) -> ElementCount, Tops, own ids  (engine kept open)
         ▼
- model.Model { Elements map[@id]Element, Order, Files, Warnings }
-        │  tree.Build                                  pure, no I/O
+ model.Model { Files, Warnings, Tops; Query, Props, Evaluate }      (DS-4)
+        │  tree.Build(ctx, m)
+        │    Query TextualRepresentation -> AsciiDoc ones, their owners documented
+        │    Query Usage/Definition -> generals walk -> inherited representations
+        │    owner chains up to the tops -> ancestors; ownedMember order
         ▼
  tree.Tree { Root, Pages (pre-order), ByID, Model, Warnings }
         │  site.Render
@@ -126,49 +129,64 @@ Everything is in memory until `Site.Write`; a failing run writes nothing.
 - `Folder{Dir}.Load` walks the folder for `*.sysml`/`*.kerml` (sorted, so runs
   are deterministic; hidden files and folders skipped, DS-2), parses them **as one model** (`ParseFiles`, so
   cross-file references resolve — DS-2), splits diagnostics into errors
-  (returned as `*DiagnosticsError`) and warnings, and converts the model to the
-  SysML v2 API JSON element array (`Convert(..., FormatAPIJSON)`).
-- `Model.Library` holds the standard-library elements the model refers to
-  (`@id` → qualified name, metaclass), from `Conversion.LibraryReferences`;
-  they are not in `Elements`. `LibraryElement.Name()` is the last segment
-  (`Real` for `ScalarValues::Real`).
-- `Element` is `map[string]any` with helpers `ID`, `Type`, `Str`, `Ref`, `Refs`
-  (`Refs` accepts single or multi-valued references, so callers need not know
-  the cardinality).
-- The OpenSysML client stays open after a successful load for
-  `Model.Evaluate(ctx, subjectQualifiedName, expression)`; the caller must
-  `Close()` it (the CLI defers it; tests mostly do not).
+  (returned as `*DiagnosticsError`) and warnings, and queries every element
+  once (`readIndex`): `ElementCount`, `Tops` (top-level elements, file
+  order) and the model's own ids (`Contains`).
+- **Reading (DS-4)**: no whole-model export. `Query` selects elements
+  (OpenSysML's SysML v2 API query; one value per property, so never read a
+  multi-valued property through it — §13). `Props(ctx, id, names...)` reads
+  one element's metamodel properties through `ElementProperties` (the API's
+  get-element), by form id (`M__pd`), qualified name or positional id
+  (`M::@2`); values are cached per element and property, the entry shared
+  by every name it was asked by. `Ref{ID, QualifiedName, Metaclass}` is an
+  element reference; `Ref.Name()` is the unquoted last segment.
+- **Element facts** (`facts.go`), for any element, page or not: `Name`
+  (derived: redefinitions borrow names), `ShortName`, `QualifiedName`
+  (positional name `M::@2` for an unnamed element, counted in the owner's
+  `ownedMember`), `Owner`, `Members`, `Types`, `Docs`,
+  `Representation(s)`, `Generals` (all owned specializations),
+  `Redefined`. `Generals` of a library element are none and unread (§13,
+  13).
+- `Stats()` counts queries, element reads and cache hits; the CLI logs them
+  with the page tree record.
+- The OpenSysML client stays open after a successful load for `Props`,
+  `Query` and `Model.Evaluate(ctx, subjectQualifiedName, expression)`; the
+  caller must `Close()` it. Not safe for concurrent use (the cache).
 - `Source` is an interface so a post-MVP SysML v2 API service source (DS-1,
   DS-3) can be added; today `Folder` is its only implementation, and
   `Evaluate` is not part of the interface.
 
 ### 5.2 `internal/tree`
 
-Pure functions over `model.Model`; this is where the requirements about *which*
-pages exist live.
+`Build(ctx, m)` reads the model and writes nothing; this is where the
+requirements about *which* pages exist live. It starts from a query (DS-4)
+and reads only the elements that get pages and their surroundings.
 
-- **Representations**: `TextualRepresentation` elements whose `language` is
-  `adoc`/`asciidoc` (case-insensitive), grouped by `owner`. Others → warning
-  (PG-4).
-- **Inheritance** (PG-7): a generals graph from every element carrying both
-  `specific` and `general` (FeatureTyping, Subclassification, Subsetting,
-  Redefinition, ReferenceSubsetting). For usages and definitions, a BFS over
-  it collects the representations of reached elements, nearest first, each
-  once, cycle-safe.
-- **Pages**: an element is *documented* if it has own or inherited
-  representations; it gets a node if it is documented or has a documented
-  descendant (PG-1, PG-6); other branches are pruned (PT-4).
-- **Names**: `declaredName`, else the owning membership's `memberName`
-  (redefinitions borrow names), else `Unnamed` with the `Unnamed` flag set.
+- **Representations**: one Query for `TextualRepresentation`; those whose
+  `language` is `adoc`/`asciidoc` (case-insensitive) are grouped by owner,
+  and their owners are documented. Others → warning (PG-4).
+- **Inheritance** (PG-7): one Query for `Usage`/`Definition`; for each, a
+  BFS over `Model.Generals` (every owned specialization: typing,
+  subclassification, subsetting, redefinition, reference subsetting)
+  collects the representations of reached elements, nearest first, each
+  once, cycle-safe (OpenSysML rejects specialization cycles anyway). No
+  query asks "what specializes X" across subsetting (§13, 2), hence the
+  walk.
+- **Pages**: documented elements and their owners up to the tops are kept
+  (PG-1, PG-6); the tree is laid out from `Model.Tops` over `ownedMember`,
+  in declaration order; anything not kept is pruned (PT-4).
+- **Names**: `Model.Name` (derived `name`: redefinitions borrow names),
+  else `Unnamed` with the `Unnamed` flag set.
 - **Paths**: `Dir` is the slash path of folder segments (PT-1). Segments are
   made filesystem-safe; unnamed siblings become `unnamed-N` (PT-6); clashes
   (case-insensitive) get `-2`, `-3`.
 - **Per-node data for macros**: `Docs` (own `doc` bodies, trimmed),
-  `ShortName`, `Members` (owned members minus annotations, each with the
-  names of its `Types`, library types included).
-- **`Tree.Specializes(specific, general)`**: transitive typing,
+  `ShortName`, `Members` (owned members minus annotations and
+  multiplicities, each with its `Metaclass` and the names of its `Types`,
+  library types named from the reference, unread).
+- **`Tree.Specializes(ctx, specific, general)`**: transitive typing,
   subclassification or subsetting (redefinition included), over the same
-  `Tree.generals` graph that representation inheritance walks. Used by
+  `Model.Generals` that representation inheritance walks. Used by
   `sysml-members-list`.
 - `Href(from, to)` is the one relative-link function (shortest path,
   segments URL-escaped, `+` as `%2B`).
@@ -217,12 +235,18 @@ name, like `Node.Name`.
   `parent.Document()` and looks it up in `tree.ByID`. This is how every macro
   knows the page's element (MC-2, MC-5). A missing or unknown id is a
   renderer bug and returns an error.
-- `registerText(g, t, name, ofPage, ofElement)`: an inline macro
+- `env` (`macros.go`): what the macros of one rendering share — the
+  rendering's context, the tree, the model, `nameIndex`, `metadataIndex`
+  and the lazily built `kindIndex`. `Register` makes one and passes it to
+  every `register<Name>(g, e)`. Macros read the model only through
+  `model.Model` (`Props`, `Query`, the element facts, `Evaluate`), never a
+  raw element map.
+- `registerText(g, e, name, ofPage, ofElement)`: an inline macro
   `name:[<element>]` returning escaped text: `ofPage(node)` without a
-  target, `ofElement(md, id)` for the element `nameTarget` resolves.
+  target, `ofElement(id)` for the element `nameTarget` resolves.
   `sysml-name`, `sysml-qualified-name` and `sysml-short-name` are a few
-  lines each on top of it; `Tree.QualifiedName`, `Tree.ShortName` and
-  `Tree.Docs` answer for any element, page or not.
+  lines each on top of it; the element facts of `model.Model` answer for
+  any element, page or not.
 - **Inline targets** (`macros.go`, `value.go`): Asciidoctor's inline forms
   take a target always (long) or never (short), and the target stops at a
   space. `optionalTargetRx(name)` (used by `registerText` and `sysml-rep`)
@@ -232,15 +256,25 @@ name, like `Node.Name`.
   Block macro targets (`sysml-doc`) arrive as written.
 - `nameIndex.resolve(name, page, accept)` (`names.go`): the one element
   lookup (MC-15), used by `sysml-members-list` and `sysml-metadata-table`.
-  It walks names segment by segment over `ownedMember`, so every segment
-  may be a name or a short name: from the top-level elements, then from
-  the page's element and each owner outward, then library qualified names,
-  then a unique plain name. `accept` narrows the candidates (metadata defs
+  It walks names segment by segment over `ownedMember` (`Props`), so every
+  segment may be a name or a short name: from the top-level elements, then
+  from the page's element and each owner outward, then library qualified
+  names (`Props` by qualified name), then a plain name or short name only
+  one model element has (`Query`, cached per name). `accept` narrows the candidates (metadata defs
   only); an unknown name wraps `errNoSuchName`, so a caller can try another
   reading (an element kind). Relative lookup sees owned members only, not
   inherited or imported ones.
 - `kindIndex` (`kinds.go`): metaclass names copied from OpenSysML's
-  internal export tables, plus every `@type` in the model.
+  internal export tables, plus every `@type` a query over the whole model
+  returns; built on first use.
+- `metadataIndex` (`metadata_table.go`): metadata defs (by `nameIndex`),
+  an element's usages of one (`metadataDefinition`), a def's attributes
+  (own, then supertypes'; redefined ones once) and an attribute's value
+  expression (bound, else the def's, following redefinitions).
+  `valueText` writes an expression back from its parts (literals,
+  enumeration literals as `Level::low`, operators, parenthesised inside),
+  since the model gives no source text (§13); anything else shows as its
+  metaclass.
 - `passthrough(html)`: wraps finished HTML in `+++…+++` for places where
   AsciiDoc substitutions would otherwise run over model text (list items,
   table cells).
@@ -252,13 +286,13 @@ name, like `Node.Name`.
 | Macro | Form | Reads | Notes |
 |---|---|---|---|
 | `sysml-name:[<element>]` | inline | `Node.Name`, `nameIndex`, `metadataIndex` | escaped text; no target: page's element; target resolved by MC-15; `[<element>::]@<metadata>[::<attribute>]` gives the metadata def's or attribute's name (`nameTarget`) |
-| `sysml-rep:[<element>][<language>]` | inline | `Tree.Model` (`repsByOwner`), `nameTarget` | body of the element's own representation in that language (case-insensitive, several joined), escaped plain text; target as `sysml-name` |
+| `sysml-rep:[<element>][<language>]` | inline | `Model.Representations`, `nameTarget` | body of the element's own representation in that language (case-insensitive, several joined), escaped plain text; target as `sysml-name` |
 | `sysml-short-name:[<element>]` | inline | `Node.ShortName`, `Tree.ShortName` | empty when none; target as `sysml-name` |
 | `sysml-qualified-name:[<element>]` | inline | `Node.QualifiedName`, `Tree.QualifiedName` | positional name for unnamed; target as `sysml-name` |
 | `sysml-doc::[<element>][]` | block | `Node.Docs`, `Tree.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block; target as `sysml-name`; macros in the docs still see the page's element |
 | `sysml-members-list::[<element or kind>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
-| `sysml-iface-ends::[<element>][]` | block | `Tree.Model` (`connectorEnds`), `nameTarget` | ulist of owned ends (`isEnd`): end name (`memberName`) and the connected feature from its `ReferenceSubsetting` (a `chainingFeature` path), segments linked; the end named `source` first; no ends → error; `depth` (named or positional): last n segments of owners(chain[0]) + chain, `::`-joined and quoted, `all` the whole path; none: chain as written with `.` |
-| `sysml-metadata-table::<def>[]` | block | `Tree.Model` | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
+| `sysml-iface-ends::[<element>][]` | block | `Props` (`connectorEnds`: `ownedFeature`, `isEnd`, `ownedReferenceSubsetting`, `chainingFeature`), `nameTarget` | ulist of owned ends (`isEnd`): end name (`name`) and the connected feature from its `ReferenceSubsetting` (a `chainingFeature` path), segments linked; the end named `source` first; no ends → error; `depth` (named or positional): last n segments of owners(chain[0]) + chain, `::`-joined and quoted, `all` the whole path; none: chain as written with `.` |
+| `sysml-metadata-table::<def>[]` | block | `metadataIndex` (`Props`) | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
 | `sysml-value:<feature>[]` | inline | `Model.Evaluate` | target must be a feature reference (`featureRefRx`: names, `::`, `.`), not an expression, or `[<element>::]@<metadata>::<attribute>` (`parseMetadataRef`, value read as `sysml-metadata-table` does, not evaluated); OpenSysML evaluates it with the page element as subject; units formatted; composite → `[composite]` + warning |
 
 Error policy today: a macro that cannot resolve what the user wrote (unknown
@@ -316,16 +350,18 @@ test to change deliberately when TBD-8 is implemented.
    expected output (see `testdata/metadata/` and `testdata/values/`). Check it
    parses: `bin/sysml-publish -model testdata/<case> -out bin/x`.
 3. Create `macros/<name>.go` with a `const` for the name and a
-   `register<Name>(g, t[, warn])`; call it from `Register`.
-   - Warn with `warn(Warning{Page: n, Macro: <macro as written>, Message: ...})`;
+   `register<Name>(g, e)` taking the shared `env`; call it from `Register`.
+   - Warn with `e.warn(Warning{Page: n, Macro: <macro as written>, Message: ...})`;
      `Message` must not repeat the page or the macro.
    - Inline text from a node field: use `registerText`.
    - Block content: return a block (`CreateOpenBlock` + `ParseContent`,
      `CreateList`, `CreateTable`), or `nil` to drop the macro line.
-   - Needs elements without pages: use `t.Model`; needs evaluation: use
-     `t.Model.Evaluate` with `n.QualifiedName` as subject.
-   - If the macro needs new per-element data, prefer adding a field to
-     `tree.Node` filled in `tree.Build` over scanning the model per call.
+   - Needs elements without pages: use the element facts or `e.m.Props`
+     with the properties you need (cached); a whole-model `e.m.Query` only
+     when nothing else answers (DS-4). Needs evaluation: use
+     `e.m.Evaluate(e.ctx, n.QualifiedName, ...)`.
+   - Never read a standard-library element you only need the name of: its
+     `Ref` carries the qualified name, and a read is slow (§13, 13).
 4. Test in `macros/<name>_test.go`: convert a snippet with
    `ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(node)})`.
    Cover: the page's own element, an inherited representation (the usage's
@@ -393,7 +429,7 @@ Known gaps (from the test review, November 2026):
    (`TestInheritance`, `TestName`, `TestQualifiedName`, `TestShortName`,
    `TestPageTitles`, `TestMetadata`, `TestSegment`, `TestUsageErrors`, ...).
 4. **`tree` is pure but tested only through the parser.** Hand-built
-   `model.Model{Elements: ...}` tests would cover cycles, missing owners and
+   models (a fake behind `Props`/`Query`) would cover missing owners and
    single- vs multi-valued `Refs` in microseconds. `TestHrefEscapesSegments`
    lives in `site_test.go`, so `tree.Href` shows 0% coverage in `tree`, and
    its shortest-path cases are only checked through sidebar HTML.
@@ -409,34 +445,34 @@ Known gaps (from the test review, November 2026):
 ## 9. Dependencies and their quirks
 
 **OpenSysML** (`client/opensysml`, in-process):
-- The API JSON form is flagged experimental by OpenSysML; the CLI prints a
-  note. Pin the OpenSysML version.
+- Pin the OpenSysML version: `Query` and `ElementProperties` are on
+  `develop`, not in a tag yet.
 - Comment bodies keep a trailing space before `*/` (trimmed for docs, not for
   representations — harmless for AsciiDoc).
-- `Convert`'s doc comment says "a model of one document"; multi-document
-  conversion works in practice (tested in `internal/model`).
-- **Library elements are not in the in-process element array**: a reference
-  to `ScalarValues::Real` is a bare `{"@id": <uuid>}`; the id, qualified
-  name and metaclass come in `Conversion.LibraryReferences` (kept as
-  `Model.Library`). The `sysml -convert api-json` CLI writes them as
-  elements instead, so do not judge the in-process output by the CLI's.
+- **Ids**: `ElementProperties` returns the element form's ids (`M__pd`,
+  `U___401`); `Query` names elements by qualified or positional name
+  (`U::@1`); `Props` accepts all three. Library elements have uuid ids and
+  carry their library qualified name in the reference.
+- **Query** returns only the model's own elements, not relationships or
+  implicit multiplicities, in declaration order; a top-level element has no
+  `owner` in it (root namespaces are not returned).
 - A usage's `type` includes the types it gets through subsetting or
   redefinition (`part front :> wheels;` gives `Wheel`; v0.12.1 left them
   out).
 - Every usage owns a `Multiplicity` member, its implicit `[1..1]` included
   (unnamed, through an `OwningMembership`); `tree` leaves multiplicities out
   of `Node.Members`.
-- Derived properties (`documentation`, `textualRepresentation`,
-  `representedElement`, `inheritedMember`) are absent from the API JSON; use
-  `owner` and the specialization relationships instead.
+- Derived properties are answered by `ElementProperties` (`name`, `type`,
+  `documentation`, `textualRepresentation`, `owner`, `ownedMember`, ...);
+  one the metaclass does not declare reads as empty (`Unsupported`).
 - `Evaluate` returns typed values; derived units come back qualified and
   quoted (`SI::'m³⋅s⁻¹'`), arithmetic is done in SI base units
   (`10 [km/h] * 2` → `50/9 m/s`), composite attribute values come back as
   `InstanceID`.
 - View rendering to DOT/Mermaid exists only in `internal/ir/view` and the
   `sysml` CLI (TBD-9).
-- The standard `Query` RPC supports only a closed set of properties (no
-  `body`, `language`); this tool does not use it.
+- `Query` supports a closed set of properties (on develop: `body`,
+  `language`, `textualRepresentation` added) and one value each (§13, 1).
 
 **asciidoctorg** (Asciidoctor in an embedded Ruby, no cgo):
 - Extensions are registered per instance; there is one instance per run.
@@ -470,8 +506,10 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
 - **Clear, one-directional pipeline** with pure core logic: `tree` has no
   I/O and decides every page, path and inheritance question, which made the
   requirements testable one by one.
-- **Single source of model truth**: one parse, one API JSON conversion, one
-  element map; macros and tree read the same data.
+- **One way to read the model** (DS-4): tree and macros read it through
+  SysML v2 API operations — Query, element reads, evaluation — on one
+  parse, with one cache; the same operations a SysML v2 API service offers
+  (DS-1, DS-3).
 - **The macro mechanism is small and uniform**: page context via a document
   attribute, one registration point, shared helpers for text, links and
   passthrough. Adding the seven macros needed no change to the renderer
@@ -485,19 +523,25 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
 
 ### Weaknesses and risks
 
-1. **Reliance on an experimental, OpenSysML-specific export.** The API JSON
-   form is marked experimental, element ids are positional for unnamed
-   elements, and several behaviours (trailing spaces, unit spellings) are
-   observed, not specified. An OpenSysML upgrade can change pages silently.
+1. **Reliance on an untagged OpenSysML API.** `ElementProperties` and the
+   query properties used are on `develop` only; element ids are
+   OpenSysML's element-form ids, and several behaviours (trailing spaces,
+   unit spellings, derived `type`, implicit multiplicities) are observed,
+   not specified. An OpenSysML upgrade can change pages silently (§13
+   lists what has already).
 2. **Rendering cost scales with pages × inherited representations ×
    macros.** Every page re-converts every representation it shows (MC-3),
-   and `sysml-value` calls the evaluator per macro per page; `sysml-metadata-table`
-   scans the whole model to resolve a def name on every call. Fine for small
-   models; a definition shared by hundreds of usages multiplies all of it.
-3. **Macros reach into two data sources.** Most read `tree.Node` fields;
-   `sysml-metadata-table` reads raw `model.Element`s and `sysml-value` calls the
-   engine. The tree is no longer the single view model, and `Tree.Model` plus
-   an open engine handle couple rendering to the parser's lifetime.
+   and `sysml-value` calls the evaluator per macro per page. Model reads are
+   cached, so repeated lookups are cheap; the inheritance walk reads every
+   usage's and definition's specializations once (`-v` logs the counts).
+   Fine for small models; a definition shared by hundreds of usages
+   multiplies the conversions.
+3. **Rendering needs the open engine.** Macros read `tree.Node` fields and,
+   for anything else, the model through `model.Model`; both reads and
+   evaluation need the OpenSysML engine open until rendering ends, so
+   rendering is tied to the parser's lifetime. The macros still take the
+   concrete `*tree.Tree`, which keeps the `macros` package unusable from
+   other modules (`internal/`).
 4. **Error policy is harsh and the messages are poor.** User mistakes in
    macros fail the whole run at the first failing page, so other pages with
    the same mistake go unreported. A message such as `converting the
@@ -616,3 +660,27 @@ rather than deleting it, and drop the workaround once `go.mod` has the fix.
     redefinition.
 11. **`develop` needs goldmark v1.8.7** while v0.12.1 used v1.8.6; a module
     cache filled for v0.12.1 cannot build develop with `GOPROXY=off`.
+12. **`ElementProperties` lists library relationships it cannot read**
+    (develop). `ScalarValues::Real`'s `ownedSpecialization` holds a
+    `Subclassification` whose id (`bead6e69-…`) `ElementProperties` answers
+    with "element not found". Reproduce: a model with `attribute mass :
+    Real;`, read `ownedSpecialization` of the type of `mass`, then `general`
+    of the relationship. Workaround: `model.Generals` skips relationships it
+    cannot read, so specialization chains stop at such library elements.
+13. **Reading a library element is slow** (develop). The first
+    `ElementProperties` of any standard-library element builds the element
+    form of its whole library document (`LibraryElementForm` →
+    `modelToRDF`): about 3 s to build the tree of `model/` when the
+    inheritance walk followed generals into `ScalarValues` and the base
+    part definitions. Workaround: `model.Contains` (the model's own ids,
+    from the all-elements query in `Load`) stops `Generals` at library
+    elements without reading them; type names come from the reference's
+    qualified name, also without a read.
+14. **No source text for expressions** (develop). `ElementProperties` of an
+    expression gives its parts (`operator`, `argument`, `referent`, a
+    literal's `value`) but not the text as written, which the API JSON
+    export carried as `sysx:sourceText`. Seen: the metadata default
+    `1 + 2` is an `OperatorExpression` with two `LiteralInteger`
+    arguments. Workaround: `metadataIndex.valueText` writes literals,
+    references and operators back; any other expression shows as its
+    metaclass name.
