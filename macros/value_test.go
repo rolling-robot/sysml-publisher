@@ -19,12 +19,15 @@ var paragraphRx = regexp.MustCompile(`<p>([^<]*)</p>`)
 
 // The expectations are the // notes in testdata/values/values.sysml.
 func TestValue(t *testing.T) {
-	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "values")}.Load(context.Background())
+	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "values")}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer m.Close()
-	tr := tree.Build(m)
+	tr, err := tree.Build(t.Context(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ad, err := asciidoctor.New()
 	if err != nil {
 		t.Fatal(err)
@@ -135,12 +138,15 @@ func TestValueRejectsExpressions(t *testing.T) {
 }
 
 func TestValueErrors(t *testing.T) {
-	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "values")}.Load(context.Background())
+	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "values")}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer m.Close()
-	tr := tree.Build(m)
+	tr, err := tree.Build(t.Context(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ad, err := asciidoctor.New()
 	if err != nil {
 		t.Fatal(err)

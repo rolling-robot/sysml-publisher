@@ -1,12 +1,17 @@
 // Package tree decides which elements of a model get pages, what each page
-// shows, and where it is written (requirements PG-1..7, PT-1..6).
+// shows, and where it is written (requirements PG-1..7, PT-1..6). It finds
+// them by querying the model for its textual representations, then grows
+// the tree from their owners: the elements that inherit them, and the
+// owners of both up to the top of the model (DS-4).
 package tree
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
 
+	"github.com/Open-MBEE/OpenSysML/client/opensysml"
 	"github.com/rolling-robot/sysml-publisher/internal/model"
 )
 
@@ -17,13 +22,13 @@ const UnnamedName = "Unnamed"
 // Rep is an AsciiDoc textual representation.
 type Rep struct {
 	ID    string
-	Owner string // @id of the element that owns it
+	Owner string // id of the element that owns it
 	Body  string
 }
 
 // Node is one page of the site, or the site root.
 type Node struct {
-	ID string // @id; empty for the root
+	ID string // element id; empty for the root
 	// Name is the element's name, UnnamedName, or empty for the root. It is
 	// not the page title, which is decided when the page is rendered (PG-8).
 	Name string
@@ -47,7 +52,7 @@ type Node struct {
 	// when it has none (MC-11).
 	ShortName string
 	// Members are the element's owned members, in declaration order, without
-	// the annotations: docs, comments, representations, metadata (MC-12).
+	// annotations and multiplicities (MC-12).
 	Members  []Member
 	Parent   *Node
 	Children []*Node
@@ -59,8 +64,9 @@ func (n *Node) Documented() bool { return len(n.Own)+len(n.Inherited) > 0 }
 
 // Member is an owned member of a page's element.
 type Member struct {
-	ID   string
-	Name string // its name, or UnnamedName
+	ID        string
+	Name      string // its name, or UnnamedName
+	Metaclass string // PartUsage, AttributeUsage, ...
 	// Types are the names of the member's types (part w : Wheel gives
 	// Wheel), in declaration order, including those a usage gets through
 	// what it subsets or redefines (part front :> wheels gives Wheel); none
@@ -80,92 +86,75 @@ type Tree struct {
 	ByID map[string]*Node
 	// Warnings are skipped representations (PG-4) and unnamed pages (PG-5).
 	Warnings []string
-
-	// generals are each element's direct generals through every
-	// specialization (typing, subclassification, subsetting, redefinition),
-	// in declaration order; shared by inheritance and Specializes.
-	generals map[string][]string
-	// docs are each element's doc comment bodies, trimmed, in declaration
-	// order; see Docs.
-	docs map[string][]string
-}
-
-// Docs are the bodies of the doc comments element id owns, trimmed, in
-// declaration order (MC-10); for a page, the same as Node.Docs.
-func (t *Tree) Docs(id string) []string { return t.docs[id] }
-
-// ShortName is element id's declared short name, or the short name its
-// owning membership gives it; "" when it has none (MC-11).
-func (t *Tree) ShortName(id string) string {
-	e := t.Model.Elements[id]
-	if n := e.Str("declaredShortName"); n != "" {
-		return n
-	}
-	if mem, ok := t.Model.Elements[e.Ref("owningMembership")]; ok {
-		return mem.Str("memberShortName")
-	}
-	return ""
-}
-
-// QualifiedName is how element id is identified (MC-9): its qualified name,
-// its positional name when it has none, a library element's qualified name,
-// else its id.
-func (t *Tree) QualifiedName(id string) string {
-	if lib, ok := t.Model.Library[id]; ok {
-		return lib.QualifiedName
-	}
-	e := t.Model.Elements[id]
-	for _, key := range []string{"qualifiedName", "sysx:positionalName"} {
-		if s := e.Str(key); s != "" {
-			return s
-		}
-	}
-	return id
 }
 
 // Specializes reports whether element specific is typed by, subclasses or
 // subsets element general, directly or through a chain of such relationships
 // (part spare : Sport with Sport :> Wheel specializes Wheel; MC-12). No
 // element specializes itself.
-func (t *Tree) Specializes(specific, general string) bool {
+func (t *Tree) Specializes(ctx context.Context, specific, general string) (bool, error) {
 	seen := map[string]bool{specific: true}
-	queue := append([]string(nil), t.generals[specific]...)
+	queue, err := t.Model.Generals(ctx, specific)
+	if err != nil {
+		return false, err
+	}
 	for len(queue) > 0 {
 		g := queue[0]
 		queue = queue[1:]
 		if g == general {
-			return true
+			return true, nil
 		}
 		if seen[g] {
 			continue
 		}
 		seen[g] = true
-		queue = append(queue, t.generals[g]...)
+		next, err := t.Model.Generals(ctx, g)
+		if err != nil {
+			return false, err
+		}
+		queue = append(queue, next...)
 	}
-	return false
+	return false, nil
 }
 
-// Build computes the page tree of m.
-func Build(m *model.Model) *Tree {
-	b := &builder{m: m, t: &Tree{Model: m, ByID: map[string]*Node{}}}
-	b.collectReps()
-	b.collectDocs()
-	b.collectGenerals()
+// Build computes the page tree of m:
+//
+//  1. query the textual representations; the owners of the AsciiDoc ones
+//     are documented (others are skipped with a warning, PG-4);
+//  2. query the usages and definitions, and keep those that inherit an
+//     AsciiDoc representation (PG-7);
+//  3. keep every owner of a documented element up to the top of the model
+//     (PG-6), and nothing else (PT-4);
+//  4. lay the kept elements out as the model's containment tree, in
+//     declaration order, and give each a folder (PT-1, PT-6).
+func Build(ctx context.Context, m *model.Model) (*Tree, error) {
+	b := &builder{m: m, t: &Tree{Model: m, ByID: map[string]*Node{}}, ctx: ctx,
+		reps: map[string][]Rep{}, inheritedOf: map[string][]Rep{}, keep: map[string]bool{}}
+	for _, step := range []func() error{b.collectReps, b.collectInherited, b.collectAncestors} {
+		if err := step(); err != nil {
+			return nil, err
+		}
+	}
 	b.t.Root = &Node{}
-	for _, id := range m.Order {
-		e := m.Elements[id]
-		if e.Type() == "Namespace" && e.Ref("owningRelationship") == "" {
-			b.addChildren(b.t.Root, e)
+	for _, top := range m.Tops {
+		if err := b.add(b.t.Root, top); err != nil {
+			return nil, err
 		}
 	}
 	b.walk(b.t.Root)
-	return b.t
+	return b.t, nil
 }
 
 type builder struct {
-	m    *model.Model
-	t    *Tree
-	reps map[string][]Rep // owner id → its AsciiDoc representations
+	m   *model.Model
+	t   *Tree
+	ctx context.Context
+	// reps are the AsciiDoc representations by owner id; inheritedOf the
+	// representations each usage or definition inherits.
+	reps        map[string][]Rep
+	inheritedOf map[string][]Rep
+	// keep are the elements that get a page.
+	keep map[string]bool
 }
 
 // isAsciiDoc reports whether a representation's language is AsciiDoc.
@@ -177,59 +166,76 @@ func isAsciiDoc(language string) bool {
 	return false
 }
 
-func (b *builder) collectReps() {
-	b.reps = map[string][]Rep{}
-	for _, id := range b.m.Order {
-		e := b.m.Elements[id]
-		if e.Type() != "TextualRepresentation" {
-			continue
+// id is the element id of an element a query returned, which names it by
+// qualified or positional name.
+func (b *builder) id(e opensysml.QueryElement) (string, error) {
+	p, err := b.m.Props(b.ctx, e.ID, "owner")
+	if err != nil {
+		return "", err
+	}
+	return p.Element.ID, nil
+}
+
+func (b *builder) collectReps() error {
+	reps, err := b.m.Query(b.ctx, opensysml.Query{Where: opensysml.InstanceOf("TextualRepresentation")})
+	if err != nil {
+		return err
+	}
+	for _, e := range reps {
+		r, err := b.m.Representation(b.ctx, e.ID)
+		if err != nil {
+			return err
 		}
-		owner := e.Ref("owner")
-		if !isAsciiDoc(e.Str("language")) {
+		if !isAsciiDoc(r.Language) {
+			owner, err := b.m.QualifiedName(b.ctx, r.Owner)
+			if err != nil {
+				return err
+			}
 			b.t.Warnings = append(b.t.Warnings, fmt.Sprintf(
-				"%s: skipped representation in language %q", b.qualifiedName(owner), e.Str("language")))
+				"%s: skipped representation in language %q", owner, r.Language))
 			continue
 		}
-		b.reps[owner] = append(b.reps[owner], Rep{ID: id, Owner: owner, Body: e.Str("body")})
+		b.reps[r.Owner] = append(b.reps[r.Owner], Rep{ID: r.ID, Owner: r.Owner, Body: r.Body})
+		b.keep[r.Owner] = true
 	}
+	return nil
 }
 
-func (b *builder) collectDocs() {
-	b.t.docs = map[string][]string{}
-	for _, id := range b.m.Order {
-		if e := b.m.Elements[id]; e.Type() == "Documentation" {
-			owner := e.Ref("owner")
-			b.t.docs[owner] = append(b.t.docs[owner], strings.TrimSpace(e.Str("body")))
+// collectInherited finds the usages and definitions that inherit AsciiDoc
+// representations: no query asks "what specializes X" across subsetting
+// and redefinition (AGENTS.md §13), so each one's generals are followed.
+func (b *builder) collectInherited() error {
+	types, err := b.m.Query(b.ctx, opensysml.Query{Where: opensysml.InstanceOf("Usage", "Definition")})
+	if err != nil {
+		return err
+	}
+	for _, e := range types {
+		id, err := b.id(e)
+		if err != nil {
+			return err
+		}
+		reps, err := b.inherited(id)
+		if err != nil {
+			return err
+		}
+		if len(reps) > 0 {
+			b.inheritedOf[id] = reps
+			b.keep[id] = true
 		}
 	}
-}
-
-// collectGenerals reads every specialization relationship (typing,
-// subclassification, subsetting, redefinition): each names a specific and a
-// general element.
-func (b *builder) collectGenerals() {
-	b.t.generals = map[string][]string{}
-	for _, id := range b.m.Order {
-		e := b.m.Elements[id]
-		specific, general := e.Ref("specific"), e.Ref("general")
-		if specific == "" || general == "" || specific == general {
-			continue
-		}
-		b.t.generals[specific] = append(b.t.generals[specific], general)
-	}
+	return nil
 }
 
 // inherited are the representations owned by the elements id specializes,
 // directly or transitively, nearest first, each once.
-func (b *builder) inherited(id string) []Rep {
-	t := b.m.Elements[id].Type()
-	if !strings.HasSuffix(t, "Usage") && !strings.HasSuffix(t, "Definition") {
-		return nil
-	}
+func (b *builder) inherited(id string) ([]Rep, error) {
 	var out []Rep
 	seenRep := map[string]bool{}
 	visited := map[string]bool{id: true}
-	queue := append([]string(nil), b.t.generals[id]...)
+	queue, err := b.m.Generals(b.ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	for len(queue) > 0 {
 		g := queue[0]
 		queue = queue[1:]
@@ -243,39 +249,100 @@ func (b *builder) inherited(id string) []Rep {
 				out = append(out, r)
 			}
 		}
-		queue = append(queue, b.t.generals[g]...)
+		next, err := b.m.Generals(b.ctx, g)
+		if err != nil {
+			return nil, err
+		}
+		queue = append(queue, next...)
 	}
-	return out
+	return out, nil
 }
 
-// addChildren adds a node for each owned member of e.
-func (b *builder) addChildren(parent *Node, e model.Element) {
-	for _, id := range e.Refs("ownedMember") {
-		child, ok := b.m.Elements[id]
-		if !ok {
-			continue
-		}
-		name := b.declaredName(id)
-		n := &Node{
-			ID:            id,
-			Name:          name,
-			Unnamed:       name == "",
-			QualifiedName: b.qualifiedName(id),
-			Own:           b.reps[id],
-			Inherited:     b.inherited(id),
-			Docs:          b.t.docs[id],
-			ShortName:     b.shortName(id),
-			Members:       b.members(child),
-			Parent:        parent,
-		}
-		if n.Unnamed {
-			n.Name = UnnamedName
-		}
-		b.addChildren(n, child)
-		if n.Documented() || len(n.Children) > 0 {
-			parent.Children = append(parent.Children, n)
+// collectAncestors keeps the owners of every documented element, up to the
+// root namespace, which is not a page.
+func (b *builder) collectAncestors() error {
+	documented := make([]string, 0, len(b.keep))
+	for id := range b.keep {
+		documented = append(documented, id)
+	}
+	for _, id := range documented {
+		for {
+			owner, err := b.m.Owner(b.ctx, id)
+			if err != nil {
+				return err
+			}
+			if owner.ID == "" || owner.Metaclass == "Namespace" && b.isRoot(owner.ID) {
+				break
+			}
+			if b.keep[owner.ID] {
+				break // its owners are kept already, or will be
+			}
+			b.keep[owner.ID] = true
+			id = owner.ID
 		}
 	}
+	return nil
+}
+
+// isRoot reports whether a namespace is a file's root namespace: one with no
+// owner.
+func (b *builder) isRoot(id string) bool {
+	owner, err := b.m.Owner(b.ctx, id)
+	return err == nil && owner.ID == ""
+}
+
+// add adds a node for the kept element e under parent, and below it nodes
+// for its kept members, in declaration order.
+func (b *builder) add(parent *Node, e model.Ref) error {
+	if !b.keep[e.ID] {
+		return nil
+	}
+	name, err := b.m.Name(b.ctx, e.ID)
+	if err != nil {
+		return err
+	}
+	qn, err := b.m.QualifiedName(b.ctx, e.ID)
+	if err != nil {
+		return err
+	}
+	docs, err := b.m.Docs(b.ctx, e.ID)
+	if err != nil {
+		return err
+	}
+	short, err := b.m.ShortName(b.ctx, e.ID)
+	if err != nil {
+		return err
+	}
+	members, err := b.members(e.ID)
+	if err != nil {
+		return err
+	}
+	n := &Node{
+		ID:            e.ID,
+		Name:          name,
+		Unnamed:       name == "",
+		QualifiedName: qn,
+		Own:           b.reps[e.ID],
+		Inherited:     b.inheritedOf[e.ID],
+		Docs:          docs,
+		ShortName:     short,
+		Members:       members,
+		Parent:        parent,
+	}
+	if n.Unnamed {
+		n.Name = UnnamedName
+	}
+	parent.Children = append(parent.Children, n)
+	owned, err := b.m.Members(b.ctx, e.ID)
+	if err != nil {
+		return err
+	}
+	for _, child := range owned {
+		if err := b.add(n, child); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // walk assigns folders in pre-order and records pages and warnings.
@@ -304,20 +371,6 @@ func (b *builder) walk(parent *Node) {
 	}
 }
 
-// declaredName is the element's name: its declared name, or the name its
-// owning membership gives it (a redefining feature borrows one); "" when it
-// has none.
-func (b *builder) declaredName(id string) string {
-	e := b.m.Elements[id]
-	if n := e.Str("declaredName"); n != "" {
-		return n
-	}
-	if mem, ok := b.m.Elements[e.Ref("owningMembership")]; ok {
-		return mem.Str("memberName")
-	}
-	return ""
-}
-
 // notMembers are the metaclasses of owned members that sysml-members-list
 // leaves out (MC-12): annotations, which annotate the owner rather than make
 // it up, and multiplicities, which are part of the owner's declaration
@@ -328,36 +381,44 @@ var notMembers = map[string]bool{
 	"Multiplicity": true, "MultiplicityRange": true,
 }
 
-// members are e's owned members other than annotations and multiplicities.
-func (b *builder) members(e model.Element) []Member {
+// members are id's owned members other than annotations and multiplicities.
+func (b *builder) members(id string) ([]Member, error) {
+	owned, err := b.m.Members(b.ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	var out []Member
-	for _, id := range e.Refs("ownedMember") {
-		m, ok := b.m.Elements[id]
-		if !ok || notMembers[m.Type()] {
+	for _, r := range owned {
+		if notMembers[r.Metaclass] {
 			continue
 		}
-		name := b.declaredName(id)
+		name, err := b.m.Name(b.ctx, r.ID)
+		if err != nil {
+			return nil, err
+		}
 		if name == "" {
 			name = UnnamedName
 		}
-		var types []string
-		for _, typ := range m.Refs("type") {
-			tn := b.declaredName(typ)
-			if lib, ok := b.m.Library[typ]; ok && tn == "" {
-				tn = lib.Name() // a library type: Real
+		types, err := b.m.Types(b.ctx, r.ID)
+		if err != nil {
+			return nil, err
+		}
+		var typeNames []string
+		for _, typ := range types {
+			tn := typ.Name() // from the qualified name: library types need no read
+			if tn == "" {
+				if tn, err = b.m.Name(b.ctx, typ.ID); err != nil {
+					return nil, err
+				}
 			}
 			if tn != "" {
-				types = append(types, tn)
+				typeNames = append(typeNames, tn)
 			}
 		}
-		out = append(out, Member{ID: id, Name: name, Types: types})
+		out = append(out, Member{ID: r.ID, Name: name, Metaclass: r.Metaclass, Types: typeNames})
 	}
-	return out
+	return out, nil
 }
-
-func (b *builder) shortName(id string) string { return b.t.ShortName(id) }
-
-func (b *builder) qualifiedName(id string) string { return b.t.QualifiedName(id) }
 
 // segment makes a name usable as one folder name on any filesystem.
 func segment(name string) string {

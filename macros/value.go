@@ -1,7 +1,6 @@
 package macros
 
 import (
-	"context"
 	"fmt"
 	"html"
 	"regexp"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/Open-MBEE/OpenSysML/client/opensysml"
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
-	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
 // Value is the inline macro sysml-value:<feature>[], replaced by the value
@@ -37,11 +35,10 @@ const valueMacroRx = `\\?sysml-value:((?:'(?:[^'\\]|\\.)*'|[^\s\['])+)\[(|.*?[^\
 // made of attributes of its own, which has no single value to show.
 const CompositeText = "[composite]"
 
-func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.Tree, warn Warn) {
-	md := newMetadataIndex(t.Model)
+func registerValue(g *asciidoctor.ExtensionGroup, e *env) {
 	g.InlineMacro(Value, asciidoctor.InlineMacroProcessorFunc(
 		func(parent asciidoctor.Node, target string, _ map[string]any) (*asciidoctor.PhraseNode, error) {
-			n, err := pageElement(parent, t)
+			n, err := pageElement(parent, e.t)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", Value, err)
 			}
@@ -52,29 +49,33 @@ func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.T
 			if target == "" {
 				return nil, fmt.Errorf("%s on the page of %s: no feature named; write %s:<feature>[]", macro, n.QualifiedName, Value)
 			}
-			ref, err := parseMetadataRef(target, n, md)
+			ref, err := parseMetadataRef(target, n, e)
 			if err != nil {
 				return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
 			}
 			if ref != nil {
-				if ref.attr == nil {
+				if ref.attr.ID == "" {
 					return nil, fmt.Errorf("%s on the page of %s: no attribute named; write %s:[<element>::]@<metadata>::<attribute>[]", macro, n.QualifiedName, Value)
 				}
-				return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(md.attributeValue(ref)), nil, nil)
+				text, err := e.md.attributeValue(ref)
+				if err != nil {
+					return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
+				}
+				return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(text), nil, nil)
 			}
 			if !featureRefRx.MatchString(target) {
 				return nil, fmt.Errorf("%s on the page of %s: %q is not a feature name; write a name, a qualified name (A::b) or a feature chain (a.b), not an expression", macro, n.QualifiedName, target)
 			}
 			// The page's element is the subject, so the feature reads its
 			// value: its own, a redefinition's, or one from its types.
-			v, err := t.Model.Evaluate(ctx, n.QualifiedName, target)
+			v, err := e.m.Evaluate(e.ctx, n.QualifiedName, target)
 			if err != nil {
 				return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
 			}
 			text, kind := formatValue(v)
 			switch kind {
 			case valueComposite:
-				warn(Warning{Page: n, Macro: macro, Message: fmt.Sprintf("%s is composite; shown as %s", target, CompositeText)})
+				e.warn(Warning{Page: n, Macro: macro, Message: fmt.Sprintf("%s is composite; shown as %s", target, CompositeText)})
 				text = CompositeText
 			case valueNone:
 				text = NoValue
@@ -87,15 +88,21 @@ func registerValue(ctx context.Context, g *asciidoctor.ExtensionGroup, t *tree.T
 // sysml-metadata-table shows it: the value the usage binds, else the
 // metadata def's, written as in the model, else NoValue. An element carrying
 // the metadata more than once gives each usage's value, joined by ", ".
-func (md *metadataIndex) attributeValue(ref *metadataRef) string {
+func (md *metadataIndex) attributeValue(ref *metadataRef) (string, error) {
 	values := make([]string, len(ref.usages))
 	for i, u := range ref.usages {
 		values[i] = NoValue
-		if v := md.value(u, ref.attr); v != nil {
-			values[i] = valueText(v)
+		expr, err := md.value(u.ID, ref.attr.ID)
+		if err != nil {
+			return "", err
+		}
+		if expr != "" {
+			if values[i], err = md.valueText(expr); err != nil {
+				return "", err
+			}
 		}
 	}
-	return strings.Join(values, ", ")
+	return strings.Join(values, ", "), nil
 }
 
 type valueKind int

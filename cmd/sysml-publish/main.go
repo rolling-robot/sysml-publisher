@@ -141,14 +141,19 @@ func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir string) 
 	}
 
 	stage = time.Now()
-	t := tree.Build(m)
+	t, err := tree.Build(ctx, m)
+	if err != nil {
+		return err
+	}
 	documented := 0
 	for _, n := range t.Pages {
 		if n.Documented() {
 			documented++
 		}
 	}
-	logger.DebugContext(ctx, "page tree built", "pages", len(t.Pages), "documented", documented, "duration", time.Since(stage))
+	logger.DebugContext(ctx, "page tree built", "pages", len(t.Pages), "documented", documented,
+		"queries", m.Stats().Queries, "element_reads", m.Stats().Reads, "cache_hits", m.Stats().Hits,
+		"duration", time.Since(stage))
 	for _, w := range t.Warnings {
 		logger.WarnContext(ctx, w)
 	}

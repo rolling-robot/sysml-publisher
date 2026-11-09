@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
-	"github.com/rolling-robot/sysml-publisher/internal/model"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
@@ -26,11 +25,10 @@ const IfaceEnds = "sysml-iface-ends"
 // IfaceEndsRole is the role of the list, for styling.
 const IfaceEndsRole = "sysml-iface-ends"
 
-func registerIfaceEnds(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	md := newMetadataIndex(t.Model)
+func registerIfaceEnds(g *asciidoctor.ExtensionGroup, e *env) {
 	g.BlockMacro(IfaceEnds, asciidoctor.BlockMacroProcessorFunc(
 		func(parent asciidoctor.StructuralNode, target string, attrs map[string]any) (asciidoctor.StructuralNode, error) {
-			n, err := pageElement(parent, t)
+			n, err := pageElement(parent, e.t)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", IfaceEnds, err)
 			}
@@ -40,27 +38,39 @@ func registerIfaceEnds(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 			if depthText != "" {
 				macro = fmt.Sprintf("%s::%s[depth=%s]", IfaceEnds, target, depthText)
 			}
+			fail := func(err error) error {
+				return fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
+			}
 			depth, err := parseDepth(depthText)
 			if err != nil {
-				return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
+				return nil, fail(err)
 			}
 			id, name := n.ID, n.QualifiedName
 			if target != "" {
-				if id, err = nameTarget(target, n, md); err != nil {
-					return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
+				if id, err = nameTarget(target, n, e); err != nil {
+					return nil, fail(err)
 				}
-				name = md.names.qualifiedName(id)
+				if name, err = e.names.qualifiedName(id); err != nil {
+					return nil, fail(err)
+				}
 			}
-			ends := connectorEnds(t.Model, id)
+			ends, err := connectorEnds(e, id)
+			if err != nil {
+				return nil, fail(err)
+			}
 			if len(ends) == 0 {
-				return nil, fmt.Errorf("%s on the page of %s: %s has no ends; name an interface or connection", macro, n.QualifiedName, name)
+				return nil, fail(fmt.Errorf("%s has no ends; name an interface or connection", name))
 			}
 			list, err := asciidoctor.CreateList(parent, "ulist", asciidoctor.Attributes{"role": IfaceEndsRole})
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", IfaceEnds, err)
 			}
-			for _, e := range ends {
-				item, err := asciidoctor.CreateListItem(list, endText(n, e, t, md.names, depth))
+			for _, end := range ends {
+				text, err := endText(n, end, e, depth)
+				if err != nil {
+					return nil, fail(err)
+				}
+				item, err := asciidoctor.CreateListItem(list, text)
 				if err != nil {
 					return nil, fmt.Errorf("%s: %w", IfaceEnds, err)
 				}
@@ -103,38 +113,49 @@ type connectorEnd struct {
 // rest in declaration order. The source is the end named source, the name
 // OpenSysML gives the first end of connect a to b and connect (a, b); ends
 // named by an interface def (supplier, consumer) keep the def's order.
-func connectorEnds(m *model.Model, id string) []connectorEnd {
+func connectorEnds(e *env, id string) ([]connectorEnd, error) {
+	p, err := e.m.Props(e.ctx, id, "ownedFeature")
+	if err != nil {
+		return nil, err
+	}
 	var ends []connectorEnd
-	for _, fid := range m.Elements[id].Refs("ownedFeature") {
-		f := m.Elements[fid]
-		if isEnd, _ := f["isEnd"].(bool); !isEnd {
+	for _, f := range p.Refs("ownedFeature") {
+		fp, err := e.m.Props(e.ctx, f.ID, "isEnd", "name", "ownedReferenceSubsetting")
+		if err != nil {
+			return nil, err
+		}
+		if !fp.Bool("isEnd") {
 			continue
 		}
-		e := connectorEnd{name: m.Elements[f.Ref("owningMembership")].Str("memberName")}
-		if e.name == "" {
-			e.name = f.Str("declaredName")
-		}
-		for _, rid := range f.Refs("ownedRelationship") {
-			r := m.Elements[rid]
-			if r.Type() != "ReferenceSubsetting" {
-				continue
+		end := connectorEnd{name: fp.Str("name")}
+		for _, rs := range fp.Refs("ownedReferenceSubsetting") {
+			rp, err := e.m.Props(e.ctx, rs.ID, "referencedFeature")
+			if err != nil {
+				return nil, err
 			}
-			ref := r.Ref("general")
-			if chain := m.Elements[ref].Refs("chainingFeature"); len(chain) > 0 {
-				e.path = chain
+			ref := rp.Ref("referencedFeature").ID
+			cp, err := e.m.Props(e.ctx, ref, "chainingFeature")
+			if err != nil {
+				return nil, err
+			}
+			if chain := cp.Refs("chainingFeature"); len(chain) > 0 {
+				end.path = nil
+				for _, c := range chain {
+					end.path = append(end.path, c.ID)
+				}
 			} else {
-				e.path = []string{ref}
+				end.path = []string{ref}
 			}
 		}
-		ends = append(ends, e)
+		ends = append(ends, end)
 	}
-	for i, e := range ends {
-		if e.name == "source" && i > 0 {
-			ends = append(append([]connectorEnd{e}, ends[:i]...), ends[i+1:]...)
+	for i, end := range ends {
+		if end.name == "source" && i > 0 {
+			ends = append(append([]connectorEnd{end}, ends[:i]...), ends[i+1:]...)
 			break
 		}
 	}
-	return ends
+	return ends, nil
 }
 
 // endText is a list item's AsciiDoc: the end's name and the feature it
@@ -144,10 +165,14 @@ func connectorEnds(m *model.Model, id string) []connectorEnd {
 // first element followed by the chain, cut to its last depth segments and
 // joined by :: (source: aircraft::engine::air). An end that connects nothing
 // (an interface def's) shows its name only.
-func endText(page *tree.Node, e connectorEnd, t *tree.Tree, names *nameIndex, depth int) string {
-	ids, sep := e.path, "."
-	if depth != depthAsWritten && len(e.path) > 0 {
-		ids = append(owners(t.Model, e.path[0]), e.path...)
+func endText(page *tree.Node, end connectorEnd, e *env, depth int) (string, error) {
+	ids, sep := end.path, "."
+	if depth != depthAsWritten && len(end.path) > 0 {
+		outer, err := owners(e, end.path[0])
+		if err != nil {
+			return "", err
+		}
+		ids = append(outer, end.path...)
 		if depth != depthAll && depth < len(ids) {
 			ids = ids[len(ids)-depth:]
 		}
@@ -155,36 +180,44 @@ func endText(page *tree.Node, e connectorEnd, t *tree.Tree, names *nameIndex, de
 	}
 	segs := make([]string, len(ids))
 	for i, id := range ids {
-		name := names.name(id)
+		name, err := e.names.name(id)
+		if err != nil {
+			return "", err
+		}
 		if sep == "::" {
 			name = quoteName(name)
 		}
 		segs[i] = html.EscapeString(name)
-		if target := t.ByID[id]; target != nil {
+		if target := e.t.ByID[id]; target != nil {
 			segs[i] = `<a href="` + tree.Href(page, target) + `">` + segs[i] + `</a>`
 		}
 	}
 	path := strings.Join(segs, sep)
 	switch {
-	case e.name == "":
-		return passthrough(path)
+	case end.name == "":
+		return passthrough(path), nil
 	case path == "":
-		return passthrough(html.EscapeString(e.name))
+		return passthrough(html.EscapeString(end.name)), nil
 	}
-	return passthrough(html.EscapeString(e.name) + ": " + path)
+	return passthrough(html.EscapeString(end.name) + ": " + path), nil
 }
 
 // owners are the elements that own id, outermost first, up to a top-level
 // element: the root namespace, which has no owner, is left out.
-func owners(m *model.Model, id string) []string {
+func owners(e *env, id string) ([]string, error) {
 	var out []string
-	for o := m.Elements[id].Ref("owner"); o != ""; o = m.Elements[o].Ref("owner") {
-		if m.Elements[o].Ref("owner") == "" {
-			break // the root namespace
+	for {
+		o, err := e.m.Owner(e.ctx, id)
+		if err != nil || o.ID == "" {
+			return out, err
 		}
-		out = append([]string{o}, out...)
+		oo, err := e.m.Owner(e.ctx, o.ID)
+		if err != nil || oo.ID == "" {
+			return out, err // o is the root namespace
+		}
+		out = append([]string{o.ID}, out...)
+		id = o.ID
 	}
-	return out
 }
 
 // basicNameRx is a SysML name that needs no quotes.

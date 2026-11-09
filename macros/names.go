@@ -1,11 +1,13 @@
 package macros
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
+	"github.com/Open-MBEE/OpenSysML/client/opensysml"
 	"github.com/rolling-robot/sysml-publisher/internal/model"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
@@ -26,59 +28,35 @@ func (e unknownNameError) Is(target error) bool { return target == errNoSuchName
 
 // nameIndex finds the element a macro names, the way a SysML reference is
 // read: every segment of a qualified name may be a name or a short name.
+// It reads the model through Props and Query (DS-4).
 type nameIndex struct {
-	m *model.Model
+	ctx context.Context
+	m   *model.Model
 	// tops are the top-level elements: the members of each file's root
 	// namespace.
-	tops []string
-	// byName are the ids of the elements, library ones included, that have
-	// a name or short name, in model order.
-	byName map[string][]string
-	// library maps a library element's qualified name to its id.
-	library map[string]string
+	tops []model.Ref
+	// byName caches the elements Query found with a name or short name.
+	byName map[string][]model.Ref
 }
 
-func newNameIndex(m *model.Model) *nameIndex {
-	x := &nameIndex{m: m, byName: map[string][]string{}, library: map[string]string{}}
-	for _, id := range m.Order {
-		e := m.Elements[id]
-		if e.Type() == "Namespace" && e.Ref("owningRelationship") == "" {
-			x.tops = append(x.tops, e.Refs("ownedMember")...)
-		}
-		for _, name := range x.names(id) {
-			x.byName[name] = append(x.byName[name], id)
-		}
-	}
-	// Sorted, so an ambiguity is reported the same way on every run.
-	ids := make([]string, 0, len(m.Library))
-	for id := range m.Library {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
-	for _, id := range ids {
-		lib := m.Library[id]
-		x.library[lib.QualifiedName] = id
-		x.byName[lib.Name()] = append(x.byName[lib.Name()], id)
-	}
-	return x
+func newNameIndex(ctx context.Context, t *tree.Tree) *nameIndex {
+	return &nameIndex{ctx: ctx, m: t.Model, tops: t.Model.Tops, byName: map[string][]model.Ref{}}
 }
 
-// names are the name and the short name of an element, those its owning
-// membership gives it when it declares none (a redefinition borrows them).
-func (x *nameIndex) names(id string) []string {
-	e := x.m.Elements[id]
-	mem := x.m.Elements[e.Ref("owningMembership")]
+// names are the name and the short name of an element (a redefinition
+// borrows the redefined feature's name).
+func (x *nameIndex) names(id string) ([]string, error) {
+	p, err := x.m.Props(x.ctx, id, "name", "shortName")
+	if err != nil {
+		return nil, err
+	}
 	var out []string
-	for _, pair := range [][2]string{{"declaredName", "memberName"}, {"declaredShortName", "memberShortName"}} {
-		n := e.Str(pair[0])
-		if n == "" {
-			n = mem.Str(pair[1])
-		}
+	for _, n := range []string{p.Str("name"), p.Element.Name(), p.Str("shortName")} {
 		if n != "" && !slices.Contains(out, n) {
 			out = append(out, n)
 		}
 	}
-	return out
+	return out, nil
 }
 
 // resolve finds the one element name refers to, seen from the page of n,
@@ -91,99 +69,155 @@ func (x *nameIndex) names(id string) []string {
 //
 // Each segment of a qualified name may be a name or a short name, quoted or
 // not. An unknown name gives an error matching errNoSuchName.
-func (x *nameIndex) resolve(name string, n *tree.Node, accept func(model.Element) bool) (string, error) {
+func (x *nameIndex) resolve(name string, n *tree.Node, accept func(model.Ref) bool) (model.Ref, error) {
 	if accept == nil {
-		accept = func(model.Element) bool { return true }
+		accept = func(model.Ref) bool { return true }
 	}
 	segs := splitQualified(name)
-	keep := func(ids []string) []string {
-		var out []string
-		for _, id := range ids {
-			if e, ok := x.m.Elements[id]; ok && accept(e) || !ok && x.acceptLibrary(id, accept) {
-				out = append(out, id)
+	keep := func(refs []model.Ref) []model.Ref {
+		var out []model.Ref
+		for _, r := range refs {
+			if accept(r) && !slices.Contains(out, r) {
+				out = append(out, r)
 			}
 		}
 		return out
 	}
-	tries := [][]string{keep(x.walk(x.tops, segs))}
-	for scope := n.ID; scope != ""; scope = x.m.Elements[scope].Ref("owner") {
-		tries = append(tries, keep(x.walk(x.m.Elements[scope].Refs("ownedMember"), segs)))
-	}
-	if id, ok := x.library[name]; ok {
-		tries = append(tries, keep([]string{id}))
-	}
-	if len(segs) == 1 {
-		tries = append(tries, keep(x.byName[segs[0]]))
-	}
-	for _, ids := range tries {
-		switch {
-		case len(ids) == 1:
-			return ids[0], nil
-		case len(ids) > 1:
-			var qns []string
-			for _, id := range ids {
-				qns = append(qns, x.qualifiedName(id))
+	tries := func(yield func([]model.Ref, error) bool) {
+		if !yield(x.walk(x.tops, segs)) {
+			return
+		}
+		for scope := n.ID; scope != ""; {
+			members, err := x.m.Members(x.ctx, scope)
+			if err != nil {
+				yield(nil, err)
+				return
 			}
-			return "", fmt.Errorf("%q names several elements (%s); use a qualified name", name, strings.Join(qns, ", "))
+			if !yield(x.walk(members, segs)) {
+				return
+			}
+			owner, err := x.m.Owner(x.ctx, scope)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+			scope = owner.ID
+		}
+		if !yield(x.library(name)) {
+			return
+		}
+		if len(segs) == 1 {
+			yield(x.named(segs[0]))
 		}
 	}
-	return "", unknownNameError{name}
-}
-
-// acceptLibrary applies accept to a library element, which has no element
-// data: it is offered as an element with only its @type.
-func (x *nameIndex) acceptLibrary(id string, accept func(model.Element) bool) bool {
-	lib, ok := x.m.Library[id]
-	return ok && accept(model.Element{"@id": id, "@type": lib.Type})
+	for refs, err := range tries {
+		if err != nil {
+			return model.Ref{}, err
+		}
+		refs = keep(refs)
+		switch {
+		case len(refs) == 1:
+			return refs[0], nil
+		case len(refs) > 1:
+			var qns []string
+			for _, r := range refs {
+				qn, err := x.qualifiedName(r.ID)
+				if err != nil {
+					return model.Ref{}, err
+				}
+				qns = append(qns, qn)
+			}
+			return model.Ref{}, fmt.Errorf("%q names several elements (%s); use a qualified name", name, strings.Join(qns, ", "))
+		}
+	}
+	return model.Ref{}, unknownNameError{name}
 }
 
 // walk follows segs from the elements start: the first segment names one of
 // them, each later one a member of the element before.
-func (x *nameIndex) walk(start, segs []string) []string {
+func (x *nameIndex) walk(start []model.Ref, segs []string) ([]model.Ref, error) {
 	cur := start
 	for i, seg := range segs {
-		var next []string
-		for _, id := range cur {
-			if slices.Contains(x.names(id), seg) && !slices.Contains(next, id) {
-				next = append(next, id)
+		var next []model.Ref
+		for _, r := range cur {
+			names, err := x.names(r.ID)
+			if err != nil {
+				return nil, err
+			}
+			if slices.Contains(names, seg) && !slices.Contains(next, r) {
+				next = append(next, r)
 			}
 		}
 		if i == len(segs)-1 || len(next) == 0 {
-			return next
+			return next, nil
 		}
 		cur = nil
-		for _, id := range next {
-			cur = append(cur, x.m.Elements[id].Refs("ownedMember")...)
+		for _, r := range next {
+			members, err := x.m.Members(x.ctx, r.ID)
+			if err != nil {
+				return nil, err
+			}
+			cur = append(cur, members...)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
-// name is the element's name as declared, without quotes: its declared
-// name, or the one its owning membership gives it; a library element's last
-// segment (Real); UnnamedName when it has none.
-func (x *nameIndex) name(id string) string {
-	if lib, ok := x.m.Library[id]; ok {
-		return lib.Name()
+// library is the standard-library element with that qualified name, if
+// any: the model reads library elements by qualified name.
+func (x *nameIndex) library(name string) ([]model.Ref, error) {
+	if !strings.Contains(name, "::") {
+		return nil, nil
 	}
-	e := x.m.Elements[id]
-	if n := e.Str("declaredName"); n != "" {
-		return n
+	p, err := x.m.Props(x.ctx, name, "owner")
+	if errors.Is(err, model.ErrNoSuchElement) {
+		return nil, nil
 	}
-	if n := x.m.Elements[e.Ref("owningMembership")].Str("memberName"); n != "" {
-		return n
+	if err != nil {
+		return nil, err
 	}
-	return tree.UnnamedName
+	if p.Element.QualifiedName != name {
+		return nil, nil // read by another kind of id, not a qualified name
+	}
+	return []model.Ref{p.Element}, nil
 }
 
-func (x *nameIndex) qualifiedName(id string) string {
-	if lib, ok := x.m.Library[id]; ok {
-		return lib.QualifiedName
+// named are the model's elements whose name or short name is name, in
+// model order.
+func (x *nameIndex) named(name string) ([]model.Ref, error) {
+	if refs, ok := x.byName[name]; ok {
+		return refs, nil
 	}
-	if qn := x.m.Elements[id].Str("qualifiedName"); qn != "" {
-		return qn
+	els, err := x.m.Query(x.ctx, opensysml.Query{Where: opensysml.Any(
+		opensysml.Equals("name", name), opensysml.Equals("shortName", name))})
+	if err != nil {
+		return nil, err
 	}
-	return id
+	var refs []model.Ref
+	for _, e := range els {
+		p, err := x.m.Props(x.ctx, e.ID, "owner")
+		if err != nil {
+			return nil, err
+		}
+		refs = append(refs, p.Element)
+	}
+	x.byName[name] = refs
+	return refs, nil
+}
+
+// name is the element's name, as declared, without quotes; UnnamedName
+// when it has none.
+func (x *nameIndex) name(id string) (string, error) {
+	n, err := x.m.Name(x.ctx, id)
+	if n == "" && err == nil {
+		n = tree.UnnamedName
+	}
+	return n, err
+}
+
+// qualifiedName is the element's qualified name, or its positional name.
+func (x *nameIndex) qualifiedName(id string) (string, error) {
+	return x.m.QualifiedName(x.ctx, id)
 }
 
 // splitQualified splits a qualified name at "::" outside quotes and unquotes

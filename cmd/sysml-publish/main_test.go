@@ -62,7 +62,7 @@ func TestJSONLogWithTimings(t *testing.T) {
 		msgs[rec["msg"].(string)] = rec
 	}
 	// The debug records time every stage.
-	for _, msg := range []string{"model parsed", "model converted to API JSON", "page tree built", "page converted", "pages rendered", "site written", "site published"} {
+	for _, msg := range []string{"model parsed", "model queried", "model converted to API JSON", "page tree built", "page converted", "pages rendered", "site written", "site published"} {
 		rec, ok := msgs[msg]
 		if !ok {
 			t.Errorf("no %q record", msg)
@@ -70,6 +70,12 @@ func TestJSONLogWithTimings(t *testing.T) {
 		}
 		if _, ok := rec["duration"]; !ok {
 			t.Errorf("%q record has no duration", msg)
+		}
+	}
+	// The page tree record counts how the model was read (DS-4).
+	for _, key := range []string{"queries", "element_reads", "cache_hits"} {
+		if n, ok := msgs["page tree built"][key].(float64); !ok || n <= 0 {
+			t.Errorf("page tree built: %s = %v, want a positive count", key, msgs["page tree built"][key])
 		}
 	}
 }

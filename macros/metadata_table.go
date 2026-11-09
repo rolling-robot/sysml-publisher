@@ -1,6 +1,7 @@
 package macros
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"html"
@@ -23,23 +24,32 @@ const MetadataTableRole = "sysml-metadata-table"
 // NoValue is shown for an attribute that has no value.
 const NoValue = "(no value)"
 
-func registerMetadataTable(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	md := newMetadataIndex(t.Model)
+func registerMetadataTable(g *asciidoctor.ExtensionGroup, e *env) {
+	md := e.md
 	g.BlockMacro(MetadataTable, asciidoctor.BlockMacroProcessorFunc(
 		func(parent asciidoctor.StructuralNode, target string, _ map[string]any) (asciidoctor.StructuralNode, error) {
-			n, err := pageElement(parent, t)
+			n, err := pageElement(parent, e.t)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", MetadataTable, err)
 			}
+			fail := func(err error) error {
+				return fmt.Errorf("%s::%s[] on the page of %s: %w", MetadataTable, target, n.QualifiedName, err)
+			}
 			def, err := md.definition(target, n)
 			if err != nil {
-				return nil, fmt.Errorf("%s::%s[] on the page of %s: %w", MetadataTable, target, n.QualifiedName, err)
+				return nil, fail(err)
 			}
-			usages := md.usages(n.ID, def)
+			usages, err := md.usages(n.ID, def.ID)
+			if err != nil {
+				return nil, fail(err)
+			}
 			if len(usages) == 0 {
 				return nil, nil // the element has no such metadata; the line is dropped
 			}
-			attrs := md.attributes(def)
+			attrs, err := md.attributes(def.ID)
+			if err != nil {
+				return nil, fail(err)
+			}
 			// One table per usage; an element rarely carries the same
 			// metadata twice, so they share an open block.
 			block, err := asciidoctor.CreateOpenBlock(parent, nil, asciidoctor.Attributes{"role": MetadataTableRole}, nil)
@@ -57,70 +67,58 @@ func registerMetadataTable(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 		}), nil)
 }
 
-// metadataIndex answers questions about metadata from the model.
+// metadataIndex answers questions about metadata, reading the model through
+// Props (DS-4).
 type metadataIndex struct {
+	ctx   context.Context
 	m     *model.Model
 	names *nameIndex
-	// supertypes are each definition's direct supertypes, from its
-	// subclassifications, in declaration order.
-	supertypes map[string][]string
-}
-
-func newMetadataIndex(m *model.Model) *metadataIndex {
-	md := &metadataIndex{m: m, names: newNameIndex(m), supertypes: map[string][]string{}}
-	for _, id := range m.Order {
-		e := m.Elements[id]
-		if e.Type() == "Subclassification" {
-			specific := e.Ref("specific")
-			md.supertypes[specific] = append(md.supertypes[specific], e.Ref("general"))
-		}
-	}
-	return md
 }
 
 // definition finds the metadata def a macro names, the way every macro reads
 // a name (nameIndex.resolve), among metadata defs only: Info, Plant::Info,
 // or a short name.
-func (md *metadataIndex) definition(target string, n *tree.Node) (model.Element, error) {
+func (md *metadataIndex) definition(target string, n *tree.Node) (model.Ref, error) {
 	if target == "" {
-		return nil, fmt.Errorf("no metadata def named; write %s::<metadata def>[]", MetadataTable)
+		return model.Ref{}, fmt.Errorf("no metadata def named; write %s::<metadata def>[]", MetadataTable)
 	}
-	id, err := md.names.resolve(target, n, func(e model.Element) bool { return e.Type() == "MetadataDefinition" })
+	def, err := md.names.resolve(target, n, func(r model.Ref) bool { return r.Metaclass == "MetadataDefinition" })
 	if errors.Is(err, errNoSuchName) {
-		return nil, fmt.Errorf("the model has no metadata def %q", target)
+		return model.Ref{}, fmt.Errorf("the model has no metadata def %q", target)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return md.m.Elements[id], nil
+	return def, err
 }
 
 // usages are the metadata usages the element owns that are typed by def, in
 // declaration order. Both @def and the prefix form #def give one.
-func (md *metadataIndex) usages(elementID string, def model.Element) []model.Element {
-	var out []model.Element
-	for _, id := range md.m.Elements[elementID].Refs("ownedMember") {
-		e := md.m.Elements[id]
-		if e.Type() != "MetadataUsage" {
+func (md *metadataIndex) usages(elementID, def string) ([]model.Ref, error) {
+	members, err := md.m.Members(md.ctx, elementID)
+	if err != nil {
+		return nil, err
+	}
+	var out []model.Ref
+	for _, r := range members {
+		if r.Metaclass != "MetadataUsage" {
 			continue
 		}
-		for _, typ := range e.Refs("type") {
-			if typ == def.ID() {
-				out = append(out, e)
-				break
-			}
+		p, err := md.m.Props(md.ctx, r.ID, "metadataDefinition")
+		if err != nil {
+			return nil, err
+		}
+		if p.Ref("metadataDefinition").ID == def {
+			out = append(out, r)
 		}
 	}
-	return out
+	return out, nil
 }
 
 // attributes are the attributes of def: its own, then those of its
 // supertypes, nearest first. One a nearer def redefines is not repeated.
-func (md *metadataIndex) attributes(def model.Element) []model.Element {
-	var out []model.Element
+func (md *metadataIndex) attributes(def string) ([]model.Ref, error) {
+	var out []model.Ref
 	redefined := map[string]bool{}
 	visited := map[string]bool{}
-	queue := []string{def.ID()}
+	queue := []string{def}
 	for len(queue) > 0 {
 		id := queue[0]
 		queue = queue[1:]
@@ -128,76 +126,166 @@ func (md *metadataIndex) attributes(def model.Element) []model.Element {
 			continue
 		}
 		visited[id] = true
-		for _, fid := range md.m.Elements[id].Refs("ownedMember") {
-			f := md.m.Elements[fid]
-			if f.Type() != "AttributeUsage" && f.Type() != "ReferenceUsage" {
+		members, err := md.m.Members(md.ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range members {
+			if f.Metaclass != "AttributeUsage" && f.Metaclass != "ReferenceUsage" || redefined[f.ID] {
 				continue
 			}
-			if redefined[fid] {
-				continue
+			rs, err := md.m.Redefined(md.ctx, f.ID)
+			if err != nil {
+				return nil, err
 			}
-			for _, r := range f.Refs("redefines") {
+			for _, r := range rs {
 				redefined[r] = true
 			}
 			out = append(out, f)
 		}
-		queue = append(queue, md.supertypes[id]...)
+		supers, err := md.m.Generals(md.ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		queue = append(queue, supers...)
 	}
-	return out
+	return out, nil
 }
 
-// value is the value of attr in usage u: the one u binds, else the one the
-// metadata def gives (a default, or a fixed = value), following the
-// attribute's own redefinitions; nil when there is none.
-func (md *metadataIndex) value(u, attr model.Element) model.Element {
-	for _, fid := range u.Refs("ownedMember") {
-		f := md.m.Elements[fid]
-		for _, r := range f.Refs("redefines") {
-			if r == attr.ID() {
-				if v, ok := md.m.Elements[f.Ref("value")]; ok {
-					return v
-				}
+// value is the expression giving attr's value in usage u: the one u binds,
+// else the one the metadata def gives (a default, or a fixed = value),
+// following the attribute's own redefinitions; "" when there is none.
+func (md *metadataIndex) value(u, attr string) (string, error) {
+	members, err := md.m.Members(md.ctx, u)
+	if err != nil {
+		return "", err
+	}
+	for _, f := range members {
+		rs, err := md.m.Redefined(md.ctx, f.ID)
+		if err != nil {
+			return "", err
+		}
+		for _, r := range rs {
+			if r != attr {
+				continue
+			}
+			if v, err := md.valueOf(f.ID); v != "" || err != nil {
+				return v, err
 			}
 		}
 	}
 	seen := map[string]bool{}
-	for a := attr; a != nil && !seen[a.ID()]; {
-		seen[a.ID()] = true
-		if v, ok := md.m.Elements[a.Ref("value")]; ok {
-			return v
+	for a := attr; a != "" && !seen[a]; {
+		seen[a] = true
+		if v, err := md.valueOf(a); v != "" || err != nil {
+			return v, err
 		}
-		next, ok := md.m.Elements[a.Ref("redefines")]
-		if !ok {
-			break
+		rs, err := md.m.Redefined(md.ctx, a)
+		if err != nil || len(rs) == 0 {
+			return "", err
 		}
-		a = next
+		a = rs[0]
 	}
-	return nil
+	return "", nil
+}
+
+// valueOf is the id of the expression a feature's value is, "" when none.
+func (md *metadataIndex) valueOf(feature string) (string, error) {
+	p, err := md.m.Props(md.ctx, feature, "value")
+	if err != nil {
+		return "", err
+	}
+	return p.Ref("value").ID, nil
 }
 
 // valueText is how a value is shown: a string without its quotes, anything
-// else as written in the model (7, true, Level::low, 1 + 2).
-func valueText(v model.Element) string {
-	if v.Type() == "LiteralString" {
-		return v.Str("value")
+// else as the model writes it (7, true, Level::low, 1 + 2). The model gives
+// no source text for an expression (AGENTS.md §13), so it is written back
+// from the expression's parts: literals, references and operators; any
+// other expression shows as its metaclass.
+func (md *metadataIndex) valueText(expr string) (string, error) {
+	return md.exprText(expr, true)
+}
+
+func (md *metadataIndex) exprText(expr string, top bool) (string, error) {
+	p, err := md.m.Props(md.ctx, expr, "value", "operator", "argument", "referent")
+	if err != nil {
+		return "", err
 	}
-	if s := strings.TrimSpace(v.Str("sysx:sourceText")); s != "" {
-		return s
+	switch mc := p.Element.Metaclass; mc {
+	case "LiteralString":
+		if top {
+			return p.Str("value"), nil
+		}
+		return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(p.Str("value")) + `"`, nil
+	case "LiteralInteger", "LiteralRational", "LiteralBoolean":
+		return p.Str("value"), nil
+	case "LiteralInfinity":
+		return "*", nil
+	case "NullExpression":
+		return "null", nil
+	case "FeatureReferenceExpression":
+		return md.referenceText(p.Ref("referent"))
+	case "OperatorExpression":
+		args := p.Refs("argument")
+		op := p.Str("operator")
+		parts := make([]string, len(args))
+		for i, a := range args {
+			if parts[i], err = md.exprText(a.ID, false); err != nil {
+				return "", err
+			}
+		}
+		switch len(parts) {
+		case 1:
+			if op != "" && 'a' <= op[0] && op[0] <= 'z' {
+				return op + " " + parts[0], nil // not x
+			}
+			return op + parts[0], nil // -x
+		case 2:
+			if !top {
+				return "(" + parts[0] + " " + op + " " + parts[1] + ")", nil
+			}
+			return parts[0] + " " + op + " " + parts[1], nil
+		}
+		return mc, nil
+	default:
+		return mc, nil
 	}
-	if x, ok := v["value"]; ok && x != nil {
-		return fmt.Sprint(x)
+}
+
+// referenceText writes a reference: an enumeration literal with its
+// enumeration's name (Level::low), anything else by its name.
+func (md *metadataIndex) referenceText(r model.Ref) (string, error) {
+	name, err := md.names.name(r.ID)
+	if err != nil {
+		return "", err
 	}
-	return v.Type()
+	owner, err := md.m.Owner(md.ctx, r.ID)
+	if err != nil {
+		return "", err
+	}
+	if owner.Metaclass == "EnumerationDefinition" {
+		on, err := md.names.name(owner.ID)
+		if err != nil {
+			return "", err
+		}
+		return quoteName(on) + "::" + quoteName(name), nil
+	}
+	return quoteName(name), nil
 }
 
 // table is the attribute table of usage u, titled with the metadata def's
 // name.
-func (md *metadataIndex) table(parent asciidoctor.StructuralNode, def, u model.Element, attrs []model.Element) (*asciidoctor.Table, error) {
+func (md *metadataIndex) table(parent asciidoctor.StructuralNode, def, u model.Ref, attrs []model.Ref) (*asciidoctor.Table, error) {
 	tbl, err := asciidoctor.CreateTable(parent, nil)
 	if err != nil {
 		return nil, err
 	}
-	tbl.SetTitle(passthrough(html.EscapeString(def.Str("declaredName"))))
+	title, err := md.names.name(def.ID)
+	if err != nil {
+		return nil, err
+	}
+	tbl.SetTitle(passthrough(html.EscapeString(title)))
 	var cols [2]*asciidoctor.Column
 	for i := range cols {
 		if cols[i], err = asciidoctor.CreateTableColumn(tbl, i, nil); err != nil {
@@ -222,10 +310,22 @@ func (md *metadataIndex) table(parent asciidoctor.StructuralNode, def, u model.E
 	}
 	for _, a := range attrs {
 		value := `<span class="no-value">` + html.EscapeString(NoValue) + `</span>`
-		if v := md.value(u, a); v != nil {
-			value = html.EscapeString(valueText(v))
+		expr, err := md.value(u.ID, a.ID)
+		if err != nil {
+			return nil, err
 		}
-		if err := row(asciidoctor.TableBody, passthrough(html.EscapeString(a.Str("declaredName"))), passthrough(value)); err != nil {
+		if expr != "" {
+			text, err := md.valueText(expr)
+			if err != nil {
+				return nil, err
+			}
+			value = html.EscapeString(text)
+		}
+		name, err := md.names.name(a.ID)
+		if err != nil {
+			return nil, err
+		}
+		if err := row(asciidoctor.TableBody, passthrough(html.EscapeString(name)), passthrough(value)); err != nil {
 			return nil, err
 		}
 	}

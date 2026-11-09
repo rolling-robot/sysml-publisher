@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
-	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
 // Doc is the block macro sysml-doc::[<element>][], replaced by the doc
@@ -16,21 +15,25 @@ const Doc = "sysml-doc"
 // DocRole is the role of the block the documentation is put in, for styling.
 const DocRole = "sysml-doc"
 
-func registerDoc(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	md := newMetadataIndex(t.Model)
+func registerDoc(g *asciidoctor.ExtensionGroup, e *env) {
 	g.BlockMacro(Doc, asciidoctor.BlockMacroProcessorFunc(
 		func(parent asciidoctor.StructuralNode, target string, _ map[string]any) (asciidoctor.StructuralNode, error) {
-			n, err := pageElement(parent, t)
+			n, err := pageElement(parent, e.t)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", Doc, err)
 			}
 			docs, owner := n.Docs, n.QualifiedName
 			if target != "" {
-				id, err := nameTarget(target, n, md)
+				id, err := nameTarget(target, n, e)
+				if err == nil {
+					docs, err = e.m.Docs(e.ctx, id)
+				}
+				if err == nil {
+					owner, err = e.names.qualifiedName(id)
+				}
 				if err != nil {
 					return nil, fmt.Errorf("%s::%s[] on the page of %s: %w", Doc, target, n.QualifiedName, err)
 				}
-				docs, owner = t.Docs(id), t.QualifiedName(id)
 			}
 			if len(docs) == 0 {
 				return nil, nil // nothing to insert; the macro line is dropped

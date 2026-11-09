@@ -1,13 +1,16 @@
 package macros
 
 import (
+	"context"
 	"strings"
+
+	"github.com/Open-MBEE/OpenSysML/client/opensysml"
 
 	"github.com/rolling-robot/sysml-publisher/internal/model"
 )
 
 // sysmlKinds are the SysML metaclasses an element can be written as, as the
-// API JSON spells its @type. Copied from OpenSysML's export tables
+// SysML v2 API spells an element's @type. Copied from OpenSysML's export tables
 // (internal/translate/export), which are not public API; kinds that occur
 // in the model are accepted too, so a kind missing here still works when
 // the model uses it.
@@ -43,17 +46,34 @@ var sysmlKinds = []string{
 // letter case (partUsage, PartUsage).
 type kindIndex map[string]string // lower-case name → metaclass
 
-func newKindIndex(m *model.Model) kindIndex {
+func newKindIndex(ctx context.Context, m *model.Model) (kindIndex, error) {
 	k := kindIndex{}
 	for _, kind := range sysmlKinds {
 		k[strings.ToLower(kind)] = kind
 	}
-	for _, id := range m.Order {
-		if kind := m.Elements[id].Type(); kind != "" {
-			k[strings.ToLower(kind)] = kind
+	all, err := m.Query(ctx, opensysml.Query{Select: []string{"@type"}})
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range all {
+		if e.Type != "" {
+			k[strings.ToLower(e.Type)] = e.Type
 		}
 	}
-	return k
+	return k, nil
+}
+
+// kinds is the kind index, made on first use: only sysml-members-list with
+// a kind needs it, and it queries the whole model.
+func (e *env) kinds() (kindIndex, error) {
+	if e.kindIndex == nil {
+		k, err := newKindIndex(e.ctx, e.m)
+		if err != nil {
+			return nil, err
+		}
+		e.kindIndex = k
+	}
+	return e.kindIndex, nil
 }
 
 // lookup is the metaclass name refers to, and whether it is one.

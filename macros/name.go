@@ -19,36 +19,37 @@ import (
 // with a path before the @, another one (wing::@m::owner).
 const Name = "sysml-name"
 
-func registerName(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	registerText(g, t, Name,
+func registerName(g *asciidoctor.ExtensionGroup, e *env) {
+	registerText(g, e, Name,
 		func(n *tree.Node) string { return n.Name },
-		func(md *metadataIndex, id string) string { return md.names.name(id) })
+		e.names.name)
 }
 
 // nameTarget is the element a sysml-name target names: an element (MC-15),
 // or metadata applied to an element and one of its attributes, written
 // [<element>::]@<metadata>[::<attribute>] (MC-8): the metadata def, or the
 // attribute.
-func nameTarget(target string, n *tree.Node, md *metadataIndex) (string, error) {
-	ref, err := parseMetadataRef(target, n, md)
+func nameTarget(target string, n *tree.Node, e *env) (string, error) {
+	ref, err := parseMetadataRef(target, n, e)
 	switch {
 	case err != nil:
 		return "", err
 	case ref == nil:
-		return md.names.resolve(target, n, nil)
-	case ref.attr != nil:
-		return ref.attr.ID(), nil
+		r, err := e.names.resolve(target, n, nil)
+		return r.ID, err
+	case ref.attr.ID != "":
+		return ref.attr.ID, nil
 	}
-	return ref.def.ID(), nil
+	return ref.def.ID, nil
 }
 
 // metadataRef is what a target [<element>::]@<metadata>[::<attribute>]
 // names: metadata applied to an element, and one of its attributes.
 type metadataRef struct {
-	element string          // the element carrying the metadata
-	def     model.Element   // the metadata def
-	usages  []model.Element // the element's usages of def, at least one
-	attr    model.Element   // nil when the target names no attribute
+	element string      // the element carrying the metadata
+	def     model.Ref   // the metadata def
+	usages  []model.Ref // the element's usages of def, at least one
+	attr    model.Ref   // the zero Ref when the target names no attribute
 }
 
 // parseMetadataRef reads a target of the form
@@ -56,7 +57,7 @@ type metadataRef struct {
 // target with no @ segment. The element defaults to the page's; the metadata
 // is a metadata def's name or short name; the attribute is one of the def's
 // attributes, its supertypes' included, by name or short name.
-func parseMetadataRef(target string, n *tree.Node, md *metadataIndex) (*metadataRef, error) {
+func parseMetadataRef(target string, n *tree.Node, e *env) (*metadataRef, error) {
 	segs := splitQualified(target)
 	at := slices.IndexFunc(segs, func(s string) bool { return strings.HasPrefix(s, "@") })
 	if at < 0 {
@@ -72,29 +73,48 @@ func parseMetadataRef(target string, n *tree.Node, md *metadataIndex) (*metadata
 		for i, seg := range segs[:at] {
 			quoted[i] = "'" + strings.ReplaceAll(seg, "'", `\'`) + "'"
 		}
-		id, err := md.names.resolve(strings.Join(quoted, "::"), n, nil)
+		r, err := e.names.resolve(strings.Join(quoted, "::"), n, nil)
 		if err != nil {
 			return nil, err
 		}
-		element, elementName = id, md.names.qualifiedName(id)
+		if elementName, err = e.names.qualifiedName(r.ID); err != nil {
+			return nil, err
+		}
+		element = r.ID
 	}
-	def, err := md.definition(meta, n)
+	def, err := e.md.definition(meta, n)
 	if err != nil {
 		return nil, err
 	}
-	ref := &metadataRef{element: element, def: def, usages: md.usages(element, def)}
-	if len(ref.usages) == 0 {
-		return nil, fmt.Errorf("%s has no @%s metadata", elementName, md.names.name(def.ID()))
+	usages, err := e.md.usages(element, def.ID)
+	if err != nil {
+		return nil, err
 	}
+	defName, err := e.names.name(def.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(usages) == 0 {
+		return nil, fmt.Errorf("%s has no @%s metadata", elementName, defName)
+	}
+	ref := &metadataRef{element: element, def: def, usages: usages}
 	if at == len(segs)-1 {
 		return ref, nil
 	}
 	attr := segs[at+1]
-	for _, a := range md.attributes(def) {
-		if slices.Contains(md.names.names(a.ID()), attr) {
+	attrs, err := e.md.attributes(def.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range attrs {
+		names, err := e.names.names(a.ID)
+		if err != nil {
+			return nil, err
+		}
+		if slices.Contains(names, attr) {
 			ref.attr = a
 			return ref, nil
 		}
 	}
-	return nil, fmt.Errorf("metadata def %s has no attribute %q", md.names.name(def.ID()), attr)
+	return nil, fmt.Errorf("metadata def %s has no attribute %q", defName, attr)
 }

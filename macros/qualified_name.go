@@ -10,8 +10,8 @@ import (
 // the target names, read as sysml-name reads it (MC-9, MC-15).
 const QualifiedName = "sysml-qualified-name"
 
-func registerQualifiedName(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	registerText(g, t, QualifiedName,
+func registerQualifiedName(g *asciidoctor.ExtensionGroup, e *env) {
+	registerText(g, e, QualifiedName,
 		func(n *tree.Node) string { return n.QualifiedName },
-		func(_ *metadataIndex, id string) string { return t.QualifiedName(id) })
+		e.names.qualifiedName)
 }

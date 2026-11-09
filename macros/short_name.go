@@ -11,8 +11,8 @@ import (
 // MC-15).
 const ShortName = "sysml-short-name"
 
-func registerShortName(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	registerText(g, t, ShortName,
+func registerShortName(g *asciidoctor.ExtensionGroup, e *env) {
+	registerText(g, e, ShortName,
 		func(n *tree.Node) string { return n.ShortName },
-		func(_ *metadataIndex, id string) string { return t.ShortName(id) })
+		func(id string) (string, error) { return e.m.ShortName(e.ctx, id) })
 }

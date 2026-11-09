@@ -16,11 +16,15 @@ import (
 
 func setupFixture(t *testing.T, fixture string) (*tree.Tree, *asciidoctor.Asciidoctor) {
 	t.Helper()
-	m, err := model.Folder{Dir: filepath.Join("..", "testdata", fixture)}.Load(context.Background())
+	m, err := model.Folder{Dir: filepath.Join("..", "testdata", fixture)}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	tr := tree.Build(m)
+	t.Cleanup(func() { m.Close() })
+	tr, err := tree.Build(t.Context(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ad, err := asciidoctor.New()
 	if err != nil {
 		t.Fatal(err)

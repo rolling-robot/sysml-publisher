@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
+	"github.com/rolling-robot/sysml-publisher/internal/model"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
@@ -44,27 +45,55 @@ func (w Warning) String() string {
 // Warn receives a warning from a macro. A nil Warn drops warnings.
 type Warn func(Warning)
 
-// Register adds every macro to ad. The macros read the page tree t, report
-// warnings to warn, and stop evaluating when ctx is cancelled. ctx is the
-// context of the rendering ad is registered for; register again for another.
+// Register adds every macro to ad. The macros read the page tree t and,
+// through it, the model (DS-4); they report warnings to warn and stop
+// reading and evaluating when ctx is cancelled. ctx is the context of the
+// rendering ad is registered for; register again for another.
 func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, t *tree.Tree, warn Warn) error {
 	if warn == nil {
 		warn = func(Warning) {}
 	}
+	e := newEnv(ctx, t, warn)
 	g := ad.Extensions().Group("sysml")
-	registerName(g, t)
-	registerRep(g, t)
-	registerQualifiedName(g, t)
-	registerShortName(g, t)
-	registerMembersList(g, t)
-	registerIfaceEnds(g, t)
-	registerDoc(g, t)
-	registerMetadataTable(g, t)
-	registerValue(ctx, g, t, warn)
+	registerName(g, e)
+	registerRep(g, e)
+	registerQualifiedName(g, e)
+	registerShortName(g, e)
+	registerMembersList(g, e)
+	registerIfaceEnds(g, e)
+	registerDoc(g, e)
+	registerMetadataTable(g, e)
+	registerValue(g, e)
 	if err := g.Register(); err != nil {
 		return fmt.Errorf("registering the sysml macros: %w", err)
 	}
 	return nil
+}
+
+// env is what every macro of one rendering shares: the rendering's
+// context, the page tree, the model, and the lookups built on it, so a
+// name or a metadata def read by one macro is not read again by the next.
+type env struct {
+	ctx   context.Context
+	t     *tree.Tree
+	m     *model.Model
+	warn  Warn
+	names *nameIndex
+	md    *metadataIndex
+	// kindIndex is made on first use, by kinds.
+	kindIndex kindIndex
+}
+
+func newEnv(ctx context.Context, t *tree.Tree, warn Warn) *env {
+	names := newNameIndex(ctx, t)
+	return &env{
+		ctx:   ctx,
+		t:     t,
+		m:     t.Model,
+		warn:  warn,
+		names: names,
+		md:    &metadataIndex{ctx: ctx, m: t.Model, names: names},
+	}
 }
 
 // pageElement is the element whose page is being rendered (MC-2).
@@ -93,11 +122,10 @@ func optionalTargetRx(name string) string {
 // about an element: ofPage gives it for the page's element when there is no
 // target; ofElement for the element a target names, read by nameTarget
 // (MC-15, MC-8).
-func registerText(g *asciidoctor.ExtensionGroup, t *tree.Tree, name string, ofPage func(*tree.Node) string, ofElement func(md *metadataIndex, id string) string) {
-	md := newMetadataIndex(t.Model)
+func registerText(g *asciidoctor.ExtensionGroup, e *env, name string, ofPage func(*tree.Node) string, ofElement func(id string) (string, error)) {
 	g.InlineMacro(name, asciidoctor.InlineMacroProcessorFunc(
 		func(parent asciidoctor.Node, target string, _ map[string]any) (*asciidoctor.PhraseNode, error) {
-			n, err := pageElement(parent, t)
+			n, err := pageElement(parent, e.t)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", name, err)
 			}
@@ -106,11 +134,13 @@ func registerText(g *asciidoctor.ExtensionGroup, t *tree.Tree, name string, ofPa
 			target = html.UnescapeString(target)
 			text := ofPage(n)
 			if target != "" {
-				id, err := nameTarget(target, n, md)
+				id, err := nameTarget(target, n, e)
+				if err == nil {
+					text, err = ofElement(id)
+				}
 				if err != nil {
 					return nil, fmt.Errorf("%s:%s[] on the page of %s: %w", name, target, n.QualifiedName, err)
 				}
-				text = ofElement(md, id)
 			}
 			// An unquoted phrase is written out verbatim, so escape the text:
 			// SysML names may contain <, > and &.

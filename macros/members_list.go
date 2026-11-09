@@ -21,24 +21,29 @@ const MembersList = "sysml-members-list"
 // MembersListRole is the role of the list, for styling.
 const MembersListRole = "sysml-members-list"
 
-func registerMembersList(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
-	names := newNameIndex(t.Model)
-	kinds := newKindIndex(t.Model)
+func registerMembersList(g *asciidoctor.ExtensionGroup, e *env) {
 	g.BlockMacro(MembersList, asciidoctor.BlockMacroProcessorFunc(
 		func(parent asciidoctor.StructuralNode, target string, _ map[string]any) (asciidoctor.StructuralNode, error) {
-			n, err := pageElement(parent, t)
+			n, err := pageElement(parent, e.t)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", MembersList, err)
 			}
 			members := n.Members
 			if target != "" {
-				keep, err := membersFilter(target, n, t, names, kinds)
+				fail := func(err error) error {
+					return fmt.Errorf("%s::%s[] on the page of %s: %w", MembersList, target, n.QualifiedName, err)
+				}
+				keep, err := membersFilter(target, n, e)
 				if err != nil {
-					return nil, fmt.Errorf("%s::%s[] on the page of %s: %w", MembersList, target, n.QualifiedName, err)
+					return nil, fail(err)
 				}
 				members = nil
 				for _, m := range n.Members {
-					if keep(m) {
+					ok, err := keep(m)
+					if err != nil {
+						return nil, fail(err)
+					}
+					if ok {
 						members = append(members, m)
 					}
 				}
@@ -51,7 +56,7 @@ func registerMembersList(g *asciidoctor.ExtensionGroup, t *tree.Tree) {
 				return nil, fmt.Errorf("%s: %w", MembersList, err)
 			}
 			for _, m := range members {
-				item, err := asciidoctor.CreateListItem(list, memberText(n, m, t, target == ""))
+				item, err := asciidoctor.CreateListItem(list, memberText(n, m, e.t, target == ""))
 				if err != nil {
 					return nil, fmt.Errorf("%s: %w", MembersList, err)
 				}
@@ -77,17 +82,21 @@ func memberText(page *tree.Node, m tree.Member, t *tree.Tree, withTypes bool) st
 
 // membersFilter is which members target keeps: an element's specializations
 // when target names an element, else the members of the kind it names.
-func membersFilter(target string, n *tree.Node, t *tree.Tree, names *nameIndex, kinds kindIndex) (func(tree.Member) bool, error) {
-	general, err := names.resolve(target, n, nil)
+func membersFilter(target string, n *tree.Node, e *env) (func(tree.Member) (bool, error), error) {
+	general, err := e.names.resolve(target, n, nil)
 	if err == nil {
-		return func(m tree.Member) bool { return t.Specializes(m.ID, general) }, nil
+		return func(m tree.Member) (bool, error) { return e.t.Specializes(e.ctx, m.ID, general.ID) }, nil
 	}
 	if !errors.Is(err, errNoSuchName) {
 		return nil, err // ambiguous: not read as a kind
+	}
+	kinds, err := e.kinds()
+	if err != nil {
+		return nil, err
 	}
 	kind, ok := kinds.lookup(target)
 	if !ok {
 		return nil, fmt.Errorf("the model has no element named %q, and it is no element kind (such as partUsage)", target)
 	}
-	return func(m tree.Member) bool { return t.Model.Elements[m.ID].Type() == kind }, nil
+	return func(m tree.Member) (bool, error) { return m.Metaclass == kind, nil }, nil
 }

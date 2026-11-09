@@ -1,7 +1,6 @@
 package site
 
 import (
-	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -19,11 +18,16 @@ import (
 
 func render(t *testing.T, fixture string) *Site {
 	t.Helper()
-	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", fixture)}.Load(context.Background())
+	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", fixture)}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Render(context.Background(), tree.Build(m), nil)
+	t.Cleanup(func() { m.Close() })
+	tr, err := tree.Build(t.Context(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := Render(t.Context(), tr, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +148,11 @@ func TestMacroErrorFailsRender(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { m.Close() })
-	s, err := Render(t.Context(), tree.Build(m), nil)
+	tr, err := tree.Build(t.Context(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := Render(t.Context(), tr, nil)
 	if err == nil {
 		t.Fatal("Render succeeded; want the sysml-value error")
 	}

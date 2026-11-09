@@ -15,11 +15,15 @@ import (
 // instance with the macros registered.
 func setup(t *testing.T) (*tree.Tree, *asciidoctor.Asciidoctor) {
 	t.Helper()
-	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "macros")}.Load(context.Background())
+	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "macros")}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	tr := tree.Build(m)
+	t.Cleanup(func() { m.Close() })
+	tr, err := tree.Build(t.Context(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ad, err := asciidoctor.New()
 	if err != nil {
 		t.Fatal(err)

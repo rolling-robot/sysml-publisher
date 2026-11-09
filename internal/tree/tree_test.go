@@ -1,7 +1,7 @@
 package tree
 
 import (
-	"context"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -12,11 +12,16 @@ import (
 
 func build(t *testing.T, fixture string) *Tree {
 	t.Helper()
-	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", fixture)}.Load(context.Background())
+	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", fixture)}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Build(m)
+	t.Cleanup(func() { m.Close() })
+	tr, err := Build(t.Context(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tr
 }
 
 func dirs(tr *Tree) []string {
@@ -167,4 +172,50 @@ func TestSegment(t *testing.T) {
 	if a, b := unique("p", used), unique("P", used); a != "p" || b != "P-2" {
 		t.Errorf("unique = %q, %q; want p, P-2 (case-insensitive filesystems)", a, b)
 	}
+}
+
+// The data a page carries for the macros: every doc, the short name, the
+// positional name of an unnamed element, and the members with their
+// metaclasses and types.
+func TestNodeFields(t *testing.T) {
+	tr := build(t, "macros")
+	t.Run("docs in order", func(t *testing.T) {
+		n := page(t, tr, "M/a_b")
+		if want := []string{"The *a<b* part.", "Second doc."}; !reflect.DeepEqual(n.Docs, want) {
+			t.Errorf("docs = %q, want %q", n.Docs, want)
+		}
+	})
+	t.Run("short name", func(t *testing.T) {
+		if got := page(t, tr, "M/pd").ShortName; got != "P" {
+			t.Errorf("short name = %q, want P", got)
+		}
+	})
+	t.Run("positional name", func(t *testing.T) {
+		n := page(t, tr, "M/unnamed-1")
+		if n.QualifiedName != "M::@2" || n.Name != UnnamedName || !n.Unnamed {
+			t.Errorf("name %q, qualified %q, unnamed %v; want Unnamed, M::@2, true", n.Name, n.QualifiedName, n.Unnamed)
+		}
+	})
+	tr = build(t, "members-list")
+	t.Run("members", func(t *testing.T) {
+		var got []string
+		for _, m := range page(t, tr, "M/pd").Members {
+			got = append(got, fmt.Sprintf("%s %s %v", m.Name, m.Metaclass, m.Types))
+		}
+		want := []string{
+			"mass AttributeUsage [Real]",
+			"a*b*+++c PortUsage []",
+			"sub PartUsage []",
+			"Unnamed PartUsage [other]",
+			"wheels PartUsage [Wheel]",
+			"front PartUsage [Wheel]",
+			"spare PartUsage [Sport]",
+			"Racing PartDefinition []",
+			"both PartUsage [Wheel Sport]",
+			"link InterfaceUsage []",
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("members:\n got %q\nwant %q", got, want)
+		}
+	})
 }
