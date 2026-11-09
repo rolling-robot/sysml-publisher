@@ -19,7 +19,11 @@ func load(t *testing.T, dir string) (*Model, error) {
 // the definition in lib.sysml. Load counts the elements and finds the
 // top-level ones in file order.
 func TestLoadCrossFileModel(t *testing.T) {
-	m := loadOpen(t, "crossfile")
+	m, err := load(t, "crossfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { m.Close() })
 	if len(m.Files) != 2 {
 		t.Fatalf("files = %v, want 2", m.Files)
 	}
@@ -30,7 +34,11 @@ func TestLoadCrossFileModel(t *testing.T) {
 	if len(types) != 1 || types[0].ID != "Lib__pd" {
 		t.Errorf("Top::x types = %+v, want [Lib::pd]", types)
 	}
-	if got := ids(m.Tops); !slices.Equal(got, []string{"Lib", "Top"}) {
+	var tops []string
+	for _, r := range m.Tops {
+		tops = append(tops, r.ID)
+	}
+	if got := tops; !slices.Equal(got, []string{"Lib", "Top"}) {
 		t.Errorf("tops = %v, want [Lib Top]", got)
 	}
 	// What a query returns: Lib, Lib::pd, its representation, Top and

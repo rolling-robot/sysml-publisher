@@ -1,17 +1,36 @@
-package model
+package sysml
 
 import (
 	"errors"
+	"path/filepath"
 	"slices"
+	"sort"
 	"testing"
 
 	"github.com/Open-MBEE/OpenSysML/client/opensysml"
 )
 
-func loadOpen(t *testing.T, dir string) *Model {
+// loadOpen parses the files of a testdata fixture as one model and opens
+// it; the model is closed when the test ends.
+func loadOpen(t *testing.T, fixture string) *Model {
 	t.Helper()
-	m, err := load(t, dir)
+	files, err := filepath.Glob(filepath.Join("..", "testdata", fixture, "*.sysml"))
+	if err != nil || len(files) == 0 {
+		t.Fatalf("fixture %s: %v", fixture, err)
+	}
+	sort.Strings(files)
+	client, err := opensysml.New()
 	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := client.ParseFiles(t.Context(), files)
+	if err != nil {
+		client.Close()
+		t.Fatal(err)
+	}
+	m, err := Open(t.Context(), client, parsed)
+	if err != nil {
+		client.Close()
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { m.Close() })
