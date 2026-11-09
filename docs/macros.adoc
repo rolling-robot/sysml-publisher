@@ -202,8 +202,8 @@ Inherited members are not listed.
 
 * Without an element, `sysml-members-list::[]` lists every member, followed by
   its types in parentheses when it has any: `inlet (FluidPort)`,
-  `both (Wheel, Sport)`. A member whose type comes only from what it subsets
-  (`part front :> wheels;`) is shown without one.
+  `both (Wheel, Sport)`. A member that gets its type from what it subsets or
+  redefines shows that type too: `part front :> wheels;` gives `front (Wheel)`.
 * With an element, `sysml-members-list::Wheel[]` lists only the members that
   are typed by it, subclass it or subset it (`part w : Wheel;`,
   `part def Racing :> Wheel;`, `part front :> wheels;`, a redefinition),

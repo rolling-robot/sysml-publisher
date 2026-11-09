@@ -34,9 +34,13 @@ go test ./...                           # parses and renders the fixture models
 go vet ./...
 ```
 
-- **Dependencies are published tags** in `go.mod`: OpenSysML `v0.12.1` and
-  asciidoctorg `v0.1.0`; `go install …/cmd/sysml-publish@latest` must work,
-  so `go.mod` never carries `replace` directives.
+- **Dependencies are versions anyone can download** in `go.mod`: OpenSysML
+  at a `develop` commit (`v0.12.2-0.20261109213743-e074d3f40c95`, for the
+  query properties `body`, `language` and `textualRepresentation`, which no
+  tag has yet; move to the next tag when it is released) and asciidoctorg
+  `v0.1.0`; `go install …/cmd/sysml-publish@latest` must work, so `go.mod`
+  never carries `replace` directives. OpenSysML pseudo-versions work: it
+  has no submodules.
 - **asciidoctorg is installable only from a release tag.** Its `master` keeps
   the Asciidoctor and CodeRay Ruby sources as git submodules, which Go module
   downloads leave out, so `//go:embed` in `rubysrc/rubysrc.go` finds no files
@@ -416,8 +420,12 @@ Known gaps (from the test review, November 2026):
   name and metaclass come in `Conversion.LibraryReferences` (kept as
   `Model.Library`). The `sysml -convert api-json` CLI writes them as
   elements instead, so do not judge the in-process output by the CLI's.
-- A usage's `type` lists only its own typings: a type it gets through
-  subsetting or redefinition (`part front :> wheels;`) is absent.
+- A usage's `type` includes the types it gets through subsetting or
+  redefinition (`part front :> wheels;` gives `Wheel`; v0.12.1 left them
+  out).
+- Every usage owns a `Multiplicity` member, its implicit `[1..1]` included
+  (unnamed, through an `OwningMembership`); `tree` leaves multiplicities out
+  of `Node.Members`.
 - Derived properties (`documentation`, `textualRepresentation`,
   `representedElement`, `inheritedMember`) are absent from the API JSON; use
   `owner` and the specialization relationships instead.
@@ -507,8 +515,9 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    quotes; rationals become floats) are reasonable but unspecified for units
    with spaces or for values beyond float precision.
 7. **`Site.Write` is not atomic** (remove, then write).
-8. **Pinned to old library tags**: `go.mod` uses OpenSysML `v0.12.1` and
-   asciidoctorg `v0.1.0`; fixes on asciidoctorg's `master` (three unpushed
+8. **Pinned to an untagged OpenSysML and an old asciidoctorg tag**: `go.mod`
+   uses an OpenSysML `develop` commit, whose behaviour can still change
+   before it is tagged, and asciidoctorg `v0.1.0`; fixes on asciidoctorg's `master` (three unpushed
    commits as of November 2026, e.g. stopping Ruby threads on `Close`) reach
    users only with a new asciidoctorg tag.
 9. **Repository hygiene**: commits have missed files (a commit referenced
@@ -552,6 +561,58 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
 - **asciidoctorg**: `asciidoctor.New()` replaces the process-wide default
   slog logger (via `confd`). Worked around in `site.newAsciidoctor`; a
   library should not change a program's global logger.
-- **OpenSysML**: the cancellation error does not wrap `context.Canceled`;
-  the unit `m^3/h` is rejected with "Must be a valid feature" (cause not
-  investigated); view rendering (DOT/Mermaid) is not public API (TBD-9).
+- **OpenSysML**: see §13.
+
+## 13. OpenSysML issues
+
+Problems met in OpenSysML while working on this tool: one entry each, with
+the version, what was seen, how to reproduce it, and the workaround used
+here. Add an entry whenever a new one is found; mark it **fixed in <version>**
+rather than deleting it, and drop the workaround once `go.mod` has the fix.
+"develop" means the commit `go.mod` pins (`e074d3f40c`, 2026-11-09).
+
+1. **Query keeps one value per property** (v0.12.1, develop). The query
+   evaluator stores only `values[0]` of each selected property
+   (`internal/semantic/query/query.go`), and `QueryElement.Properties` is a
+   `map[string]string`, so a list cannot be returned at all. Seen:
+   `documentation` and `textualRepresentation` of an element with two docs or
+   two reps give the first one only. Workaround: query the `Documentation` /
+   `TextualRepresentation` elements by `owner`, or read the element with
+   `ElementProperties`, whose values are lists.
+2. **Query `general` is typing and `:>` only** (v0.12.1, develop). For a
+   usage it is its typings, for a definition its subclassifications; a
+   usage's subsetting and redefinition (`part y :> x`) are absent, so
+   "what specializes X" cannot be asked with one query. Workaround: build the
+   generals graph from `ElementProperties(id, "ownedSpecialization")` and
+   each relationship's `general`.
+3. **No representation properties in Query** (v0.12.1; **fixed in develop**,
+   PR #1926). `body`, `language`, `textualRepresentation` and `locale` were
+   unknown query properties (`unknown query property "language"`).
+4. **Query reports no `type` for a `MetadataUsage`** (v0.12.1; not yet
+   checked on develop): which metadata definition a usage has cannot be
+   queried. Workaround: `ElementProperties(id, "metadataDefinition")`.
+5. **Reflective reads of unnamed elements fail without a cast** (v0.12.1).
+   `(X meta SysML::Element).textualRepresentation` and `.documentation`
+   evaluate to `null: unsupported: metaobject of an element with no
+   qualified name`; adding `as SysML::TextualRepresentation` (or
+   `SysML::Documentation`) and reading `.body` works. Not used here:
+   `ElementProperties` replaces it.
+6. **Positional names do not resolve in expressions** (v0.12.1):
+   `Evaluate` of `(M::D::'@0' meta SysML::TextualRepresentation).body` fails
+   with `unresolved reference: M::D::@0`, although Query and
+   `ElementProperties` accept and return positional ids. An unnamed element
+   cannot be an expression's subject.
+7. **The cancellation error does not wrap `context.Canceled`** (v0.12.1):
+   detect cancellation with `ctx.Err()` (§5.5).
+8. **The unit `m^3/h` is rejected** with "Must be a valid feature" (v0.12.1;
+   cause not investigated).
+9. **View rendering is not public API** (v0.12.1): the DOT and Mermaid
+   writers are in `internal/ir/view`; `RenderView` gives only the view's
+   data (TBD-9).
+10. **Export changes between v0.12.1 and develop** (not bugs, but they
+    changed this tool's output): every usage owns an unnamed `Multiplicity`
+    member, its implicit `[1..1]` included (left out of `Node.Members`); a
+    usage's `type` includes the types it gets through subsetting or
+    redefinition.
+11. **`develop` needs goldmark v1.8.7** while v0.12.1 used v1.8.6; a module
+    cache filled for v0.12.1 cannot build develop with `GOPROXY=off`.

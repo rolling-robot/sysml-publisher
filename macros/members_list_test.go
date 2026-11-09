@@ -24,7 +24,7 @@ func TestMembersList(t *testing.T) {
 			`<a href="sub/index.html">sub</a>`,
 			"Unnamed (other)",
 			"wheels (Wheel)",
-			"front",
+			"front (Wheel)",
 			"spare (Sport)",
 			"Racing",
 			"both (Wheel, Sport)",

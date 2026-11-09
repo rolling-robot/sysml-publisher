@@ -62,8 +62,9 @@ type Member struct {
 	ID   string
 	Name string // its name, or UnnamedName
 	// Types are the names of the member's types (part w : Wheel gives
-	// Wheel), in declaration order; none for a definition or an untyped
-	// usage. Types a usage gets only through subsetting are not included.
+	// Wheel), in declaration order, including those a usage gets through
+	// what it subsets or redefines (part front :> wheels gives Wheel); none
+	// for a definition or an untyped usage.
 	Types []string
 }
 
@@ -317,19 +318,22 @@ func (b *builder) declaredName(id string) string {
 	return ""
 }
 
-// annotations are the metaclasses of owned members that annotate the owner
-// rather than make it up; sysml-members-list leaves them out (MC-12).
-var annotations = map[string]bool{
+// notMembers are the metaclasses of owned members that sysml-members-list
+// leaves out (MC-12): annotations, which annotate the owner rather than make
+// it up, and multiplicities, which are part of the owner's declaration
+// (OpenSysML gives every usage one, its implicit [1..1] included).
+var notMembers = map[string]bool{
 	"Comment": true, "Documentation": true, "TextualRepresentation": true,
 	"MetadataUsage": true, "MetadataFeature": true,
+	"Multiplicity": true, "MultiplicityRange": true,
 }
 
-// members are e's owned members other than annotations.
+// members are e's owned members other than annotations and multiplicities.
 func (b *builder) members(e model.Element) []Member {
 	var out []Member
 	for _, id := range e.Refs("ownedMember") {
 		m, ok := b.m.Elements[id]
-		if !ok || annotations[m.Type()] {
+		if !ok || notMembers[m.Type()] {
 			continue
 		}
 		name := b.declaredName(id)

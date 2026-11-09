@@ -3,7 +3,7 @@ module github.com/rolling-robot/sysml-publisher
 go 1.27.2
 
 require (
-	github.com/Open-MBEE/OpenSysML v0.12.1
+	github.com/Open-MBEE/OpenSysML v0.12.2-0.20261109213743-e074d3f40c95
 	github.com/rolling-robot/asciidoctorg v0.1.0
 )
 
@@ -378,7 +378,7 @@ require (
 	github.com/xdg-go/scram v1.2.0 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	github.com/yuin/goldmark v1.8.6 // indirect
+	github.com/yuin/goldmark v1.8.7 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.etcd.io/bbolt v1.5.0 // indirect
 	go.etcd.io/etcd/api/v3 v3.7.2 // indirect

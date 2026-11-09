@@ -394,8 +394,6 @@ This is a first version.
   placeholder and warn is undecided.
 - The tool relies on OpenSysML's SysML v2 API JSON export, which OpenSysML
   marks as experimental (the tool says so on every run).
-- In member lists, a member that gets its type only through what it subsets or
-  redefines (`part front :> wheels;`) is shown without a type.
 
 ## Further reading
 

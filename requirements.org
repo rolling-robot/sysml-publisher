@@ -173,7 +173,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   replaced by a bullet list of the members the page's element owns (MC-2),
   in declaration order, each shown by its name ("Unnamed" for one without)
   and linked to its page when it has one. Annotations (=doc=, comments,
-  representations, metadata usages) shall be left out.
+  representations, metadata usages) and multiplicities shall be left out.
   - Without =<element>=, every such member shall be listed, followed by its
     types in parentheses when it has any: =mass (Real)=,
     =both (Wheel, Sport)=.

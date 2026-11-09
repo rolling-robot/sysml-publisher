@@ -4,7 +4,8 @@
 //   sysml-members-list::[]   every owned member, in declaration order, with
 //                            its types; no docs, representations, metadata:
 //     mass (Real), a*b*+++c, sub (linked), Unnamed (other), wheels (Wheel),
-//     front, spare (Sport), Racing, both (Wheel, Sport), link
+//     front (Wheel, from wheels), spare (Sport), Racing, both (Wheel, Sport),
+//     link
 //   ::Wheel[]   members typed by, subclassing or subsetting Wheel, at any
 //               depth, without types: wheels (: Wheel), front (:> wheels,
 //               which is : Wheel), spare (: Sport, Sport :> Wheel), Racing
