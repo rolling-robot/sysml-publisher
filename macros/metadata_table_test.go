@@ -16,7 +16,7 @@ import (
 
 func setupFixture(t *testing.T, fixture string) (*tree.Tree, *asciidoctor.Asciidoctor) {
 	t.Helper()
-	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", fixture)}.Load(context.Background())
+	m, err := model.Folder{Dir: filepath.Join("..", "testdata", fixture)}.Load(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

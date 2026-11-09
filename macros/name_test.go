@@ -15,7 +15,7 @@ import (
 // instance with the macros registered.
 func setup(t *testing.T) (*tree.Tree, *asciidoctor.Asciidoctor) {
 	t.Helper()
-	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", "macros")}.Load(context.Background())
+	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "macros")}.Load(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

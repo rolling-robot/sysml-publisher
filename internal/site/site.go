@@ -18,8 +18,8 @@ import (
 	"time"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
-	"github.com/rolling-robot/sysml-publisher/internal/macros"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
+	"github.com/rolling-robot/sysml-publisher/macros"
 )
 
 // Marker is the file a generated site folder carries, so a later run knows it

@@ -78,7 +78,7 @@ internal/tree/              which elements get pages, inheritance, names, paths 
 internal/site/              render pages (asciidoctorg + html/template), titles, write
 internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT) + layout.css
 internal/site/page.html.tmpl
-internal/macros/            the sysml-* AsciiDoc macros, one file per macro;
+macros/                     the sysml-* AsciiDoc macros, one file per macro;
                             names.go (element lookup), kinds.go (metaclass names)
 model/                      the user's model (default input)
 testdata/<case>/            fixture models, one folder per test case
@@ -204,7 +204,7 @@ name, like `Node.Name`.
   the text, so rewording a message cannot change it
   (`TestWarningsOncePerPageAndMacro`).
 
-### 5.4 `internal/macros`
+### 5.4 `macros`
 
 `Register(ad, tree, warn)` adds every macro in one `ExtensionGroup` named
 `sysml` (MC-4). Shared pieces in `macros.go`:
@@ -311,7 +311,7 @@ test to change deliberately when TBD-8 is implemented.
 2. Add a fixture model in `testdata/<case>/` whose `//` notes state the
    expected output (see `testdata/metadata/` and `testdata/values/`). Check it
    parses: `bin/sysml-publish -model testdata/<case> -out bin/x`.
-3. Create `internal/macros/<name>.go` with a `const` for the name and a
+3. Create `macros/<name>.go` with a `const` for the name and a
    `register<Name>(g, t[, warn])`; call it from `Register`.
    - Warn with `warn(Warning{Page: n, Macro: <macro as written>, Message: ...})`;
      `Message` must not repeat the page or the macro.
@@ -322,7 +322,7 @@ test to change deliberately when TBD-8 is implemented.
      `t.Model.Evaluate` with `n.QualifiedName` as subject.
    - If the macro needs new per-element data, prefer adding a field to
      `tree.Node` filled in `tree.Build` over scanning the model per call.
-4. Test in `internal/macros/<name>_test.go`: convert a snippet with
+4. Test in `macros/<name>_test.go`: convert a snippet with
    `ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(node)})`.
    Cover: the page's own element, an inherited representation (the usage's
    page, not the owner's), an unnamed element, the "nothing to show" case,

@@ -128,7 +128,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   (MC-2), so each page shall render its representations itself rather than
   reuse another page's output.
 - MC-4 :: Macros shall be written in Go and registered on the asciidoctorg
-  instance in one place, the package =internal/macros=, one file per macro
+  instance in one place, the package =macros=, one file per macro
   with its test beside it.
 - MC-5 :: The page's element shall be passed to macros as document
   attributes set when a representation is converted (e.g. =sysml-element=,
