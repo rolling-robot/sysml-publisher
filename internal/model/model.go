@@ -66,6 +66,11 @@ func refID(v any) string {
 type Model struct {
 	// Files are the model files parsed, in the order given to the parser.
 	Files []string
+	// ElementCount is the number of elements in the model.
+	ElementCount int
+	// Tops are the top-level elements, in file order: the members of each
+	// file's root namespace.
+	Tops []Ref
 	// Elements by @id, and Order lists the ids as the element array does.
 	Elements map[string]Element
 	Order    []string
@@ -83,7 +88,24 @@ type Model struct {
 	// The engine the model was parsed by, kept open for Evaluate until Close.
 	client opensysml.Client
 	parsed *opensysml.Model
+	// cache holds the properties Props has read, by element id and by every
+	// other name an element was asked by.
+	cache map[string]*elementCache
+	// own are the ids of the model's own elements, by readIndex.
+	own   map[string]bool
+	stats Stats
 }
+
+// Stats count how the model was read: the cost of reading it through
+// queries and element reads rather than one export (DS-4).
+type Stats struct {
+	Queries int // Query calls
+	Reads   int // ElementProperties calls: elements, or properties, not cached yet
+	Hits    int // Props calls answered from the cache
+}
+
+// Stats are the reads made so far.
+func (m *Model) Stats() Stats { return m.stats }
 
 // LibraryElement is a standard-library element the model refers to.
 type LibraryElement struct {
@@ -198,6 +220,12 @@ func (f Folder) Load(ctx context.Context) (*Model, error) {
 	}
 
 	start = time.Now()
+	if err := m.readIndex(ctx); err != nil {
+		return nil, err
+	}
+	f.logger().DebugContext(ctx, "model queried", "elements", m.ElementCount, "top-level", len(m.Tops), "duration", time.Since(start))
+
+	start = time.Now()
 	conv, err := client.Convert(ctx, parsed, opensysml.FormatAPIJSON)
 	if err != nil {
 		return nil, fmt.Errorf("converting the model to API JSON: %w", err)
@@ -229,6 +257,34 @@ func (f Folder) Load(ctx context.Context) (*Model, error) {
 	ok = true
 	return m, nil
 }
+
+// readIndex queries every element once: the count, the ids of the model's
+// own elements, and those without an owner, which are the top-level ones,
+// in file order. The query names elements by qualified or positional name,
+// so each is read once (its name, a cheap property) for its id.
+func (m *Model) readIndex(ctx context.Context) error {
+	all, err := m.Query(ctx, opensysml.Query{Select: []string{"owner"}})
+	if err != nil {
+		return err
+	}
+	m.ElementCount = len(all)
+	m.own = make(map[string]bool, len(all))
+	for _, e := range all {
+		p, err := m.Props(ctx, e.ID, "name")
+		if err != nil {
+			return err
+		}
+		m.own[p.Element.ID] = true
+		if e.Properties["owner"] == "" {
+			m.Tops = append(m.Tops, p.Element)
+		}
+	}
+	return nil
+}
+
+// Contains reports whether id is an element of the model itself, not of
+// the standard library it refers to.
+func (m *Model) Contains(id string) bool { return m.own[id] }
 
 // modelFiles lists the model files under dir, sorted so every run parses them
 // in the same order.
