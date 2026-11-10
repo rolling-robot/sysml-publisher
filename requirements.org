@@ -273,6 +273,14 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   Without =depth= the chain is shown as written (=engine.air=). A depth that
   is neither a positive number nor =all= shall stop the run with an error
   naming the macro and the page.
+- MC-18 :: The text of =sysml-name=, =sysml-short-name= and
+  =sysml-qualified-name= (MC-8, MC-9, MC-11) shall link to the page of the
+  element it describes when that element has a page (PG-1, PG-6), with a
+  relative link (PT-1). It shall not link when the element has no page, when
+  it is the page's own element (the link would lead back to the same page),
+  or when the text is empty (an element without a short name). In a
+  document title, the link is kept in the page heading and dropped from the
+  browser tab and the sidebar (PG-8).
 * Open questions
 - TBD-8 :: For MC-7: besides the warning, what does a failing macro leave on
   the page, and should it fail the run? Suggested: a visible placeholder

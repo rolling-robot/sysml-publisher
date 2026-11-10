@@ -132,9 +132,10 @@ func registerText(g *asciidoctor.ExtensionGroup, e *env, name string, ofPage fun
 			// Inline macros run after special characters are escaped, so
 			// M::'a<b' arrives as M::'a&lt;b'.
 			target = html.UnescapeString(target)
-			text := ofPage(n)
+			text, id := ofPage(n), n.ID
 			if target != "" {
-				id, err := nameTarget(target, n, e)
+				var err error
+				id, err = nameTarget(target, n, e)
 				if err == nil {
 					text, err = ofElement(id)
 				}
@@ -144,8 +145,18 @@ func registerText(g *asciidoctor.ExtensionGroup, e *env, name string, ofPage fun
 			}
 			// An unquoted phrase is written out verbatim, so escape the text:
 			// SysML names may contain <, > and &.
-			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(text), nil, nil)
+			return asciidoctor.CreatePhraseNode(parent, "quoted", linkTo(n, e.t.ByID[id], html.EscapeString(text)), nil, nil)
 		}), &asciidoctor.MacroOptions{Regexp: optionalTargetRx(name)})
+}
+
+// linkTo is the HTML text linked, on the page of from, to the page to
+// (MC-18): unlinked when to is nil (the element has no page), when to is
+// from itself, or when the text is empty, which leaves nothing to click.
+func linkTo(from, to *tree.Node, text string) string {
+	if to == nil || to == from || text == "" {
+		return text
+	}
+	return `<a href="` + tree.Href(from, to) + `">` + text + `</a>`
 }
 
 // passthrough is AsciiDoc for finished HTML: an inline passthrough, which

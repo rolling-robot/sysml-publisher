@@ -91,6 +91,14 @@ language, they are joined in the order they are declared. Only the
 element's own representations count, not inherited ones. The body is
 inserted as plain text: it is escaped and not read as AsciiDoc.
 
+[[name-links]]
+When the element has a page, the name links to it: on the page of `a<b`,
+`sysml-name:pd[]` is a link to the page of `pd`. An element without a page,
+and the page's own element, give plain text. `sysml-short-name` and
+`sysml-qualified-name` link the same way. In a document title the link
+shows in the page heading; the browser tab and the sidebar show the text
+only.
+
 A missing language, or an element without a representation in it, stops the
 run with an error naming the macro and the page.
 
@@ -127,7 +135,8 @@ name, like `Model::@2`.
 
 With a target, it gives the qualified name of the element the target names,
 read as for `sysml-name` (see <<naming>>): `sysml-qualified-name:ap[]` gives
-`Model::AircraftPart`.
+`Model::AircraftPart`. It links to the element's page when it has one, as
+`sysml-name` does (see <<name-links>>).
 
 Syntax:: `sysml-qualified-name:[]`, `sysml-qualified-name:<element>[]`
 Attributes:: none
@@ -183,7 +192,8 @@ the macro disappears.
 
 With a target, it gives the short name of the element the target names, read
 as for `sysml-name` (see <<naming>>): `sysml-short-name:AircraftPart[]` gives
-`ap`.
+`ap`. It links to the element's page when it has one, as `sysml-name`
+does (see <<name-links>>).
 
 Syntax:: `sysml-short-name:[]`, `sysml-short-name:<element>[]`
 Attributes:: none

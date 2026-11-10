@@ -33,8 +33,9 @@ func TestShortName(t *testing.T) {
 func TestShortNameTarget(t *testing.T) {
 	tr, ad := setup(t)
 	cases := []struct{ name, page, target, want string }{
-		{"another element's short name", "M/a_b", "pd", "SN: (P)."},
-		{"by its own short name", "M/a_b", "P", "SN: (P)."},
+		{"another element's short name, linked (MC-18)", "M/a_b", "pd", `SN: (<a href="../pd/index.html">P</a>).`},
+		{"by its own short name", "M/a_b", "P", `SN: (<a href="../pd/index.html">P</a>).`},
+		{"the page's own element: no link", "M/pd", "P", "SN: (P)."},
 		{"an element without a short name", "M/pd", "'a<b'", "SN: ()."},
 		{"an element without a page", "M/pd", "Other", "SN: ()."},
 	}

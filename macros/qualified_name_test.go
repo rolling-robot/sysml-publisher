@@ -34,8 +34,9 @@ func TestQualifiedName(t *testing.T) {
 func TestQualifiedNameTarget(t *testing.T) {
 	tr, ad := setup(t)
 	cases := []struct{ name, page, target, want string }{
-		{"quoted name, escaped", "M/pd", "'a<b'", "M::&#39;a&lt;b&#39;"},
-		{"short name", "M/a_b", "P", "M::pd"},
+		{"quoted name, escaped, linked (MC-18)", "M/pd", "'a<b'", `<a href="../a_b/index.html">M::&#39;a&lt;b&#39;</a>`},
+		{"short name", "M/a_b", "P", `<a href="../pd/index.html">M::pd</a>`},
+		{"the page's own element: no link", "M/pd", "pd", "M::pd"},
 		{"element without a page", "M/pd", "Other::'top speed'", "M::Other::&#39;top speed&#39;"},
 	}
 	for _, c := range cases {

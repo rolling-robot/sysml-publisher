@@ -53,12 +53,15 @@ func TestName(t *testing.T) {
 		{"own element", "M/pd", "sysml-name:[]", "pd"},
 		{"inherited representation: the page's element (MC-2)", "M/a_b", "sysml-name:[]", "a&lt;b"},
 		{"element without a name (PG-5)", "M/unnamed-1", "sysml-name:[]", "Unnamed"},
-		// A target (MC-15), looked up from the page of a<b.
-		{"qualified name", "M/a_b", "sysml-name:M::pd[]", "pd"},
-		{"relative name", "M/a_b", "sysml-name:pd[]", "pd"},
-		{"short name", "M/a_b", "sysml-name:P[]", "pd"},
-		{"qualified, short last segment", "M/a_b", "sysml-name:M::P[]", "pd"},
-		{"quoted segment, escaped", "M/pd", "sysml-name:M::'a<b'[]", "a&lt;b"},
+		// A target (MC-15), looked up from the page of a<b, linked to its page
+		// (MC-18).
+		{"qualified name", "M/a_b", "sysml-name:M::pd[]", `<a href="../pd/index.html">pd</a>`},
+		{"relative name", "M/a_b", "sysml-name:pd[]", `<a href="../pd/index.html">pd</a>`},
+		{"short name", "M/a_b", "sysml-name:P[]", `<a href="../pd/index.html">pd</a>`},
+		{"qualified, short last segment", "M/a_b", "sysml-name:M::P[]", `<a href="../pd/index.html">pd</a>`},
+		{"quoted segment, escaped", "M/pd", "sysml-name:M::'a<b'[]", `<a href="../a_b/index.html">a&lt;b</a>`},
+		// A link only to another page (MC-18).
+		{"the page's own element, named", "M/pd", "sysml-name:M::pd[]", "pd"},
 		{"element without a page, quoted name with a space", "M/pd", "sysml-name:M::Other::'top speed'[]", "top speed"},
 		{"relative, quoted name with a space", "M/pd", "sysml-name:Other::'top speed'[]", "top speed"},
 		{"escaped macro stays text", "M/pd", `\sysml-name:pd[]`, "sysml-name:pd[]"},

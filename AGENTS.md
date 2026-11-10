@@ -246,7 +246,8 @@ name, like `Node.Name`.
   target, `ofElement(id)` for the element `nameTarget` resolves.
   `sysml-name`, `sysml-qualified-name` and `sysml-short-name` are a few
   lines each on top of it; the element facts of `model.Model` answer for
-  any element, page or not.
+  any element, page or not. The text links to the element's page when it
+  has one and is not the page itself (`linkTo`, MC-18).
 - **Inline targets** (`macros.go`, `value.go`): Asciidoctor's inline forms
   take a target always (long) or never (short), and the target stops at a
   space. `optionalTargetRx(name)` (used by `registerText` and `sysml-rep`)
@@ -285,10 +286,10 @@ name, like `Node.Name`.
 
 | Macro | Form | Reads | Notes |
 |---|---|---|---|
-| `sysml-name:[<element>]` | inline | `Node.Name`, `nameIndex`, `metadataIndex` | escaped text; no target: page's element; target resolved by MC-15; `[<element>::]@<metadata>[::<attribute>]` gives the metadata def's or attribute's name (`nameTarget`) |
+| `sysml-name:[<element>]` | inline | `Node.Name`, `nameIndex`, `metadataIndex` | escaped text, linked to the element's page if it has one and it is not this page (MC-18); no target: page's element; target resolved by MC-15; `[<element>::]@<metadata>[::<attribute>]` gives the metadata def's or attribute's name (`nameTarget`) |
 | `sysml-rep:[<element>][<language>]` | inline | `Model.Representations`, `nameTarget` | body of the element's own representation in that language (case-insensitive, several joined), escaped plain text; target as `sysml-name` |
-| `sysml-short-name:[<element>]` | inline | `Node.ShortName`, `Tree.ShortName` | empty when none; target as `sysml-name` |
-| `sysml-qualified-name:[<element>]` | inline | `Node.QualifiedName`, `Tree.QualifiedName` | positional name for unnamed; target as `sysml-name` |
+| `sysml-short-name:[<element>]` | inline | `Node.ShortName`, `Model.ShortName` | empty when none; linked as `sysml-name`; target as `sysml-name` |
+| `sysml-qualified-name:[<element>]` | inline | `Node.QualifiedName`, `Model.QualifiedName` | positional name for unnamed; linked as `sysml-name`; target as `sysml-name` |
 | `sysml-doc::[<element>][]` | block | `Node.Docs`, `Tree.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block; target as `sysml-name`; macros in the docs still see the page's element |
 | `sysml-members-list::[<element or kind>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
 | `sysml-iface-ends::[<element>][]` | block | `Props` (`connectorEnds`: `ownedFeature`, `isEnd`, `ownedReferenceSubsetting`, `chainingFeature`), `nameTarget` | ulist of owned ends (`isEnd`): end name (`name`) and the connected feature from its `ReferenceSubsetting` (a `chainingFeature` path), segments linked; the end named `source` first; no ends → error; `depth` (named or positional): last n segments of owners(chain[0]) + chain, `::`-joined and quoted, `all` the whole path; none: chain as written with `.` |
