@@ -36,52 +36,45 @@ const valueMacroRx = `\\?sysml-value:((?:'(?:[^'\\]|\\.)*'|[^\s\['])+)\[(|.*?[^\
 const CompositeText = "[composite]"
 
 func registerValue(g *asciidoctor.ExtensionGroup, e *env) {
-	g.InlineMacro(Value, asciidoctor.InlineMacroProcessorFunc(
-		func(parent asciidoctor.Node, target string, _ map[string]any) (*asciidoctor.PhraseNode, error) {
-			n, err := pageElement(parent, e.t)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", Value, err)
-			}
-			// Inline macros run after special characters are escaped, so
-			// 'a<b' arrives as 'a&lt;b'.
-			target = html.UnescapeString(target)
-			macro := fmt.Sprintf("%s:%s[]", Value, target)
+	inline(g, e, Value, &asciidoctor.MacroOptions{Regexp: valueMacroRx}, nil,
+		func(c call[asciidoctor.Node]) (string, error) {
+			n, target := c.page, c.target
 			if target == "" {
-				return nil, fmt.Errorf("%s on the page of %s: no feature named; write %s:<feature>[]", macro, n.QualifiedName, Value)
+				return "", fmt.Errorf("no feature named; write %s:<feature>[]", Value)
 			}
 			ref, err := parseMetadataRef(target, n, e)
 			if err != nil {
-				return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
+				return "", err
 			}
 			if ref != nil {
 				if ref.attr.ID == "" {
-					return nil, fmt.Errorf("%s on the page of %s: no attribute named; write %s:[<element>::]@<metadata>::<attribute>[]", macro, n.QualifiedName, Value)
+					return "", fmt.Errorf("no attribute named; write %s:[<element>::]@<metadata>::<attribute>[]", Value)
 				}
 				text, err := e.md.attributeValue(ref)
 				if err != nil {
-					return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
+					return "", err
 				}
-				return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(text), nil, nil)
+				return html.EscapeString(text), nil
 			}
 			if !featureRefRx.MatchString(target) {
-				return nil, fmt.Errorf("%s on the page of %s: %q is not a feature name; write a name, a qualified name (A::b) or a feature chain (a.b), not an expression", macro, n.QualifiedName, target)
+				return "", fmt.Errorf("%q is not a feature name; write a name, a qualified name (A::b) or a feature chain (a.b), not an expression", target)
 			}
 			// The page's element is the subject, so the feature reads its
 			// value: its own, a redefinition's, or one from its types.
 			v, err := e.m.Evaluate(e.ctx, n.QualifiedName, target)
 			if err != nil {
-				return nil, fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
+				return "", err
 			}
 			text, kind := formatValue(v)
 			switch kind {
 			case valueComposite:
-				e.warn(Warning{Page: n, Macro: macro, Message: fmt.Sprintf("%s is composite; shown as %s", target, CompositeText)})
+				e.warn(Warning{Page: n, Macro: c.macro, Message: fmt.Sprintf("%s is composite; shown as %s", target, CompositeText)})
 				text = CompositeText
 			case valueNone:
 				text = NoValue
 			}
-			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(text), nil, nil)
-		}), &asciidoctor.MacroOptions{Regexp: valueMacroRx})
+			return html.EscapeString(text), nil
+		})
 }
 
 // attributeValue is the value of the metadata attribute ref names, as

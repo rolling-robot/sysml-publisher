@@ -132,6 +132,45 @@ func TestModelWithoutRepresentationsWritesLandingPageOnly(t *testing.T) {
 	}
 }
 
+// Failing macros do not fail the run (MC-19): every failing page is
+// reported as a warning with the file and line of the macro, and the site is
+// written with placeholders. The cases are the // notes in
+// testdata/macroerror/macroerror.sysml.
+func TestMacroFailuresAreWarnings(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "site")
+	var log bytes.Buffer
+	if code := run(t.Context(), []string{"-model", fixture("macroerror"), "-out", out}, &log); code != exitOK {
+		t.Fatalf("exit %d, want %d; log:\n%s", code, exitOK, log.String())
+	}
+	file := filepath.Join(fixture("macroerror"), "macroerror.sysml")
+	var got []string
+	for _, line := range strings.Split(log.String(), "\n") {
+		if strings.HasPrefix(line, "level=WARN ") {
+			got = append(got, line)
+		}
+	}
+	prefixes := []string{
+		`level=WARN msg="` + file + `:21: M::a: sysml-value:mas[]: `,
+		`level=WARN msg="` + file + `:21: M::pd: sysml-value:mas[]: `,
+		`level=WARN msg="` + file + `:26: M::b: sysml-doc::Nothing[]: `,
+	}
+	if len(got) != len(prefixes) {
+		t.Fatalf("warnings:\n%s\nwant %d", strings.Join(got, "\n"), len(prefixes))
+	}
+	for i, p := range prefixes {
+		if !strings.HasPrefix(got[i], p) {
+			t.Errorf("warning %d:\n got %s\nwant %s...", i, got[i], p)
+		}
+	}
+	page, err := os.ReadFile(filepath.Join(out, "M", "b", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(page), `<div class="sysml-failed">`) {
+		t.Errorf("M/b/index.html has no placeholder:\n%s", page)
+	}
+}
+
 func TestUsageErrors(t *testing.T) {
 	for _, args := range [][]string{
 		{"-log-format", "xml"},

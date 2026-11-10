@@ -35,18 +35,15 @@ func TestRepErrors(t *testing.T) {
 	tr, ad := setupFixture(t, "rep")
 	cases := []struct{ name, page, src, want string }{
 		{"own representations only", "R/e", "sysml-rep:[python]",
-			`sysml-rep:[python] on the page of R::e: R::e has no representation in language "python"`},
+			`R::e: sysml-rep:[python]: R::e has no representation in language "python"`},
 		{"no language", "R/Engine", "sysml-rep:Other[]",
-			"sysml-rep:Other[] on the page of R::Engine: no language named"},
+			"R::Engine: sysml-rep:Other[]: no language named; write sysml-rep:[<element>][<language>]"},
 		{"unknown element", "R/Engine", "sysml-rep:Nothing[ocl]",
-			`sysml-rep:Nothing[ocl] on the page of R::Engine: the model has no element named "Nothing"`},
+			`R::Engine: sysml-rep:Nothing[ocl]: the model has no element named "Nothing"`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ad.Convert(c.src, &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
-			if err == nil || !strings.Contains(err.Error(), c.want) {
-				t.Errorf("err = %v, want one containing %q", err, c.want)
-			}
+			mustFail(t, ad, c.src, Attributes(pageAt(t, tr, c.page)), c.want)
 		})
 	}
 }

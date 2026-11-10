@@ -114,18 +114,15 @@ func TestIfaceEndsErrors(t *testing.T) {
 	tr, ad := setupFixture(t, "iface-ends")
 	page := Attributes(pageAt(t, tr, "I/sys"))
 	cases := []struct{ name, src, want string }{
-		{"no ends: the page's part", "sysml-iface-ends::[]", "sysml-iface-ends::[] on the page of I::sys: I::sys has no ends; name an interface or connection"},
-		{"no ends: a target", "sysml-iface-ends::x[]", "sysml-iface-ends::x[] on the page of I::sys: I::sys::x has no ends"},
-		{"depth zero", "sysml-iface-ends::i1[depth=0]", `sysml-iface-ends::i1[depth=0] on the page of I::sys: depth "0" is not a positive number or all`},
-		{"depth not a number", "sysml-iface-ends::i1[depth=two]", `sysml-iface-ends::i1[depth=two] on the page of I::sys: depth "two" is not a positive number or all`},
-		{"unknown target", "sysml-iface-ends::nope[]", `sysml-iface-ends::nope[] on the page of I::sys: the model has no element named "nope"`},
+		{"no ends: the page's part", "sysml-iface-ends::[]", "I::sys: sysml-iface-ends::[]: I::sys has no ends; name an interface or connection"},
+		{"no ends: a target", "sysml-iface-ends::x[]", "I::sys: sysml-iface-ends::x[]: I::sys::x has no ends; name an interface or connection"},
+		{"depth zero", "sysml-iface-ends::i1[depth=0]", `I::sys: sysml-iface-ends::i1[depth=0]: depth "0" is not a positive number or all`},
+		{"depth not a number", "sysml-iface-ends::i1[depth=two]", `I::sys: sysml-iface-ends::i1[depth=two]: depth "two" is not a positive number or all`},
+		{"unknown target", "sysml-iface-ends::nope[]", `I::sys: sysml-iface-ends::nope[]: the model has no element named "nope"`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ad.Convert(c.src, &asciidoctor.Options{Attributes: page})
-			if err == nil || !strings.Contains(err.Error(), c.want) {
-				t.Errorf("err = %v, want one containing %q", err, c.want)
-			}
+			mustFail(t, ad, c.src, page, c.want)
 		})
 	}
 }

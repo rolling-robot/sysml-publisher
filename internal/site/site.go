@@ -41,7 +41,9 @@ var page = template.Must(template.New("page").Parse(pageTemplate))
 // the site folder.
 type Site struct {
 	Files map[string][]byte
-	// Warnings are the macros' warnings, each once, in the order first seen.
+	// Warnings are the macros' warnings, each once, in the order first seen,
+	// failing macros included (MC-19): "<file>:<line>: <page>: <macro>:
+	// <message>".
 	Warnings []string
 }
 
@@ -49,7 +51,9 @@ type Site struct {
 // are converted with asciidoctorg on every page that shows them, since macros
 // may render them differently per page (MC-3). Cancelling ctx stops the
 // rendering between pages and inside macro evaluations. logger receives
-// debug records (page durations); nil uses slog.Default.
+// debug records (page durations); nil uses slog.Default. A macro that fails
+// leaves a placeholder on its page and a warning, and rendering goes on
+// (MC-19); only a cancelled ctx or a rendering bug returns an error.
 func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, error) {
 	if logger == nil {
 		logger = slog.Default()
@@ -60,9 +64,12 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 	}
 	defer ad.Close()
 	s := &Site{Files: map[string][]byte{}}
+	r := &renderer{t: t, ad: ad, bodies: map[*tree.Node]*body{}, titles: map[*tree.Node]title{},
+		sources: newSources(t.Model.Files)}
 	// One warning per page and macro (MC-7): a macro written twice on a
 	// page, or shown there by two representations, warns once; every page
-	// that shows it warns on its own.
+	// that shows it warns on its own. Macros warn while a representation is
+	// converted, so the warning is placed in that one (MC-19).
 	type key struct {
 		page  *tree.Node
 		macro string
@@ -70,16 +77,19 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 	seen := map[key]bool{}
 	warn := func(w macros.Warning) {
 		k := key{w.Page, w.Macro}
-		if !seen[k] {
-			seen[k] = true
-			s.Warnings = append(s.Warnings, w.String())
+		if seen[k] {
+			return
 		}
+		seen[k] = true
+		if r.current != nil && w.Location == "" {
+			w.Location = r.sources.locate(*r.current, w.Macro)
+		}
+		s.Warnings = append(s.Warnings, w.String())
 	}
 	if err := macros.Register(ctx, ad, t, warn); err != nil {
 		return nil, err
 	}
 
-	r := &renderer{t: t, ad: ad, bodies: map[*tree.Node]*body{}, titles: map[*tree.Node]title{}}
 	// Titles come from the converted bodies, and every page's sidebar shows
 	// every title, so convert all bodies first, then title, then write.
 	for _, n := range t.Pages {
@@ -126,10 +136,14 @@ func newAsciidoctor() (*asciidoctor.Asciidoctor, error) {
 }
 
 type renderer struct {
-	t      *tree.Tree
-	ad     *asciidoctor.Asciidoctor
-	bodies map[*tree.Node]*body
-	titles map[*tree.Node]title
+	t       *tree.Tree
+	ad      *asciidoctor.Asciidoctor
+	bodies  map[*tree.Node]*body
+	titles  map[*tree.Node]title
+	sources *sources
+	// current is the representation being converted, for the location of
+	// macro warnings.
+	current *tree.Rep
 }
 
 // title is a page title: HTML for the page heading, which may carry inline
@@ -184,7 +198,9 @@ func (r *renderer) convert(n *tree.Node, rep tree.Rep, b *body) (template.HTML, 
 	if b.docTitle != nil {
 		attrs = attrs.Set("showtitle", "")
 	}
+	r.current = &rep
 	doc, out, err := r.ad.ConvertDocument(rep.Body, &asciidoctor.Options{Attributes: attrs})
+	r.current = nil
 	if err != nil {
 		return "", fmt.Errorf("converting the representation of %s on the page of %s: %w", r.owner(rep).QualifiedName, n.QualifiedName, err)
 	}

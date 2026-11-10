@@ -128,50 +128,30 @@ func TestValueRejectsExpressions(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ad.Convert("V: sysml-value:"+c.target+"[].", &asciidoctor.Options{Attributes: page})
-			want := "sysml-value:" + c.target + "[] on the page of Values::typical: \"" + c.target + "\" is not a feature name"
-			if err == nil || !strings.Contains(err.Error(), want) {
-				t.Errorf("err = %v, want one containing %q", err, want)
-			}
+			mustFail(t, ad, "V: sysml-value:"+c.target+"[].", page,
+				"Values::typical: sysml-value:"+c.target+"[]: \""+c.target+"\" is not a feature name; write a name, a qualified name (A::b) or a feature chain (a.b), not an expression")
 		})
 	}
 }
 
+// An attribute the element does not have fails the macro (MC-14, MC-19);
+// OpenSysML's wording of the problem is not pinned. Without a target the
+// text is not the macro at all (its syntax needs one), so it stays as
+// written.
 func TestValueErrors(t *testing.T) {
-	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "values")}.Load(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer m.Close()
-	tr, err := tree.Build(t.Context(), m)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ad, err := asciidoctor.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ad.Close()
-	if err := Register(context.Background(), ad, tr, nil); err != nil {
-		t.Fatal(err)
-	}
+	tr, ad := setupFixture(t, "values")
 	page := Attributes(pageAt(t, tr, "Values/typical"))
-	for src, want := range map[string]string{
-		"sysml-value:missing[]": "sysml-value:missing[] on the page of Values::typical",
-		"sysml-value:[]":        "",
-	} {
-		out, err := ad.Convert(src, &asciidoctor.Options{Attributes: page})
-		if want == "" {
-			// Without a target the text is not the macro at all (its
-			// syntax needs one), so it stays as written.
-			if err != nil || !strings.Contains(out, "sysml-value:[]") {
-				t.Errorf("%s: out %q err %v, want the text unchanged", src, out, err)
-			}
-			continue
-		}
-		if err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%s: err = %v, want one containing %q", src, err, want)
-		}
+	ws := recorded[ad]
+	if _, err := ad.Convert("sysml-value:missing[]", &asciidoctor.Options{Attributes: page}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*ws) != 1 || (*ws)[0].Macro != "sysml-value:missing[]" || (*ws)[0].Page.QualifiedName != "Values::typical" || (*ws)[0].Message == "" {
+		t.Errorf("warnings %q, want one for sysml-value:missing[] on Values::typical", *ws)
+	}
+	*ws = nil
+	out, err := ad.Convert("sysml-value:[]", &asciidoctor.Options{Attributes: page})
+	if err != nil || !strings.Contains(out, "sysml-value:[]") || len(*ws) != 0 {
+		t.Errorf("out %q err %v warnings %q, want the text unchanged", out, err, *ws)
 	}
 }
 
@@ -250,11 +230,7 @@ func TestValueMetadataErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ad.Convert("V: sysml-value:"+c.target+"[].", &asciidoctor.Options{Attributes: page})
-			want := "sysml-value:" + c.target + "[] on the page of Meta::bound: " + c.want
-			if err == nil || !strings.Contains(err.Error(), want) {
-				t.Errorf("err = %v, want one containing %q", err, want)
-			}
+			mustFail(t, ad, "V: sysml-value:"+c.target+"[].", page, "Meta::bound: sysml-value:"+c.target+"[]: "+c.want)
 		})
 	}
 }

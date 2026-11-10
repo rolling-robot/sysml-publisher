@@ -77,8 +77,5 @@ func TestDocumentationTarget(t *testing.T) {
 			}
 		})
 	}
-	_, err := ad.Convert("sysml-doc::Nothing[]", &asciidoctor.Options{Attributes: page})
-	if want := `sysml-doc::Nothing[] on the page of M::pd: the model has no element named "Nothing"`; err == nil || !strings.Contains(err.Error(), want) {
-		t.Errorf("err = %v, want one containing %q", err, want)
-	}
+	mustFail(t, ad, "sysml-doc::Nothing[]", page, `M::pd: sysml-doc::Nothing[]: the model has no element named "Nothing"`)
 }

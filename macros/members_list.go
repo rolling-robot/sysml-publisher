@@ -22,26 +22,20 @@ const MembersList = "sysml-members-list"
 const MembersListRole = "sysml-members-list"
 
 func registerMembersList(g *asciidoctor.ExtensionGroup, e *env) {
-	g.BlockMacro(MembersList, asciidoctor.BlockMacroProcessorFunc(
-		func(parent asciidoctor.StructuralNode, target string, _ map[string]any) (asciidoctor.StructuralNode, error) {
-			n, err := pageElement(parent, e.t)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", MembersList, err)
-			}
+	block(g, e, MembersList, nil, nil,
+		func(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNode, error) {
+			n := c.page
 			members := n.Members
-			if target != "" {
-				fail := func(err error) error {
-					return fmt.Errorf("%s::%s[] on the page of %s: %w", MembersList, target, n.QualifiedName, err)
-				}
-				keep, err := membersFilter(target, n, e)
+			if c.target != "" {
+				keep, err := membersFilter(c.target, n, e)
 				if err != nil {
-					return nil, fail(err)
+					return nil, err
 				}
 				members = nil
 				for _, m := range n.Members {
 					ok, err := keep(m)
 					if err != nil {
-						return nil, fail(err)
+						return nil, err
 					}
 					if ok {
 						members = append(members, m)
@@ -51,19 +45,19 @@ func registerMembersList(g *asciidoctor.ExtensionGroup, e *env) {
 			if len(members) == 0 {
 				return nil, nil // nothing to list; the macro line is dropped
 			}
-			list, err := asciidoctor.CreateList(parent, "ulist", asciidoctor.Attributes{"role": MembersListRole})
+			list, err := asciidoctor.CreateList(c.parent, "ulist", asciidoctor.Attributes{"role": MembersListRole})
 			if err != nil {
-				return nil, fmt.Errorf("%s: %w", MembersList, err)
+				return nil, err
 			}
 			for _, m := range members {
-				item, err := asciidoctor.CreateListItem(list, memberText(n, m, e.t, target == ""))
+				item, err := asciidoctor.CreateListItem(list, memberText(n, m, e.t, c.target == ""))
 				if err != nil {
-					return nil, fmt.Errorf("%s: %w", MembersList, err)
+					return nil, err
 				}
 				list.AddItem(item)
 			}
 			return list, nil
-		}), nil)
+		})
 }
 
 // memberText is a list item's AsciiDoc: the member's name, linked to its

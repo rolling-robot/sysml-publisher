@@ -29,7 +29,7 @@ func setup(t *testing.T) (*tree.Tree, *asciidoctor.Asciidoctor) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { ad.Close() })
-	if err := Register(context.Background(), ad, tr, nil); err != nil {
+	if err := Register(context.Background(), ad, tr, record(t, ad)); err != nil {
 		t.Fatal(err)
 	}
 	return tr, ad
@@ -84,16 +84,13 @@ func TestNameErrors(t *testing.T) {
 	page := Attributes(pageAt(t, tr, "M/pd"))
 	cases := []struct{ name, src, want string }{
 		{"unknown element", "sysml-name:Nothing[]",
-			`sysml-name:Nothing[] on the page of M::pd: the model has no element named "Nothing"`},
+			`M::pd: sysml-name:Nothing[]: the model has no element named "Nothing"`},
 		{"ambiguous plain name", "sysml-name:x[]",
-			`"x" names several elements (M::A::x, M::B::x); use a qualified name`},
+			`M::pd: sysml-name:x[]: "x" names several elements (M::A::x, M::B::x); use a qualified name`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ad.Convert(c.src, &asciidoctor.Options{Attributes: page})
-			if err == nil || !strings.Contains(err.Error(), c.want) {
-				t.Errorf("err = %v, want one containing %q", err, c.want)
-			}
+			mustFail(t, ad, c.src, page, c.want)
 		})
 	}
 }
@@ -144,11 +141,7 @@ func TestNameMetadataErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ad.Convert("sysml-name:"+c.target+"[]", &asciidoctor.Options{Attributes: page})
-			want := "sysml-name:" + c.target + "[] on the page of Meta::bound: " + c.want
-			if err == nil || !strings.Contains(err.Error(), want) {
-				t.Errorf("err = %v, want one containing %q", err, want)
-			}
+			mustFail(t, ad, "sysml-name:"+c.target+"[]", page, "Meta::bound: sysml-name:"+c.target+"[]: "+c.want)
 		})
 	}
 }

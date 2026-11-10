@@ -24,8 +24,49 @@ read its name the way a SysML reference is read, trying in turn:
 Every segment may be the element's name or its short name, quoted or not:
 for `package <V> Vehicles { part def <W> Wheel; }`, `Vehicles::Wheel`,
 `V::W`, `V::Wheel` and `W` all name the wheel. A name that several elements
-answer to in the same step is an error asking for a qualified name; a name
-nothing answers to is an error too.
+answer to in the same step fails the macro, asking for a qualified name; a
+name nothing answers to fails it too (<<failures>>).
+
+[[failures]]
+== When a macro fails
+
+A macro that cannot do what is written, such as one naming an element the
+model does not have, does not stop the run. In its place the page shows a
+placeholder with the macro and the problem, marked with the class
+`sysml-failed`:
+
+[source,sysml]
+.model/parts.sysml
+----
+package Model {
+    part def pd {
+        attribute mass = 5;
+        rep language "adoc"
+            /* Mass: sysml-value:mas[]. */
+    }
+}
+----
+
+shows on the page of `pd`:
+
+====
+Mass: [.sysml-failed]#sysml-value:mas[]: opensysml: Evaluate: evaluation
+failed: unresolved reference: mas — did you mean mass?#.
+====
+
+The run also reports a warning with the file and line where the macro is
+written, the page, the macro and the problem:
+
+----
+level=WARN msg="model/parts.sysml:5: Model::pd: sysml-value:mas[]: opensysml: Evaluate: evaluation failed: unresolved reference: mas — did you mean mass?"
+----
+
+A block macro (`sysml-doc::Nothing[]`) leaves a block in its place.
+
+The rest of the page is built as usual, and every failing macro on every
+page is reported, each once per page. A representation inherited by several
+usages reports its failing macro on each of their pages. The run still
+succeeds; check the warnings to find the problems.
 
 == sysml-name
 
@@ -37,7 +78,7 @@ Inline macro. Replaced by an element's name, as declared and without quotes.
   read as described in <<naming>>: `sysml-name:Model::AircraftPart[]`,
   `sysml-name:ap[]` (a short name), `sysml-name:Pump::'rated power'[]` (a
   quoted name, which may contain spaces). A target that names no element,
-  or several, stops the run with an error naming the macro and the page.
+  or several, fails the macro (<<failures>>).
 * `sysml-name:@<metadata>[]` and `sysml-name:@<metadata>::<attribute>[]`
   give the name of metadata applied to the page's element, and of one of its
   attributes. Put an element before the `@` for metadata on another element:
@@ -49,6 +90,14 @@ Inline macro. Replaced by an element's name, as declared and without quotes.
 For `part wing : ap { @m { owner = "Petr"; } }`, on `wing`'s page
 `sysml-name:@m[]` gives `m` and `sysml-name:@m::owner[]` gives `owner`. To
 show the attributes' values, use `sysml-metadata-table::m[]`.
+
+[[name-links]]
+When the element has a page, the name links to it: on the page of `a<b`,
+`sysml-name:pd[]` is a link to the page of `pd`. An element without a page,
+and the page's own element, give plain text. `sysml-short-name` and
+`sysml-qualified-name` link the same way. In a document title the link
+shows in the page heading; the browser tab and the sidebar show the text
+only.
 
 It gives the element's name, not the page title, so it can be used in a
 document title: `= Element: sysml-name:[]` titles each page showing the
@@ -91,16 +140,7 @@ language, they are joined in the order they are declared. Only the
 element's own representations count, not inherited ones. The body is
 inserted as plain text: it is escaped and not read as AsciiDoc.
 
-[[name-links]]
-When the element has a page, the name links to it: on the page of `a<b`,
-`sysml-name:pd[]` is a link to the page of `pd`. An element without a page,
-and the page's own element, give plain text. `sysml-short-name` and
-`sysml-qualified-name` link the same way. In a document title the link
-shows in the page heading; the browser tab and the sidebar show the text
-only.
-
-A missing language, or an element without a representation in it, stops the
-run with an error naming the macro and the page.
+A missing language, or an element without a representation in it, fails the macro (<<failures>>).
 
 Representations in other languages are still reported by the warning
 "skipped representation in language ...", since they get no page of their
@@ -228,8 +268,8 @@ Inherited members are not listed.
   SysML counts an interface as a kind of part.
 
 A target is read as an element first; only when no element has that name is
-it read as a kind. A name that is neither stops the run with an error naming
-the macro and the page, and so does a name several elements have.
+it read as a kind. A name that is neither fails the macro (<<failures>>), and
+so does a name several elements have.
 
 An empty list gives nothing: the macro line is dropped. The list has the role
 `sysml-members-list`, for styling.
@@ -284,8 +324,7 @@ feature linked to their pages when they have one: `source: engine.air`.
   only.
 
 The source end comes first, then the other ends in the order they are
-declared. An element without ends stops the run with an error naming the
-macro and the page. The list has the role `sysml-iface-ends`, for styling.
+declared. An element without ends fails the macro (<<failures>>). The list has the role `sysml-iface-ends`, for styling.
 
 The attribute `depth` chooses how much of the connected feature's path is
 shown. Its path is the qualified name of the part it is on followed by the
@@ -307,7 +346,7 @@ whose element has a page is a link.
 `[2]` is the same as `[depth=2]`. A depth longer than the path shows the
 whole path. Names that need quotes are quoted, as in a qualified name:
 `wing::'de-icing fluid'`. A depth that is neither a positive number nor
-`all` stops the run with an error.
+`all` fails the macro (<<failures>>).
 
 Syntax:: `sysml-iface-ends::[]`, `sysml-iface-ends::<element>[]`,
 `sysml-iface-ends::<element>[depth=<n>|all]`
@@ -362,8 +401,7 @@ element, by short name, or by its name when no other metadata def has it
 (`sysml-metadata-table::Info[]`)
 Attributes:: none
 
-A missing, unknown or ambiguous metadata def name stops the run with an error
-naming the macro and the page.
+A missing, unknown or ambiguous metadata def name fails the macro (<<failures>>).
 
 Example:
 
@@ -402,7 +440,7 @@ feature, read with the page's element as its subject, so it can be:
 * a quoted name, which may contain spaces: `'rated power'`.
 
 The target is a name, not an expression: operators, literals and calls
-(`count*2`, `count<5`, `5`) stop the run with an error. To show a computed
+(`count*2`, `count<5`, `5`) fail the macro (<<failures>>). To show a computed
 value, give it an attribute in the model (`attribute doubled = count*2;`) and
 name that attribute.
 
@@ -432,8 +470,7 @@ Syntax:: `sysml-value:<feature>[]` or
 `sysml-value:[<element>::]@<metadata>::<attribute>[]`
 Attributes:: none
 
-An attribute the element does not have stops the run with an error naming the
-macro and the page.
+An attribute the element does not have fails the macro (<<failures>>).
 
 Example:
 
@@ -486,5 +523,4 @@ part wing {
 
 On the page of `wing` this gives the rows Owner = Petr, Reviewed = false and
 Status = approved. An element without that metadata, an attribute the
-metadata def does not have, or a target without an attribute (`@m`) stops
-the run with an error.
+metadata def does not have, or a target without an attribute (`@m`) fails the macro (<<failures>>).

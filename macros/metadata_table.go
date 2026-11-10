@@ -26,45 +26,38 @@ const NoValue = "(no value)"
 
 func registerMetadataTable(g *asciidoctor.ExtensionGroup, e *env) {
 	md := e.md
-	g.BlockMacro(MetadataTable, asciidoctor.BlockMacroProcessorFunc(
-		func(parent asciidoctor.StructuralNode, target string, _ map[string]any) (asciidoctor.StructuralNode, error) {
-			n, err := pageElement(parent, e.t)
+	block(g, e, MetadataTable, nil, nil,
+		func(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNode, error) {
+			def, err := md.definition(c.target, c.page)
 			if err != nil {
-				return nil, fmt.Errorf("%s: %w", MetadataTable, err)
+				return nil, err
 			}
-			fail := func(err error) error {
-				return fmt.Errorf("%s::%s[] on the page of %s: %w", MetadataTable, target, n.QualifiedName, err)
-			}
-			def, err := md.definition(target, n)
+			usages, err := md.usages(c.page.ID, def.ID)
 			if err != nil {
-				return nil, fail(err)
-			}
-			usages, err := md.usages(n.ID, def.ID)
-			if err != nil {
-				return nil, fail(err)
+				return nil, err
 			}
 			if len(usages) == 0 {
 				return nil, nil // the element has no such metadata; the line is dropped
 			}
 			attrs, err := md.attributes(def.ID)
 			if err != nil {
-				return nil, fail(err)
+				return nil, err
 			}
 			// One table per usage; an element rarely carries the same
 			// metadata twice, so they share an open block.
-			block, err := asciidoctor.CreateOpenBlock(parent, nil, asciidoctor.Attributes{"role": MetadataTableRole}, nil)
+			block, err := asciidoctor.CreateOpenBlock(c.parent, nil, asciidoctor.Attributes{"role": MetadataTableRole}, nil)
 			if err != nil {
 				return nil, err
 			}
 			for _, u := range usages {
 				tbl, err := md.table(block, def, u, attrs)
 				if err != nil {
-					return nil, fmt.Errorf("%s: %w", MetadataTable, err)
+					return nil, err
 				}
 				block.Append(tbl)
 			}
 			return block, nil
-		}), nil)
+		})
 }
 
 // metadataIndex answers questions about metadata, reading the model through

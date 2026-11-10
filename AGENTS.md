@@ -4,7 +4,7 @@ Guide for anyone (human or agent) changing this code: what the program does,
 how it is built, the rules the code relies on, and an assessment of the
 architecture as of November 2026.
 
-The requirements live in `requirements.org` (IDs such as PG-7, MC-10, TBD-8
+The requirements live in `requirements.org` (IDs such as PG-7, MC-10, TBD-9
 below refer to it). The user-facing macro reference is `docs/macros.adoc`.
 Keep both in step with the code: every behaviour change updates the
 requirement it implements, and every macro change updates the reference.
@@ -79,7 +79,8 @@ go vet ./...
 cmd/sysml-publish/main.go   CLI: flags, wiring, messages, exit codes
 internal/model/             load + parse (OpenSysML in-process); Query, Props (cached element reads), Evaluate
 internal/tree/              which elements get pages, inheritance, names, paths (reads the model, writes nothing)
-internal/site/              render pages (asciidoctorg + html/template), titles, write
+internal/site/              render pages (asciidoctorg + html/template), titles, write;
+                            source.go (where a macro is written, for warnings)
 internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT) + layout.css
 internal/site/page.html.tmpl
 macros/                     the sysml-* AsciiDoc macros, one file per macro;
@@ -222,9 +223,19 @@ name, like `Node.Name`.
   replaces it).
 - Macro warnings arrive as `macros.Warning{Page, Macro, Message}` and are
   kept once per (page, macro) in `Site.Warnings` (MC-7), as
-  `<page>: <macro>: <message>`. Deduplication is by those fields, never by
-  the text, so rewording a message cannot change it
+  `<file>:<line>: <page>: <macro>: <message>`. Deduplication is by those
+  fields, never by the text, so rewording a message cannot change it
   (`TestWarningsOncePerPageAndMacro`).
+- **Source locations** (`source.go`, MC-19): the model gives no source
+  positions (§13, 15), so `Render` fills `Warning.Location` itself. Macros
+  warn while a representation is converted (`renderer.current`); `sources`
+  finds that representation's body in the model files by its text (lines
+  compared without surrounding whitespace, since OpenSysML strips the
+  indentation, and only between `/*` and `*/`, so a `//` note quoting a
+  macro is not taken for it), then the first body line holding the macro's
+  name and target. A macro not in the body (one in a doc `sysml-doc`
+  inserted) gets the body's first line; a body not found, no location.
+  Identical bodies in two places are located at the first.
 
 ### 5.4 `macros`
 
@@ -241,6 +252,19 @@ name, like `Node.Name`.
   every `register<Name>(g, e)`. Macros read the model only through
   `model.Model` (`Props`, `Query`, the element facts, `Evaluate`), never a
   raw element map.
+- **Failing macros (MC-19)**: every macro is registered through
+  `inline(g, e, name, opts, written, body)` or `block(...)`. They read the
+  page's element, unescape inline targets, write the macro as it appears in
+  warnings (`written`; default `name:target[]` / `name::target[]`), and
+  call `body(call)`. An error from the body is the macro failing: `e.fail`
+  reports `Warning{Page, Macro, Message: err.Error()}` and a placeholder
+  takes the macro's place (`<span class="sysml-failed">` inline, a pass
+  block `<div class="sysml-failed">` for a block macro), showing the macro
+  and the message, escaped. So a body returns plain errors that say what is
+  wrong, never `"<macro> on the page of …"`. Only a cancelled context (and
+  `pageElement`'s renderer bugs) still return an error from the processor,
+  which stops the conversion. Block macros run while Asciidoctor parses,
+  inline ones afterwards, so on one page block warnings come first.
 - `registerText(g, e, name, ofPage, ofElement)`: an inline macro
   `name:[<element>]` returning escaped text: `ofPage(node)` without a
   target, `ofElement(id)` for the element `nameTarget` resolves.
@@ -279,10 +303,12 @@ name, like `Node.Name`.
 - `passthrough(html)`: wraps finished HTML in `+++…+++` for places where
   AsciiDoc substitutions would otherwise run over model text (list items,
   table cells).
-- `Warning{Page, Macro, Message}` and `Warn`: how a macro reports a problem
-  while still producing output. The macro fills the fields and never
-  formats the page or macro into `Message`; `Warning.String()` builds the
-  reported line, and `site.Render` deduplicates on (page, macro) (MC-7).
+- `Warning{Page, Macro, Message, Location}` and `Warn`: how a macro reports
+  a problem while still producing output, a failure included. The macro
+  fills the first three and never formats the page or macro into
+  `Message`; `Location` is left to the renderer (§5.3). `Warning.String()`
+  builds the reported line, and `site.Render` deduplicates on (page, macro)
+  (MC-7).
 
 | Macro | Form | Reads | Notes |
 |---|---|---|---|
@@ -292,18 +318,19 @@ name, like `Node.Name`.
 | `sysml-qualified-name:[<element>]` | inline | `Node.QualifiedName`, `Model.QualifiedName` | positional name for unnamed; linked as `sysml-name`; target as `sysml-name` |
 | `sysml-doc::[<element>][]` | block | `Node.Docs`, `Tree.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block; target as `sysml-name`; macros in the docs still see the page's element |
 | `sysml-members-list::[<element or kind>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
-| `sysml-iface-ends::[<element>][]` | block | `Props` (`connectorEnds`: `ownedFeature`, `isEnd`, `ownedReferenceSubsetting`, `chainingFeature`), `nameTarget` | ulist of owned ends (`isEnd`): end name (`name`) and the connected feature from its `ReferenceSubsetting` (a `chainingFeature` path), segments linked; the end named `source` first; no ends → error; `depth` (named or positional): last n segments of owners(chain[0]) + chain, `::`-joined and quoted, `all` the whole path; none: chain as written with `.` |
+| `sysml-iface-ends::[<element>][]` | block | `Props` (`connectorEnds`: `ownedFeature`, `isEnd`, `ownedReferenceSubsetting`, `chainingFeature`), `nameTarget` | ulist of owned ends (`isEnd`): end name (`name`) and the connected feature from its `ReferenceSubsetting` (a `chainingFeature` path), segments linked; the end named `source` first; no ends → failure; `depth` (named or positional): last n segments of owners(chain[0]) + chain, `::`-joined and quoted, `all` the whole path; none: chain as written with `.` |
 | `sysml-metadata-table::<def>[]` | block | `metadataIndex` (`Props`) | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
 | `sysml-value:<feature>[]` | inline | `Model.Evaluate` | target must be a feature reference (`featureRefRx`: names, `::`, `.`), not an expression, or `[<element>::]@<metadata>::<attribute>` (`parseMetadataRef`, value read as `sysml-metadata-table` does, not evaluated); OpenSysML evaluates it with the page element as subject; units formatted; composite → `[composite]` + warning |
 
-Error policy today: a macro that cannot resolve what the user wrote (unknown
-metadata def, unknown attribute) returns an error, which fails the whole run
-(TBD-8 is still open on whether to degrade to a placeholder + warning). The
-error keeps its Go chain through asciidoctorg's Ruby: `site.convert` wraps an
-`*asciidoctor.Error` whose `Cause` is the macro's error, so `errors.As` reaches
-e.g. `*opensysml.FailureError` (`Op == "Evaluate"`). Identify errors by type,
-not by message. `TestMacroErrorFailsRender` pins this behaviour and is the
-test to change deliberately when TBD-8 is implemented.
+Failure policy (MC-19): a macro that cannot do what the user wrote leaves
+a placeholder and a warning, and the run succeeds; there is no flag to turn
+warnings into a failing exit code. `TestMacroFailureLeavesPlaceholder`
+(site), `TestMacroFailuresAreWarnings` (CLI) and `TestFailurePlaceholder`,
+`TestEveryFailureReported`, `TestCancelledIsNoFailure` (macros) pin it.
+Errors that still stop the run (cancellation) keep their Go chain through
+asciidoctorg's Ruby: `site.convert` wraps an `*asciidoctor.Error` whose
+`Cause` is the macro's error; identify them by type or `ctx.Err()`, not by
+message.
 
 ### 5.5 `cmd/sysml-publish`
 
@@ -341,7 +368,10 @@ test to change deliberately when TBD-8 is implemented.
 5. **Folders follow element names, titles do not** (PT-1, PG-8). Changing a
    representation's title must never move a page.
 6. **Nothing is written on failure**, and only a marked folder is replaced.
-7. **Every macro name starts with `sysml-`** (MC-1) and is documented in
+7. **A failing macro never stops the run** (MC-19): it leaves a placeholder
+   and a warning. Only cancellation and renderer bugs return errors from a
+   macro processor.
+8. **Every macro name starts with `sysml-`** (MC-1) and is documented in
    `docs/macros.adoc` (MC-6) and in `requirements.org`.
 
 ## 7. Adding a macro
@@ -352,7 +382,13 @@ test to change deliberately when TBD-8 is implemented.
    parses: `bin/sysml-publish -model testdata/<case> -out bin/x`.
 3. Create `macros/<name>.go` with a `const` for the name and a
    `register<Name>(g, e)` taking the shared `env`; call it from `Register`.
-   - Warn with `e.warn(Warning{Page: n, Macro: <macro as written>, Message: ...})`;
+   - Register through `inline` or `block` (§5.4), never `g.InlineMacro` /
+     `g.BlockMacro` directly: they give the page's element, the unescaped
+     target and the macro as written, and turn the body's errors into a
+     placeholder and a warning (MC-19). Return an error saying only what is
+     wrong; never add the macro or the page to it.
+   - Warn without failing with
+     `e.warn(Warning{Page: c.page, Macro: c.macro, Message: ...})`;
      `Message` must not repeat the page or the macro.
    - Inline text from a node field: use `registerText`.
    - Block content: return a block (`CreateOpenBlock` + `ParseContent`,
@@ -367,7 +403,9 @@ test to change deliberately when TBD-8 is implemented.
    `ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(node)})`.
    Cover: the page's own element, an inherited representation (the usage's
    page, not the owner's), an unnamed element, the "nothing to show" case,
-   escaping, and errors.
+   escaping, and failures: `mustFail(t, ad, src, attrs, "<page>: <macro>:
+   <message>")` checks the exact warning and the placeholder (`setup` and
+   `setupFixture` record warnings).
 5. Document it in `docs/macros.adoc` with an example, and verify the example
    end to end with the CLI.
 
@@ -543,15 +581,15 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    rendering is tied to the parser's lifetime. The macros still take the
    concrete `*tree.Tree`, which keeps the `macros` package unusable from
    other modules (`internal/`).
-4. **Error policy is harsh and the messages are poor.** User mistakes in
-   macros fail the whole run at the first failing page, so other pages with
-   the same mistake go unreported. A message such as `converting the
-   representation of M::pd on the page of M::pd: asciidoctor:
-   sysml-value:mas[] on the page of M::pd: … (RuntimeError)` repeats the
-   element, carries Ruby leftovers (`asciidoctor:`, `(RuntimeError)`), and
-   gives no file and line in the model. TBD-8 is open.
+4. **Source locations are found by text.** The model gives no source
+   positions (§13, 15), so a failing macro's file and line come from
+   matching the representation's body against the model files (§5.3): two
+   identical bodies are both located at the first, and a body OpenSysML
+   changes beyond its indentation is not found (the warning then has no
+   location). Failures pass silently in CI: the run succeeds, by decision
+   (MC-19).
 5. **Test gaps** (§8): the main paths are covered (normal run, JSON +
-   timings, model errors, ER-4, macro errors, warnings, usage,
+   timings, model errors, ER-4, macro failures, warnings, usage,
    interruption), but several stated rules are not (cancellation during
    rendering, `Write` edge cases, inheritance cycles), table tests have no
    subtests, some assertions cannot fail, and the docs' macro examples are
@@ -573,31 +611,23 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
 
 ### Recommendations (in priority order)
 
-1. **Decide TBD-8** and implement one macro failure path: placeholder on the
-   page + warning with page, macro and source location, optional
-   `-strict` flag to turn warnings into a failing exit code for CI. Strip
-   Asciidoctor's wrapper from error messages (`asciidoctor.Error.Cause` holds
-   the original), name the element once, and report every failing page, not
-   just the first.
-2. **Close the test gaps of §8**, cheapest first: subtests and weak
+1. **Close the test gaps of §8**, cheapest first: subtests and weak
    assertions, then a shared fixture helper, then the untested rules.
-3. **Move model reading behind the tree**: precompute what macros need
+2. **Move model reading behind the tree**: precompute what macros need
    (metadata defs by name, metadata usages per element) in `tree.Build` or a
    small index built once, so macros never scan the model.
-4. **Cache by (page, representation) only where it matters**, or skip
+3. **Cache by (page, representation) only where it matters**, or skip
    per-page conversion for representations that contain no `sysml-` macro
    (a cheap substring check), which restores sharing for the common case.
-5. **Make `Write` atomic**: render into a sibling temp folder, then swap.
-6. **Tag asciidoctorg releases** whenever this project needs its newer code
+4. **Make `Write` atomic**: render into a sibling temp folder, then swap.
+5. **Tag asciidoctorg releases** whenever this project needs its newer code
    (and push its local commits), then bump `go.mod`.
-7. **Resolve TBD-9** (view rendering) — the recommended path (sysml CLI → DOT
+6. **Resolve TBD-9** (view rendering) — the recommended path (sysml CLI → DOT
    → Graphviz SVG) introduces the first external programs; isolate it behind
    an interface so option 3 (public OpenSysML writer) can replace it.
 
 ## 11. Open decisions
 
-- **TBD-8** — what a failing macro leaves on the page; whether it fails the
-  run.
 - **TBD-9 / AM-3** — how `sysml-view::<view>[]` turns a view into a picture.
 - **AM-2** — `xref:` links between pages (not scheduled).
 
@@ -685,3 +715,12 @@ rather than deleting it, and drop the workaround once `go.mod` has the fix.
     arguments. Workaround: `metadataIndex.valueText` writes literals,
     references and operators back; any other expression shows as its
     metaclass name.
+15. **No source positions for elements** (develop). Neither `Query` nor
+    `ElementProperties` gives the file and line an element is declared at;
+    only diagnostics carry a `Span`. A comment body is also not its text as
+    written: OpenSysML strips the common indentation and the line break
+    after `/*`. Seen: the representation
+    `/*⏎    At sysml-value:position[], …⏎    */` reads back as
+    `"At sysml-value:position[], …\n"`. Workaround: `site.sources` matches
+    the body's lines, whitespace aside, between `/*` and `*/` in the model
+    files to place macro warnings (MC-19, §5.3).

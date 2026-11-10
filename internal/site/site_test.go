@@ -10,8 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Open-MBEE/OpenSysML/client/opensysml"
-	asciidoctor "github.com/rolling-robot/asciidoctorg"
 	"github.com/rolling-robot/sysml-publisher/internal/model"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
@@ -138,65 +136,50 @@ func TestRepresentationRendersPerPage(t *testing.T) {
 	mustContain(t, s, "M/unnamed-1/index.html", "<p>Name: Unnamed.</p>")
 }
 
-// A macro that fails fails the run: Render returns no site and an error that
-// names the representation's owner, the page and the macro, and still holds
-// the engine's error after the round trip through asciidoctorg's Ruby.
-// This pins today's behaviour as the baseline for TBD-8.
-func TestMacroErrorFailsRender(t *testing.T) {
-	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", "macroerror")}.Load(t.Context())
-	if err != nil {
-		t.Fatal(err)
+// A failing macro leaves a placeholder on every page that shows it and a
+// warning naming the file and line where it is written, the page and the
+// macro, and the run goes on (MC-19); the cases are the // notes in
+// testdata/macroerror/macroerror.sysml. OpenSysML's wording of the
+// evaluation error is not pinned.
+func TestMacroFailureLeavesPlaceholder(t *testing.T) {
+	s := render(t, "macroerror")
+	file := filepath.Join("..", "..", "testdata", "macroerror", "macroerror.sysml")
+	// message is empty where it is OpenSysML's.
+	want := []struct{ prefix, message string }{
+		{file + ":21: M::a: sysml-value:mas[]: ", ""},
+		{file + ":21: M::pd: sysml-value:mas[]: ", ""},
+		{file + ":26: M::b: sysml-doc::Nothing[]: ", `the model has no element named "Nothing"`},
 	}
-	t.Cleanup(func() { m.Close() })
-	tr, err := tree.Build(t.Context(), m)
-	if err != nil {
-		t.Fatal(err)
+	if len(s.Warnings) != len(want) {
+		t.Fatalf("warnings:\n got %q\nwant %v", s.Warnings, want)
 	}
-	s, err := Render(t.Context(), tr, nil)
-	if err == nil {
-		t.Fatal("Render succeeded; want the sysml-value error")
-	}
-	if s != nil {
-		t.Errorf("Render returned a site with %d files alongside the error", len(s.Files))
-	}
-
-	// The first page converted is the usage's, not the owner's.
-	for _, want := range []string{
-		"converting the representation of M::pd on the page of M::a: ",
-		"sysml-value:mas[] on the page of M::a: ",
-	} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error lacks %q:\n%v", want, err)
+	for i, w := range want {
+		got, ok := strings.CutPrefix(s.Warnings[i], w.prefix)
+		if !ok || got == "" || (w.message != "" && got != w.message) {
+			t.Errorf("warning %d:\n got %q\nwant %q%s", i, s.Warnings[i], w.prefix, w.message)
 		}
 	}
-
-	// The macro's Go error survives Ruby as the asciidoctorg error's cause,
-	// so callers can tell what failed without parsing the message.
-	var ae *asciidoctor.Error
-	if !errors.As(err, &ae) {
-		t.Fatalf("error %T does not wrap an *asciidoctor.Error: %v", err, err)
-	}
-	if ae.Cause == nil {
-		t.Errorf("asciidoctorg error has no Go cause: %v", ae)
-	}
-	var fe *opensysml.FailureError
-	if !errors.As(err, &fe) {
-		t.Fatalf("error does not reach the engine's *opensysml.FailureError: %v", err)
-	}
-	if fe.Op != "Evaluate" {
-		t.Errorf("engine failure in %q, want Evaluate", fe.Op)
-	}
+	mustContain(t, s, "M/a/index.html", `<span class="sysml-failed">sysml-value:mas[]: `)
+	mustContain(t, s, "M/pd/index.html", `<span class="sysml-failed">sysml-value:mas[]: `)
+	mustContain(t, s, "M/b/index.html",
+		`<div class="sysml-failed"><p>sysml-doc::Nothing[]: the model has no element named &#34;Nothing&#34;</p></div>`)
 }
 
 // Macro warnings are reported once per page and macro (MC-7); the cases are
 // the // notes in testdata/warnings/warnings.sysml.
 func TestWarningsOncePerPageAndMacro(t *testing.T) {
 	s := render(t, "warnings")
+	// Each warning is placed where the macro is first written in the
+	// representation that warned first on that page: Tagged's own, else
+	// Pump's (PG-7: nearest first).
+	file := filepath.Join("..", "..", "testdata", "warnings", "warnings.sysml")
 	var want []string
-	for _, page := range []string{"W::Pump", "W::Tagged", "W::a", "W::b"} {
+	for _, c := range []struct{ page, position string }{
+		{"W::Pump", "25"}, {"W::Tagged", "32"}, {"W::a", "32"}, {"W::b", "25"},
+	} {
 		want = append(want,
-			page+": sysml-value:position[]: position is composite; shown as [composite]",
-			page+": sysml-value:home[]: home is composite; shown as [composite]")
+			file+":"+c.position+": "+c.page+": sysml-value:position[]: position is composite; shown as [composite]",
+			file+":27: "+c.page+": sysml-value:home[]: home is composite; shown as [composite]")
 	}
 	if !reflect.DeepEqual(s.Warnings, want) {
 		t.Errorf("warnings:\n got %q\nwant %q", s.Warnings, want)

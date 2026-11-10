@@ -143,11 +143,11 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   the element's id), so macros keep no global state.
 - MC-6 :: Every macro shall be documented in =docs/macros.adoc=: its syntax,
   its attributes, and an example.
-- MC-7 :: (TBD-8) A macro that cannot do its job, e.g. one naming an element
-  the model does not have, shall produce a warning naming the page and the
-  macro. Warnings shall be reported once per page and macro: a macro written
-  more than once on a page, or shown there by more than one representation,
-  warns once; each page that shows it warns on its own.
+- MC-7 :: A macro that cannot do its job, e.g. one naming an element the
+  model does not have, shall produce a warning naming the page and the
+  macro (MC-19). Warnings shall be reported once per page and macro: a macro
+  written more than once on a page, or shown there by more than one
+  representation, warns once; each page that shows it warns on its own.
 - MC-8 :: The inline macro =sysml-name:[<element>]= shall be replaced by
   an element's name, as declared and without quotes: without a target, the
   name of the page's element (MC-2), "Unnamed" for an element without a name
@@ -161,7 +161,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   element's name, not the page title (PG-8), so it can be used inside a
   document title. A target that names no element, or several, or metadata
   the element does not carry, or an attribute the metadata does not have,
-  shall stop the run with an error naming the macro and the page.
+  shall fail the macro (MC-19).
 - MC-9 :: The inline macro =sysml-qualified-name:[<element>]= shall be
   replaced by the qualified name of the page's element (MC-2), or of the
   element the target names, read as for =sysml-name= (MC-8, MC-15), as SysML
@@ -196,8 +196,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
     an element (MC-15) first, and as a kind only when no element has that
     name.
   - A target that is neither an element nor a kind, or that several
-    elements answer to, shall stop the run with an error naming the macro
-    and the page.
+    elements answer to, shall fail the macro (MC-19).
   - An empty list gives nothing.
 - MC-13 :: The block macro =sysml-metadata-table::<metadata def>[]= shall be
   replaced by a table of the attributes of that metadata on the page's
@@ -208,23 +207,20 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   Strings are shown without quotes, other values as written in the model.
   The metadata def is named as MC-15 says, among metadata defs only. An
   element without that metadata gives nothing. A name that is
-  missing, unknown or ambiguous shall stop the run with an error naming the
-  macro and the page (until TBD-8 decides otherwise).
+  missing, unknown or ambiguous shall fail the macro (MC-19).
 - MC-14 :: The inline macro =sysml-value:<feature>[]= shall be replaced
   by the value of the feature it names, read with the page's element (MC-2)
   as subject: a feature of the element (=mass=, a chain =motor.power=), a
   qualified name (=Values::custom::count=) or a name relative to the page's
   element (=custom::count=), quoted names included (='rated power'=). The
   target shall name a feature, not an expression: a target with operators,
-  literals or calls (=count*2=) shall stop the run with an error naming the
-  macro and the page. The value is evaluated: the
-  element's own, a redefinition's, or one from its types. A quantity shall be shown as magnitude and unit symbol (=5 kg=,
+  literals or calls (=count*2=) shall fail the macro (MC-19). The value is
+  evaluated: the element's own, a redefinition's, or one from its types. A quantity shall be shown as magnitude and unit symbol (=5 kg=,
   =2.5 m³⋅s⁻¹=); a string without quotes; an enumeration literal as written
   (=Level::low=); no value as "(no value)". A composite value (one made of
   attributes of its own) shall be shown as =[composite]=, and the tool shall
   report a warning naming the page and the macro. An attribute the element
-  does not have shall stop the run with an error naming the macro and the
-  page.
+  does not have shall fail the macro (MC-19).
   A target =[<element>::]@<metadata>::<attribute>= (=@Info::owner=,
   =wing::@m::owner=) shall give the value of that attribute of the metadata
   applied to the element (the page's element when no element is written):
@@ -233,8 +229,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   usages of the same metadata give their values joined by ", ". The element
   and metadata def are named as MC-15 says, the attribute by name or short
   name. An element without that metadata, an unknown attribute, or a target
-  naming no attribute (=@Info=) shall stop the run with an error naming the
-  macro and the page.
+  naming no attribute (=@Info=) shall fail the macro (MC-19).
 
 - MC-15 :: A macro that names an element shall find it by trying, in turn:
   a qualified name from the top of the model; a name inside the page's
@@ -250,8 +245,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   compared in any letter case; several representations in it are joined in
   declaration order. The body is inserted as plain text, escaped, not read
   as AsciiDoc. Inherited representations do not count. A missing language,
-  or an element without a representation in it, shall stop the run with an
-  error naming the macro and the page.
+  or an element without a representation in it, shall fail the macro (MC-19).
 
 - MC-17 :: The block macro =sysml-iface-ends::[<element>][]= shall be
   replaced by a bullet list of the ends of an interface or connection: the
@@ -262,8 +256,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   the feature only, an end that connects nothing (an interface def's) its
   name only. The source end (the end named =source=, as in =connect a to b=
   and =connect (a, b)=) shall come first, the other ends in declaration
-  order. An element without ends shall stop the run with an error naming the
-  macro and the page.
+  order. An element without ends shall fail the macro (MC-19).
   The attribute =depth= (=[depth=2]= or =[2]=) shall choose how much of the
   connected feature's path is shown: its qualified path (the owners of the
   feature chain's first element, then the chain), cut to its last =depth=
@@ -271,8 +264,7 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   path for =all= (=Model::aircraft::engine::air=), names quoted as in a
   qualified name. A depth longer than the path shows the whole path.
   Without =depth= the chain is shown as written (=engine.air=). A depth that
-  is neither a positive number nor =all= shall stop the run with an error
-  naming the macro and the page.
+  is neither a positive number nor =all= shall fail the macro (MC-19).
 - MC-18 :: The text of =sysml-name=, =sysml-short-name= and
   =sysml-qualified-name= (MC-8, MC-9, MC-11) shall link to the page of the
   element it describes when that element has a page (PG-1, PG-6), with a
@@ -281,10 +273,15 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   or when the text is empty (an element without a short name). In a
   document title, the link is kept in the page heading and dropped from the
   browser tab and the sidebar (PG-8).
+- MC-19 :: A macro that fails (one that cannot do what is written, e.g. it
+  names an element the model does not have) shall leave a visible
+  placeholder where it is written, showing the macro and the problem, and
+  shall report a warning naming the source location (file and line where
+  the macro is written in the model), the page and the macro (MC-7). The
+  run shall go on and succeed, so every failing macro on every page is
+  reported in one run; the rest of the page is rendered as usual. Only an
+  interrupted run (CLI-7) stops rendering.
 * Open questions
-- TBD-8 :: For MC-7: besides the warning, what does a failing macro leave on
-  the page, and should it fail the run? Suggested: a visible placeholder
-  naming the problem, and the run still succeeds.
 - TBD-9 :: For AM-3: how a view becomes a picture. OpenSysML's public Go API
   (=RenderView=) gives only the view's data (nodes, edges, geometry); its
   DOT and Mermaid writers are in an internal package this tool cannot

@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
-	"strings"
 	"testing"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
@@ -30,7 +29,7 @@ func setupFixture(t *testing.T, fixture string) (*tree.Tree, *asciidoctor.Asciid
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { ad.Close() })
-	if err := Register(context.Background(), ad, tr, nil); err != nil {
+	if err := Register(context.Background(), ad, tr, record(t, ad)); err != nil {
 		t.Fatal(err)
 	}
 	return tr, ad
@@ -120,13 +119,15 @@ func TestMetadataTableByShortName(t *testing.T) {
 func TestMetadataTableErrors(t *testing.T) {
 	tr, ad := setupFixture(t, "metadata-table")
 	page := Attributes(pageAt(t, tr, "Meta/bound"))
-	for src, want := range map[string]string{
-		"sysml-metadata-table::Missing[]": `no metadata def "Missing"`,
-		"sysml-metadata-table::[]":        "no metadata def named",
-	} {
-		_, err := ad.Convert(src, &asciidoctor.Options{Attributes: page})
-		if err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%s: err = %v, want one containing %q", src, err, want)
-		}
+	cases := []struct{ name, src, want string }{
+		{"unknown metadata def", "sysml-metadata-table::Missing[]",
+			`Meta::bound: sysml-metadata-table::Missing[]: the model has no metadata def "Missing"`},
+		{"no metadata def named", "sysml-metadata-table::[]",
+			"Meta::bound: sysml-metadata-table::[]: no metadata def named; write sysml-metadata-table::<metadata def>[]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			mustFail(t, ad, c.src, page, c.want)
+		})
 	}
 }

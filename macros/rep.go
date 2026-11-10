@@ -16,35 +16,28 @@ import (
 const Rep = "sysml-rep"
 
 func registerRep(g *asciidoctor.ExtensionGroup, e *env) {
-	g.InlineMacro(Rep, asciidoctor.InlineMacroProcessorFunc(
-		func(parent asciidoctor.Node, target string, attrs map[string]any) (*asciidoctor.PhraseNode, error) {
-			n, err := pageElement(parent, e.t)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", Rep, err)
-			}
-			// Inline macros run after special characters are escaped.
-			target = html.UnescapeString(target)
-			language, _ := attrs["language"].(string)
-			language = strings.TrimSpace(html.UnescapeString(language))
-			macro := fmt.Sprintf("%s:%s[%s]", Rep, target, language)
+	inline(g, e, Rep, &asciidoctor.MacroOptions{Regexp: optionalTargetRx(Rep), PositionalAttributes: []string{"language"}},
+		func(name, sep, target string, attrs map[string]any) string {
+			return name + sep + target + "[" + repLanguage(attrs) + "]"
+		},
+		func(c call[asciidoctor.Node]) (string, error) {
+			language := repLanguage(c.attrs)
 			if language == "" {
-				return nil, fmt.Errorf("%s on the page of %s: no language named; write %s:[<element>][<language>]", macro, n.QualifiedName, Rep)
+				return "", fmt.Errorf("no language named; write %s:[<element>][<language>]", Rep)
 			}
-			fail := func(err error) error {
-				return fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
-			}
-			id, name := n.ID, n.QualifiedName
-			if target != "" {
-				if id, err = nameTarget(target, n, e); err != nil {
-					return nil, fail(err)
+			id, name := c.page.ID, c.page.QualifiedName
+			if c.target != "" {
+				var err error
+				if id, err = nameTarget(c.target, c.page, e); err != nil {
+					return "", err
 				}
 				if name, err = e.names.qualifiedName(id); err != nil {
-					return nil, fail(err)
+					return "", err
 				}
 			}
 			reps, err := e.m.Representations(e.ctx, id)
 			if err != nil {
-				return nil, fail(err)
+				return "", err
 			}
 			var bodies []string
 			for _, r := range reps {
@@ -53,8 +46,15 @@ func registerRep(g *asciidoctor.ExtensionGroup, e *env) {
 				}
 			}
 			if len(bodies) == 0 {
-				return nil, fmt.Errorf("%s on the page of %s: %s has no representation in language %q", macro, n.QualifiedName, name, language)
+				return "", fmt.Errorf("%s has no representation in language %q", name, language)
 			}
-			return asciidoctor.CreatePhraseNode(parent, "quoted", html.EscapeString(strings.Join(bodies, "\n")), nil, nil)
-		}), &asciidoctor.MacroOptions{Regexp: optionalTargetRx(Rep), PositionalAttributes: []string{"language"}})
+			return html.EscapeString(strings.Join(bodies, "\n")), nil
+		})
+}
+
+// repLanguage is the language attribute of a sysml-rep macro, unescaped
+// (inline macros run after special characters are escaped) and trimmed.
+func repLanguage(attrs map[string]any) string {
+	language, _ := attrs["language"].(string)
+	return strings.TrimSpace(html.UnescapeString(language))
 }

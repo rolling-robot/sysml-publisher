@@ -26,7 +26,8 @@ func Attributes(n *tree.Node) asciidoctor.Attributes {
 }
 
 // Warning is a problem a macro reports while still producing output, such as
-// a value it cannot show. Its parts are kept apart so the receiver can tell
+// a value it cannot show, or a macro that failed and left a placeholder
+// (MC-19). Its parts are kept apart so the receiver can tell
 // repeats without parsing the text (MC-7: one warning per page and macro).
 type Warning struct {
 	// Page is the page the macro was converted for.
@@ -35,11 +36,20 @@ type Warning struct {
 	Macro string
 	// Message says what is wrong, without the page or the macro.
 	Message string
+	// Location is where the macro is written in the model, file:line, or
+	// empty when unknown. Macros leave it empty: they see the
+	// representation's text, not its file; the renderer fills it in.
+	Location string
 }
 
-// String is the warning as reported: "<page>: <macro>: <message>".
+// String is the warning as reported: "<location>: <page>: <macro>:
+// <message>", without the location when it is unknown.
 func (w Warning) String() string {
-	return w.Page.QualifiedName + ": " + w.Macro + ": " + w.Message
+	s := w.Page.QualifiedName + ": " + w.Macro + ": " + w.Message
+	if w.Location != "" {
+		s = w.Location + ": " + s
+	}
+	return s
 }
 
 // Warn receives a warning from a macro. A nil Warn drops warnings.
@@ -118,35 +128,125 @@ func optionalTargetRx(name string) string {
 	return `\\?` + regexp.QuoteMeta(name) + `:((?:'(?:[^'\\]|\\.)*'|[^\s\['])*)\[(|.*?[^\\])\]`
 }
 
+// FailedRole is the class of the placeholder a failing macro leaves on the
+// page (MC-19), for styling.
+const FailedRole = "sysml-failed"
+
+// call is one use of a macro on the page of an element: what a macro's body
+// gets from inline or block.
+type call[P asciidoctor.Node] struct {
+	parent P
+	// page is the element whose page is being rendered (MC-2).
+	page *tree.Node
+	// target is the target as written, unescaped.
+	target string
+	attrs  map[string]any
+	// macro is the macro as written, for warnings: sysml-value:mass[].
+	macro string
+}
+
+// written is how a macro is written in warnings and placeholders, from its
+// name, the separator (":" inline, "::" block), its target and attributes.
+type written func(name, sep, target string, attrs map[string]any) string
+
+// plainWritten writes a macro without its attributes: name:target[].
+func plainWritten(name, sep, target string, _ map[string]any) string {
+	return name + sep + target + "[]"
+}
+
+// inline registers the inline macro name. body returns the HTML that
+// replaces the macro; an error from it is the macro failing (fail). Targets
+// arrive unescaped: inline macros run after special characters are escaped,
+// so M::'a<b' arrives as M::'a&lt;b'.
+func inline(g *asciidoctor.ExtensionGroup, e *env, name string, opts *asciidoctor.MacroOptions, w written, body func(c call[asciidoctor.Node]) (string, error)) {
+	if w == nil {
+		w = plainWritten
+	}
+	g.InlineMacro(name, asciidoctor.InlineMacroProcessorFunc(
+		func(parent asciidoctor.Node, target string, attrs map[string]any) (*asciidoctor.PhraseNode, error) {
+			n, err := pageElement(parent, e.t)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			target = html.UnescapeString(target)
+			c := call[asciidoctor.Node]{parent: parent, page: n, target: target, attrs: attrs, macro: w(name, ":", target, attrs)}
+			out, err := body(c)
+			if err != nil {
+				if err := e.fail(n, c.macro, err); err != nil {
+					return nil, err
+				}
+				out = `<span class="` + FailedRole + `">` + failedText(c.macro, err) + `</span>`
+			}
+			return asciidoctor.CreatePhraseNode(parent, "quoted", out, nil, nil)
+		}), opts)
+}
+
+// block registers the block macro name. body returns the block that
+// replaces the macro, or nil to drop the macro line; an error from it is the
+// macro failing (fail).
+func block(g *asciidoctor.ExtensionGroup, e *env, name string, opts *asciidoctor.MacroOptions, w written, body func(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNode, error)) {
+	if w == nil {
+		w = plainWritten
+	}
+	g.BlockMacro(name, asciidoctor.BlockMacroProcessorFunc(
+		func(parent asciidoctor.StructuralNode, target string, attrs map[string]any) (asciidoctor.StructuralNode, error) {
+			n, err := pageElement(parent, e.t)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			c := call[asciidoctor.StructuralNode]{parent: parent, page: n, target: target, attrs: attrs, macro: w(name, "::", target, attrs)}
+			out, err := body(c)
+			if err == nil {
+				return out, nil
+			}
+			if err := e.fail(n, c.macro, err); err != nil {
+				return nil, err
+			}
+			return asciidoctor.CreatePassBlock(parent,
+				`<div class="`+FailedRole+`"><p>`+failedText(c.macro, err)+`</p></div>`, nil, nil)
+		}), opts)
+}
+
+// fail handles a macro that cannot do its job (MC-7, MC-19): it reports a
+// warning naming the page and the macro, and the caller leaves a placeholder
+// in the macro's place, so the run goes on and every failing page is
+// reported. A cancelled rendering is no macro failure: its error is returned,
+// which stops the conversion.
+func (e *env) fail(n *tree.Node, macro string, err error) error {
+	if e.ctx.Err() != nil {
+		return err
+	}
+	e.warn(Warning{Page: n, Macro: macro, Message: err.Error()})
+	return nil
+}
+
+// failedText is the escaped text of a failing macro's placeholder: the
+// macro as written and what went wrong.
+func failedText(macro string, err error) string {
+	return html.EscapeString(macro + ": " + err.Error())
+}
+
 // registerText registers the inline macro name:[<element>], replaced by text
 // about an element: ofPage gives it for the page's element when there is no
 // target; ofElement for the element a target names, read by nameTarget
 // (MC-15, MC-8).
 func registerText(g *asciidoctor.ExtensionGroup, e *env, name string, ofPage func(*tree.Node) string, ofElement func(id string) (string, error)) {
-	g.InlineMacro(name, asciidoctor.InlineMacroProcessorFunc(
-		func(parent asciidoctor.Node, target string, _ map[string]any) (*asciidoctor.PhraseNode, error) {
-			n, err := pageElement(parent, e.t)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", name, err)
-			}
-			// Inline macros run after special characters are escaped, so
-			// M::'a<b' arrives as M::'a&lt;b'.
-			target = html.UnescapeString(target)
-			text, id := ofPage(n), n.ID
-			if target != "" {
+	inline(g, e, name, &asciidoctor.MacroOptions{Regexp: optionalTargetRx(name)}, nil,
+		func(c call[asciidoctor.Node]) (string, error) {
+			text, id := ofPage(c.page), c.page.ID
+			if c.target != "" {
 				var err error
-				id, err = nameTarget(target, n, e)
-				if err == nil {
-					text, err = ofElement(id)
+				if id, err = nameTarget(c.target, c.page, e); err != nil {
+					return "", err
 				}
-				if err != nil {
-					return nil, fmt.Errorf("%s:%s[] on the page of %s: %w", name, target, n.QualifiedName, err)
+				if text, err = ofElement(id); err != nil {
+					return "", err
 				}
 			}
 			// An unquoted phrase is written out verbatim, so escape the text:
 			// SysML names may contain <, > and &.
-			return asciidoctor.CreatePhraseNode(parent, "quoted", linkTo(n, e.t.ByID[id], html.EscapeString(text)), nil, nil)
-		}), &asciidoctor.MacroOptions{Regexp: optionalTargetRx(name)})
+			return linkTo(c.page, e.t.ByID[id], html.EscapeString(text)), nil
+		})
 }
 
 // linkTo is the HTML text linked, on the page of from, to the page to

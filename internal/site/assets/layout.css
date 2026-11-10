@@ -43,3 +43,15 @@
   .sidebar { position: static; max-height: none; border-left: 0; border-top: 1px solid #e7e7e9; padding-left: 0; }
 }
 .sysml-metadata-table .no-value { color: rgba(0, 0, 0, .45); font-style: italic; }
+/* The placeholder a failing macro leaves (MC-19): visible, but not mistaken for content. */
+.sysml-failed {
+  color: #8a1f11;
+  background: #fdf0ee;
+  border: 1px dashed #d9534f;
+  border-radius: 2px;
+  padding: 0 .25em;
+  font-family: "DejaVu Sans Mono", monospace;
+  font-size: .9em;
+}
+div.sysml-failed { margin-bottom: 1.25em; padding: .5em .75em; }
+div.sysml-failed > p { margin: 0; }

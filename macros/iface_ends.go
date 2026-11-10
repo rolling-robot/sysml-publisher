@@ -26,58 +26,57 @@ const IfaceEnds = "sysml-iface-ends"
 const IfaceEndsRole = "sysml-iface-ends"
 
 func registerIfaceEnds(g *asciidoctor.ExtensionGroup, e *env) {
-	g.BlockMacro(IfaceEnds, asciidoctor.BlockMacroProcessorFunc(
-		func(parent asciidoctor.StructuralNode, target string, attrs map[string]any) (asciidoctor.StructuralNode, error) {
-			n, err := pageElement(parent, e.t)
+	block(g, e, IfaceEnds, &asciidoctor.MacroOptions{PositionalAttributes: []string{"depth"}},
+		func(name, sep, target string, attrs map[string]any) string {
+			if depth := ifaceDepth(attrs); depth != "" {
+				return name + sep + target + "[depth=" + depth + "]"
+			}
+			return name + sep + target + "[]"
+		},
+		func(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNode, error) {
+			depth, err := parseDepth(ifaceDepth(c.attrs))
 			if err != nil {
-				return nil, fmt.Errorf("%s: %w", IfaceEnds, err)
+				return nil, err
 			}
-			depthText, _ := attrs["depth"].(string)
-			depthText = strings.TrimSpace(depthText)
-			macro := fmt.Sprintf("%s::%s[]", IfaceEnds, target)
-			if depthText != "" {
-				macro = fmt.Sprintf("%s::%s[depth=%s]", IfaceEnds, target, depthText)
-			}
-			fail := func(err error) error {
-				return fmt.Errorf("%s on the page of %s: %w", macro, n.QualifiedName, err)
-			}
-			depth, err := parseDepth(depthText)
-			if err != nil {
-				return nil, fail(err)
-			}
-			id, name := n.ID, n.QualifiedName
-			if target != "" {
-				if id, err = nameTarget(target, n, e); err != nil {
-					return nil, fail(err)
+			id, name := c.page.ID, c.page.QualifiedName
+			if c.target != "" {
+				if id, err = nameTarget(c.target, c.page, e); err != nil {
+					return nil, err
 				}
 				if name, err = e.names.qualifiedName(id); err != nil {
-					return nil, fail(err)
+					return nil, err
 				}
 			}
 			ends, err := connectorEnds(e, id)
 			if err != nil {
-				return nil, fail(err)
+				return nil, err
 			}
 			if len(ends) == 0 {
-				return nil, fail(fmt.Errorf("%s has no ends; name an interface or connection", name))
+				return nil, fmt.Errorf("%s has no ends; name an interface or connection", name)
 			}
-			list, err := asciidoctor.CreateList(parent, "ulist", asciidoctor.Attributes{"role": IfaceEndsRole})
+			list, err := asciidoctor.CreateList(c.parent, "ulist", asciidoctor.Attributes{"role": IfaceEndsRole})
 			if err != nil {
-				return nil, fmt.Errorf("%s: %w", IfaceEnds, err)
+				return nil, err
 			}
 			for _, end := range ends {
-				text, err := endText(n, end, e, depth)
+				text, err := endText(c.page, end, e, depth)
 				if err != nil {
-					return nil, fail(err)
+					return nil, err
 				}
 				item, err := asciidoctor.CreateListItem(list, text)
 				if err != nil {
-					return nil, fmt.Errorf("%s: %w", IfaceEnds, err)
+					return nil, err
 				}
 				list.AddItem(item)
 			}
 			return list, nil
-		}), &asciidoctor.MacroOptions{PositionalAttributes: []string{"depth"}})
+		})
+}
+
+// ifaceDepth is the depth attribute of a sysml-iface-ends macro, trimmed.
+func ifaceDepth(attrs map[string]any) string {
+	depth, _ := attrs["depth"].(string)
+	return strings.TrimSpace(depth)
 }
 
 // Depths of sysml-iface-ends: depthAsWritten without the attribute, the

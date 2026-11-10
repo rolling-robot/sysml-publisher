@@ -83,16 +83,13 @@ func TestMembersListErrors(t *testing.T) {
 	page := Attributes(pageAt(t, tr, "M/pd"))
 	cases := []struct{ name, macro, want string }{
 		{"unknown element", "sysml-members-list::Nothing[]",
-			`sysml-members-list::Nothing[] on the page of M::pd: the model has no element named "Nothing", and it is no element kind (such as partUsage)`},
+			`M::pd: sysml-members-list::Nothing[]: the model has no element named "Nothing", and it is no element kind (such as partUsage)`},
 		{"ambiguous plain name", "sysml-members-list::x[]",
-			`"x" names several elements (M::A::x, M::B::x); use a qualified name`},
+			`M::pd: sysml-members-list::x[]: "x" names several elements (M::A::x, M::B::x); use a qualified name`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := ad.Convert(c.macro, &asciidoctor.Options{Attributes: page})
-			if err == nil || !strings.Contains(err.Error(), c.want) {
-				t.Errorf("err = %v, want one containing %q", err, c.want)
-			}
+			mustFail(t, ad, c.macro, page, c.want)
 		})
 	}
 }

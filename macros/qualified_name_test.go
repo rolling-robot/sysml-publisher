@@ -50,8 +50,6 @@ func TestQualifiedNameTarget(t *testing.T) {
 			}
 		})
 	}
-	_, err := ad.Convert("sysml-qualified-name:Nothing[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "M/pd"))})
-	if want := `sysml-qualified-name:Nothing[] on the page of M::pd: the model has no element named "Nothing"`; err == nil || !strings.Contains(err.Error(), want) {
-		t.Errorf("err = %v, want one containing %q", err, want)
-	}
+	mustFail(t, ad, "sysml-qualified-name:Nothing[]", Attributes(pageAt(t, tr, "M/pd")),
+		`M::pd: sysml-qualified-name:Nothing[]: the model has no element named "Nothing"`)
 }
