@@ -415,13 +415,16 @@ Exit status:
 - errors in the model, each reported with its location
   (`msg="model error" diagnostic="model/bad.sysml:2:14: ..."`);
 - a model folder with no model files;
-- a macro that cannot do what it was asked: an attribute or metadata def the
-  model does not have, an element name that is unknown or names several
-  elements;
 - an output folder that is not empty and was not written by the tool.
 
 **Warn and carry on:**
 
+- a macro that cannot do what it was asked (an attribute or metadata def the
+  model does not have, an element name that is unknown or names several
+  elements): the page shows a placeholder with the macro and the problem,
+  and the warning names the file and line where the macro is written, the
+  page and the macro (`model/parts.sysml:5: Model::pd: sysml-value:mas[]:
+  ...`); every failing macro on every page is reported;
 - a representation in another language than AsciiDoc;
 - an unnamed element with a page;
 - a `sysml-value` whose attribute is composite (made of attributes of its
