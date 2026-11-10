@@ -23,7 +23,7 @@ func renderSite(t *testing.T, fixture string) *Site {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Render(t.Context(), tr, nil)
+	s, err := Render(t.Context(), tr, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

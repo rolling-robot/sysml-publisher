@@ -1,4 +1,4 @@
-// Package macros holds the sysml-* AsciiDoc macros (requirements MC-1..20),
+// Package macros holds the sysml-* AsciiDoc macros (requirements MC-1..21),
 // which put facts from a SysML v2 model into AsciiDoc text: names, docs,
 // members, metadata, evaluated values. Each macro lives in its own file;
 // Register adds them all to an asciidoctorg instance.
@@ -111,6 +111,7 @@ func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, m *sysml.Model, 
 	registerDoc(g, e)
 	registerMetadataTable(g, e)
 	registerValue(g, e)
+	registerView(g, e)
 	if err := g.Register(); err != nil {
 		return nil, fmt.Errorf("registering the sysml macros: %w", err)
 	}
@@ -128,6 +129,8 @@ type env struct {
 	warn  Warn
 	names *nameIndex
 	md    *metadataIndex
+	// views renders sysml-view's views; nil until Registry.SetViews.
+	views Views
 	// kindIndex is made on first use, by kinds.
 	kindIndex kindIndex
 }

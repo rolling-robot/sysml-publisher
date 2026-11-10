@@ -524,3 +524,60 @@ part wing {
 On the page of `wing` this gives the rows Owner = Petr, Reviewed = false and
 Status = approved. An element without that metadata, an attribute the
 metadata def does not have, or a target without an attribute (`@m`) fails the macro (<<failures>>).
+
+== sysml-view
+
+Block macro, on a line of its own. Replaced by a view of the model as
+OpenSysML renders it: the view a target names (`sysml-view::interfaces[]`),
+named as described in <<naming>>, or, with `sysml-view::[]`, the page's
+element, which must then be a view.
+
+* A diagram (an interconnection, tree, state, action view, ...) becomes an
+  SVG picture in the page.
+* A table view (`render asElementTable`) becomes a table, its first row the
+  header.
+
+A title written above the macro (`.Wiring`) titles the picture or the table.
+The block has the role `sysml-view`, for styling.
+
+The view is rendered by two programs, which must be installed where the
+site is built: OpenSysML's `sysml` command writes the view, and Graphviz's
+`dot` lays a diagram out. `sysml-publish` finds them on `PATH`; `-sysml` and
+`-dot` name others. Each view is rendered once per run, however many pages
+show it. A target that names no view, a page's element that is not a view,
+a program that cannot be run and a view `sysml` cannot render fail the macro
+(<<failures>>), with the message the program gives.
+
+Syntax:: `sysml-view::[]`, `sysml-view::<view>[]`
+
+Example:
+
+[source,sysml]
+----
+package Aircraft {
+    private import Views::*;
+    private import StandardViewDefinitions::*;
+
+    part aircraft {
+        rep language "asciidoc"
+            /*
+            = Aircraft
+
+            .Wiring
+            sysml-view::wiring[]
+            */
+        part engine { out port air; }
+        part airConditioner { in port air; }
+        interface airDuct connect engine.air to airConditioner.air;
+
+        view wiring {
+            expose aircraft;
+            render asInterconnectionDiagram;
+        }
+    }
+}
+----
+
+The page of `aircraft` shows the interconnection diagram of `engine` and
+`airConditioner`, joined by `airDuct`, titled Wiring. The view library
+imports (`Views`, `StandardViewDefinitions`) make the `render` kinds known.

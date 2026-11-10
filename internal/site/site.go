@@ -19,6 +19,7 @@ import (
 
 	"github.com/rolling-robot/sysml-publisher/internal/render"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
+	"github.com/rolling-robot/sysml-publisher/macros"
 )
 
 // Marker is the file a generated site folder carries, so a later run knows it
@@ -46,10 +47,10 @@ type Site struct {
 	Warnings []string
 }
 
-// Render renders t (render.Tree) and lays it out as a site (New). logger is
-// render.Options.Logger.
-func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, error) {
-	res, err := render.Tree(ctx, t, render.Options{Logger: logger})
+// Render renders t (render.Tree) and lays it out as a site (New). logger
+// and views are render.Options.Logger and render.Options.Views.
+func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger, views macros.Views) (*Site, error) {
+	res, err := render.Tree(ctx, t, render.Options{Logger: logger, Views: views})
 	if err != nil {
 		return nil, err
 	}

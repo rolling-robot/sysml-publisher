@@ -22,7 +22,8 @@ from the model (names, docs, members, metadata tables, evaluated attribute
 values).
 
 ```
-sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json]   # defaults: ./model, ./site
+sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-sysml CMD] [-dot CMD]
+# defaults: ./model, ./site, sysml and dot from PATH
 ```
 
 ## 2. Building, running, testing
@@ -88,6 +89,7 @@ sysml/                      public: reads a parsed model (Query, Props, element 
 macros/                     public: the sysml-* AsciiDoc macros, one file per macro;
                             names.go (element lookup), kinds.go (metaclass names);
                             example_test.go (use from another module)
+views/                      public: renders views for sysml-view with the sysml and dot commands
 model/                      the user's model (default input)
 testdata/<case>/            fixture models, one folder per test case
 docs/macros.adoc            user reference for the macros
@@ -111,7 +113,7 @@ requirements.org            requirements, decisions, open questions
         │    owner chains up to the tops -> ancestors; ownedMember order
         ▼
  tree.Tree { Root, Pages (pre-order), ByID, Model, Warnings }
-        │  render.Tree(ctx, t, Options{Logger, Pages})
+        │  render.Tree(ctx, t, Options{Logger, Pages, Views})
         ▼
  asciidoctorg instance + macros.Register(ad, model, Pages (default: the tree), warn)
    pass 1: convert every page's representations (per page — MC-3)
@@ -213,12 +215,14 @@ Rendering is split from output so another output (Confluence, say) can
 take the same converted pages: `internal/render` converts and titles,
 `internal/site` writes HTML files.
 
-`render.Tree(ctx, t, Options{Logger, Pages})`:
+`render.Tree(ctx, t, Options{Logger, Pages, Views})`:
 
 - creates **one** asciidoctorg instance per call and registers the
   macros on it, with `Options.Pages` deciding their links between pages
   (MC-18; nil: the tree's relative links, `tree.Tree.Href`). An output
-  whose pages are not the site's folders passes its own.
+  whose pages are not the site's folders passes its own. `Options.Views`
+  renders `sysml-view`'s views (`Registry.SetViews`; nil: every
+  `sysml-view` fails).
 - **Pass 1** (`renderer.body`): each page converts each of its
   representations with `ConvertDocumentContext`, passing the page's element id as
   the document attribute `sysml-element` (`macros.Attributes`). The first
@@ -291,6 +295,12 @@ internal type:
   `FormatValue` and `Passthrough` are the built-ins' formatting. Names must
   be macro names and not start with `sysml-` (`checkName`). This is public
   API: changing `Call` or these functions breaks other modules' macros.
+- `Views` is the host's say on views (MC-21): `Render(ctx, qualifiedName)
+  (*Rendering, error)`, a `Rendering` being an SVG or a table's rows;
+  `Registry.SetViews` sets it after `Register`, so `Register`'s signature
+  did not change. `views.CLI` (package `views`) is this tool's; a view's
+  rendering does not depend on the page, so caching it per view does not
+  break MC-3.
 - `Pages` is the host's say on links: `Href(fromID, toID) (href, ok)`.
   `*tree.Tree` implements it for this tool; nil links nothing.
 - `Attributes(elementID)` are the document attributes to convert a
@@ -398,6 +408,7 @@ view: it parses a model, `sysml.Open`s it, registers with a map as
 | `sysml-members-list::[<element or kind>][]` | block | `members` (`Model.Members`, `Model.Types`), `Model.Specializes` | ulist; owned members minus annotations and multiplicities (`notMembers`); links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
 | `sysml-iface-ends::[<element>][]` | block | `Props` (`connectorEnds`: `ownedFeature`, `isEnd`, `ownedReferenceSubsetting`, `chainingFeature`), `nameTarget` | ulist of owned ends (`isEnd`): end name (`name`) and the connected feature from its `ReferenceSubsetting` (a `chainingFeature` path), segments linked; the end named `source` first; no ends → failure; `depth` (named or positional): last n segments of owners(chain[0]) + chain, `::`-joined and quoted, `all` the whole path; none: chain as written with `.` |
 | `sysml-metadata-table::<def>[]` | block | `metadataIndex` (`Props`) | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
+| `sysml-view::[<view>][]` | block | `nameIndex` (`ViewUsage`), `Views` | the host's `Views` renders the view by qualified name (`Registry.SetViews`; none: failure); diagram → open block holding the SVG (`inlineSVG`: prolog dropped, ids prefixed per view), table → table, header row first; both with role and `AttrView` (the qualified name) and the `.Title` written above set on the block itself, since the parser drops a block macro's attributes; no target: the page's element, must be a view; a name that is no view → "X is a PartUsage, not a view" |
 | `sysml-value:<feature>[]` | inline | `Model.Evaluate` | target must be a feature reference (`featureRefRx`: names, `::`, `.`), not an expression, or `[<element>::]@<metadata>::<attribute>` (`parseMetadataRef`, value read as `sysml-metadata-table` does, not evaluated); OpenSysML evaluates it with the page element as subject; units formatted; composite → `[composite]` + warning |
 
 Failure policy (MC-19): a macro that cannot do what the user wrote leaves
@@ -425,6 +436,9 @@ message.
   (`asciidocLog`, §5.3).
 - **Loggers are passed explicitly** (`model.Folder.Logger`, `site.Render`'s
   `logger`), not taken from `slog.Default`; see the asciidoctorg quirk in §9.
+- **Views (MC-21, CLI-8)**: `publish` gives `site.Render` a `views.CLI`
+  with the model's files and the `-sysml`/`-dot` commands. Missing programs
+  are no usage error: only the `sysml-view` macros that need them fail.
 - **Cancellation (CLI-7)**: `main` uses `signal.NotifyContext`; the context
   flows into `Load`, `Render` (checked between pages, and passed to
   `ConvertDocumentContext`, which stops a conversion at asciidoctorg's next
@@ -497,7 +511,10 @@ What the suite is:
 
 - Tests go through the real stack: fixtures are parsed by OpenSysML in
   process, rendered by asciidoctorg. No mocks, no build tags: nothing leaves
-  the process, and the whole suite runs in a few seconds (about 0.2 s of each
+  the process, except where the code itself runs programs: the `views` tests
+  run `sysml` and `dot` and skip when they are not on `PATH`, and the
+  `sysml-view` tests in `macros` render with a map (`fakeViews`), as the
+  `Pages` of the examples is one. The whole suite runs in a few seconds (about 0.2 s of each
   macro or site test is parsing and starting asciidoctorg).
 - One folder per fixture under `testdata/`; expected results live as `//`
   notes in the fixture or as tables in the test. Fixtures must be committed
@@ -591,7 +608,13 @@ Known gaps (from the test review, November 2026):
   (`10 [km/h] * 2` → `50/9 m/s`), composite attribute values come back as
   `InstanceID`.
 - View rendering to DOT/Mermaid exists only in `internal/ir/view` and the
-  `sysml` CLI (TBD-9).
+  `sysml` CLI (TBD-9), so `sysml-view` runs the CLI (`views.CLI`): `sysml
+  <files> -render <qn> -render-form dot`, then `dot -Tsvg`; a table view
+  refuses DOT, and is written with `-render-form csv` instead. The CLI
+  prints `✓ package …` and its errors (`sysml: <message>`) on stderr,
+  exits 2 when it refuses; it needs `private import Views::*` and
+  `StandardViewDefinitions::*` in the model for `render as…`. Its version
+  is whatever is installed, not the one `go.mod` pins.
 - `Query` supports a closed set of properties (on develop: `body`,
   `language`, `textualRepresentation` added) and one value each (§13, 1).
 
@@ -706,13 +729,12 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
 4. **Make `Write` atomic**: render into a sibling temp folder, then swap.
 5. **Tag asciidoctorg releases** whenever this project needs its newer code
    (and push its local commits), then bump `go.mod`.
-6. **Resolve TBD-9** (view rendering) — the recommended path (sysml CLI → DOT
-   → Graphviz SVG) introduces the first external programs; isolate it behind
-   an interface so option 3 (public OpenSysML writer) can replace it.
+6. **Render views in process** once OpenSysML's `RenderView` returns a
+   picture (or DOT): a second `macros.Views` replaces `views.CLI`, and the
+   installed `sysml` stops mattering (TBD-9, §13 9).
 
 ## 11. Open decisions
 
-- **TBD-9 / AM-3** — how `sysml-view::<view>[]` turns a view into a picture.
 - **AM-2** — `xref:` links between pages (not scheduled).
 
 ## 12. Upstream issues (to report or fix in the dependencies)
@@ -767,9 +789,11 @@ re-checked since; the workarounds still pass the tests.
    detect cancellation with `ctx.Err()` (§5.5).
 8. **The unit `m^3/h` is rejected** with "Must be a valid feature" (v0.12.1;
    cause not investigated).
-9. **View rendering is not public API** (v0.12.1): the DOT and Mermaid
-   writers are in `internal/ir/view`; `RenderView` gives only the view's
-   data (TBD-9).
+9. **View rendering is not public API** (v0.12.1; still so on develop
+   `d2136035d7`, 2026-11-10): the DOT and Mermaid writers are in
+   `internal/ir/view`; `RenderView` gives only the view's data, and
+   `RenderViewRequest` has no form. Workaround: `views.CLI` runs the `sysml`
+   command and Graphviz (TBD-9, MC-21).
 10. **Export changes between v0.12.1 and develop** (not bugs, but they
     changed this tool's output): every usage owns an unnamed `Multiplicity`
     member, its implicit `[1..1]` included (left out of the members `sysml-members-list` lists); a

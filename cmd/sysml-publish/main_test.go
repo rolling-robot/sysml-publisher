@@ -199,3 +199,37 @@ func TestInterruptedRunWritesNothing(t *testing.T) {
 		t.Errorf("site folder created after an interrupted run: %v", err)
 	}
 }
+
+// -sysml and -dot choose the programs sysml-view renders with (CLI-8); one
+// that cannot be run fails the macro, not the run (MC-19). The fixture's
+// pages run sysml first, so its missing command is what each names.
+func TestViewPrograms(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "site")
+	var log bytes.Buffer
+	args := []string{"-model", fixture("views"), "-out", out, "-sysml", "/nonexistent/sysml"}
+	if code := run(t.Context(), args, &log); code != exitOK {
+		t.Fatalf("exit %d, want %d; log:\n%s", code, exitOK, log.String())
+	}
+	file := filepath.Join(fixture("views"), "views.sysml")
+	// The rest of a missing program's message is Go's (os/exec).
+	missing := `cannot run sysml: `
+	want := []string{
+		`level=WARN msg="` + file + `:14: V::sys: sysml-view::interfaces[]: ` + missing,
+		`level=WARN msg="` + file + `:17: V::sys: sysml-view::partsTable[]: ` + missing,
+		`level=WARN msg="` + file + `:40: V::partsTable: sysml-view::[]: ` + missing,
+		`level=WARN msg="` + file + `:48: V::notAView: sysml-view::sys[]: V::sys is a PartUsage, not a view"`,
+	}
+	var got []string
+	for _, line := range strings.Split(log.String(), "\n") {
+		if strings.HasPrefix(line, "level=WARN ") {
+			got = append(got, line)
+		}
+	}
+	ok := len(got) == len(want)
+	for i := 0; ok && i < len(want); i++ {
+		ok = got[i] == want[i] || strings.HasSuffix(want[i], missing) && strings.HasPrefix(got[i], want[i])
+	}
+	if !ok {
+		t.Errorf("warnings:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}

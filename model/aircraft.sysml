@@ -1,6 +1,8 @@
 package Model {
     private import ScalarValues::*;
     private import SI::*;
+    private import Views::*;
+    private import StandardViewDefinitions::*;
 
     attribute def Size {
         attribute width : ISQ::LengthValue;
@@ -47,6 +49,9 @@ package Model {
         == Interfaces:
 
         sysml-members-list::InterfaceUsage[]
+
+        .Wiring
+        sysml-view::wiring[]
         */
 
         doc /*
@@ -98,5 +103,10 @@ package Model {
         }
         interface airDuct connect (engine.air, airConditioner.air);
         interface fuelLine connect (fuelTank.fuel, engine.fuel);
+
+        view wiring {
+            expose aircraft;
+            render asInterconnectionDiagram;
+        }
     }
 }

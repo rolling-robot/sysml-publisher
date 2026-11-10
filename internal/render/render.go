@@ -27,6 +27,9 @@ type Options struct {
 	// Pages decides the macros' links between pages (MC-18); nil uses the
 	// tree's relative links (tree.Tree.Href), as in the HTML site.
 	Pages macros.Pages
+	// Views renders the views sysml-view shows (MC-21); nil leaves every
+	// sysml-view a failure (MC-19).
+	Views macros.Views
 }
 
 // Result is a rendered page tree.
@@ -108,8 +111,12 @@ func Tree(ctx context.Context, t *tree.Tree, opts Options) (*Result, error) {
 		}
 		res.Warnings = append(res.Warnings, w)
 	}
-	if _, err := macros.Register(ctx, ad, t.Model.Model, pages, warn); err != nil {
+	reg, err := macros.Register(ctx, ad, t.Model.Model, pages, warn)
+	if err != nil {
 		return nil, err
+	}
+	if opts.Views != nil {
+		reg.SetViews(opts.Views)
 	}
 	if _, err := ad.RegisterLogHandler(asciidocLog{r: r, logger: logger}); err != nil {
 		return nil, fmt.Errorf("routing asciidoctorg's messages: %w", err)
