@@ -55,7 +55,3 @@
 }
 div.sysml-failed { margin-bottom: 1.25em; padding: .5em .75em; }
 div.sysml-failed > p { margin: 0; }
-
-/* sysml-view (MC-21): a diagram is an SVG sized in points; keep it inside
-   the page, scaled down when wider. */
-.openblock.sysml-view svg { max-width: 100%; height: auto; }

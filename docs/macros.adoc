@@ -533,7 +533,8 @@ named as described in <<naming>>, or, with `sysml-view::[]`, the page's
 element, which must then be a view.
 
 * A diagram (an interconnection, tree, state, action view, ...) becomes an
-  SVG picture in the page.
+  SVG picture in the page (an image block, so the stylesheet styles it as
+  one).
 * A table view (`render asElementTable`) becomes a table, its first row the
   header.
 

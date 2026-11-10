@@ -305,9 +305,11 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   view (one =sysml= writes as CSV, not as a diagram) as a table. The target
   names the view as MC-15 says; without a target, the page's element shall
   be the view. A block title written above the macro (=.Title=) shall be
-  the picture's or the table's title. The block shall carry the view's
-  qualified name, so another output can write the picture its own way
-  (MC-18). A view shown on several pages shall be rendered once per run.
+  the picture's or the table's title. Like a link (MC-18), the picture and
+  the table shall be Asciidoctor blocks written by the output's converter
+  (an image, its SVG in the image's target; a table), marked with the
+  view's qualified name, so that an output whose pictures are not =<img>=
+  (Confluence's attachments) writes its own. A view shown on several pages shall be rendered once per run.
   A target that names no view, a page's element that is not a view, a
   program that cannot be run and a view =sysml= cannot render shall fail
   the macro (MC-19), with the message the program gives.

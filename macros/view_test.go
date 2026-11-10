@@ -2,7 +2,9 @@ package macros
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"html"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -83,10 +85,8 @@ func TestView(t *testing.T) {
 	sys := Attributes(pageAt(t, tr, "V/sys").ID)
 	table := Attributes(pageAt(t, tr, "V/partsTable").ID)
 	other := Attributes(pageAt(t, tr, "V/notAView").ID)
-	diagram := `<div class="openblock sysml-view">` + "\n" + `<div class="content">` + "\n" +
-		`<svg width="10pt" height="10pt" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">` + "\n" +
-		`<g id="sysml-view-0e9f1a3a-graph0" class="graph"><g id="sysml-view-0e9f1a3a-node1" class="node">` +
-		`<a xlink:href="#sysml-view-0e9f1a3a-node1"><text fill="url(#sysml-view-0e9f1a3a-grad1)">x</text></a></g></g>` + "\n</svg>\n</div>\n</div>"
+	diagram := `<div class="imageblock sysml-view">` + "\n" + `<div class="content">` + "\n" +
+		`<img src="data:image/svg+xml;base64,` + base64.StdEncoding.EncodeToString([]byte(testSVG)) + `" alt="interfaces">` + "\n</div>\n</div>"
 
 	cases := []struct {
 		name, src string
@@ -105,7 +105,7 @@ func TestView(t *testing.T) {
 		}, "V::partsTable"},
 		{"title of a table", ".Parts\nsysml-view::partsTable[]", sys, []string{`<caption class="title">Parts</caption>`}, "V::partsTable"},
 		{"title of a diagram", ".Wiring\nsysml-view::interfaces[]", sys, []string{
-			`<div class="openblock sysml-view">` + "\n" + `<div class="title">Wiring</div>`}, "V::sys::interfaces"},
+			`<div class="imageblock sysml-view">`, `</div>` + "\n" + `<div class="title">Wiring</div>`}, "V::sys::interfaces"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -132,31 +132,60 @@ func TestView(t *testing.T) {
 	}
 }
 
-// A converter for another output finds the view's qualified name on the
-// block (AttrView), to write the picture its own way.
-func TestViewAttribute(t *testing.T) {
+// A view is ordinary nodes the document's converter writes (MC-21), as a
+// link is (MC-18): html5 writes a diagram as an image, another converter
+// tells the diagram's image block and the table by AttrView and writes its
+// own markup, with the SVG from ViewSVG.
+func TestViewsAreWrittenByTheConverter(t *testing.T) {
 	tr, ad := setupViews(t, fixtureViews())
 	base, err := ad.BuiltinConverter("xhtml5")
 	if err != nil {
 		t.Fatal(err)
 	}
-	conv := asciidoctor.ConverterFunc(func(n asciidoctor.Node, transform string, opts map[string]any) (string, error) {
+	wiki := asciidoctor.ConverterFunc(func(n asciidoctor.Node, transform string, opts map[string]any) (string, error) {
 		if qn, ok := n.Attr(AttrView).(string); ok {
-			return `<view of="` + qn + `" as="` + transform + `"/>`, nil
+			svg, _ := ViewSVG(n)
+			return `<view of="` + qn + `" as="` + transform + `" svg="` + html.EscapeString(string(svg)) + `"/>`, nil
 		}
 		return base.Convert(n, transform, opts)
 	})
-	if err := ad.RegisterConverter(conv, &asciidoctor.BackendTraits{Basebackend: "html", HTMLSyntax: "xml"}, "wiki"); err != nil {
+	if err := ad.RegisterConverter(wiki, &asciidoctor.BackendTraits{Basebackend: "html", HTMLSyntax: "xml"}, "wiki"); err != nil {
 		t.Fatal(err)
 	}
-	out, err := ad.Convert("sysml-view::interfaces[]\n\nsysml-view::partsTable[]",
-		&asciidoctor.Options{Backend: "wiki", Attributes: Attributes(pageAt(t, tr, "V/sys").ID)})
+	sys := Attributes(pageAt(t, tr, "V/sys").ID)
+	cases := []struct{ name, src, html, wiki string }{
+		{"diagram", "sysml-view::interfaces[]",
+			`<img src="data:image/svg+xml;base64,` + base64.StdEncoding.EncodeToString([]byte(testSVG)) + `" alt="interfaces">`,
+			`<view of="V::sys::interfaces" as="image" svg="` + html.EscapeString(testSVG) + `"/>`},
+		{"table", "sysml-view::partsTable[]",
+			`<table class="tableblock frame-all grid-all stretch sysml-view">`,
+			`<view of="V::partsTable" as="table" svg=""/>`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			for _, out := range []struct{ backend, want string }{{"html5", c.html}, {"wiki", c.wiki}} {
+				got, err := ad.Convert(c.src, &asciidoctor.Options{Backend: out.backend, Attributes: sys})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(got, out.want) {
+					t.Errorf("%s: %q does not contain %q", out.backend, got, out.want)
+				}
+			}
+		})
+	}
+}
+
+// ViewSVG gives nothing for a node sysml-view did not make.
+func TestViewSVGOfOtherNodes(t *testing.T) {
+	_, ad := setupViews(t, fixtureViews())
+	doc, err := ad.Load("image::data:image/svg+xml;base64,PHN2Zy8+[]", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `<view of="V::sys::interfaces" as="open"/>` + "\n" + `<view of="V::partsTable" as="table"/>`
-	if !strings.Contains(out, want) {
-		t.Errorf("output %q lacks %q", out, want)
+	img := doc.Blocks()[0]
+	if svg, ok := ViewSVG(img); ok {
+		t.Errorf("ViewSVG of a plain image = %q, true", svg)
 	}
 }
 

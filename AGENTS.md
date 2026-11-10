@@ -340,6 +340,9 @@ view: it parses a model, `sysml.Open`s it, registers with a map as
   calls `e.href` and `link` itself, so it also links a segment that is the
   page's own element. Never write `<a href>` in a macro
   (`TestLinksAreWrittenByTheConverter`, `TestIfaceEndsLinks`).
+  `sysml-view` follows the same rule for pictures (MC-21): an image block
+  carrying `AttrView`, never SVG or `<img>` markup in a pass block
+  (`TestViewsAreWrittenByTheConverter`).
 - **Failing macros (MC-19)**: every macro is registered through
   `inline(g, e, name, opts, written, body)` or `block(...)`. They read the
   page's element, unescape inline targets, write the macro as it appears in
@@ -408,7 +411,7 @@ view: it parses a model, `sysml.Open`s it, registers with a map as
 | `sysml-members-list::[<element or kind>][]` | block | `members` (`Model.Members`, `Model.Types`), `Model.Specializes` | ulist; owned members minus annotations and multiplicities (`notMembers`); links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
 | `sysml-iface-ends::[<element>][]` | block | `Props` (`connectorEnds`: `ownedFeature`, `isEnd`, `ownedReferenceSubsetting`, `chainingFeature`), `nameTarget` | ulist of owned ends (`isEnd`): end name (`name`) and the connected feature from its `ReferenceSubsetting` (a `chainingFeature` path), segments linked; the end named `source` first; no ends → failure; `depth` (named or positional): last n segments of owners(chain[0]) + chain, `::`-joined and quoted, `all` the whole path; none: chain as written with `.` |
 | `sysml-metadata-table::<def>[]` | block | `metadataIndex` (`Props`) | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
-| `sysml-view::[<view>][]` | block | `nameIndex` (`ViewUsage`), `Views` | the host's `Views` renders the view by qualified name (`Registry.SetViews`; none: failure); diagram → open block holding the SVG (`inlineSVG`: prolog dropped, ids prefixed per view), table → table, header row first; both with role and `AttrView` (the qualified name) and the `.Title` written above set on the block itself, since the parser drops a block macro's attributes; no target: the page's element, must be a view; a name that is no view → "X is a PartUsage, not a view" |
+| `sysml-view::[<view>][]` | block | `nameIndex` (`ViewUsage`), `Views` | the host's `Views` renders the view by qualified name (`Registry.SetViews`; none: failure); diagram → image block (`CreateImageBlock`), target the SVG as a `data:image/svg+xml;base64,` URI, alt the view's name; table → table, header row first; both with role and `AttrView` (the qualified name), written by the output's converter as links are (MC-18; `ViewSVG` gives another converter the SVG) and the `.Title` written above set on the block itself, since the parser drops a block macro's attributes; no target: the page's element, must be a view; a name that is no view → "X is a PartUsage, not a view" |
 | `sysml-value:<feature>[]` | inline | `Model.Evaluate` | target must be a feature reference (`featureRefRx`: names, `::`, `.`), not an expression, or `[<element>::]@<metadata>::<attribute>` (`parseMetadataRef`, value read as `sysml-metadata-table` does, not evaluated); OpenSysML evaluates it with the page element as subject; units formatted; composite → `[composite]` + warning |
 
 Failure policy (MC-19): a macro that cannot do what the user wrote leaves

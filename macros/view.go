@@ -2,11 +2,10 @@ package macros
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"html"
-	"regexp"
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
@@ -23,10 +22,14 @@ const View = "sysml-view"
 // ViewRole is the role of the block a view is put in, for styling.
 const ViewRole = "sysml-view"
 
-// AttrView is the attribute of the block a view is put in: the view's
-// qualified name. html5 writes a diagram's block as an open block holding
-// the SVG; a converter for another output can tell it by AttrView and
-// write the picture its own way (Confluence's <ac:image>).
+// AttrView is the attribute of the block a view is put in (MC-21): the
+// view's qualified name. As links are anchor nodes (AttrLink), a view is an
+// ordinary node the document's converter writes: a diagram an image block,
+// whose target is the SVG as a data: URI, a table view a table. html5
+// writes the diagram as <img src="data:...">; a converter for another
+// output can tell the block by AttrView and write the picture its own way
+// (Confluence's <ac:image> with an attachment), taking the SVG from
+// ViewSVG.
 const AttrView = "sysml-view"
 
 // Views renders the views sysml-view shows (MC-21).
@@ -38,9 +41,7 @@ type Views interface {
 
 // Rendering is a rendered view: a diagram or a table.
 type Rendering struct {
-	// SVG is a diagram, as a standalone SVG document; nil for a table. It
-	// is put in the page as it is, so it must come from a trusted
-	// renderer.
+	// SVG is a diagram, as a standalone SVG document; nil for a table.
 	SVG []byte
 	// Table is a table view's cells, row by row, the header row first.
 	Table [][]string
@@ -79,7 +80,10 @@ func registerView(g *asciidoctor.ExtensionGroup, e *env) {
 			if r.SVG == nil {
 				b, err = viewTable(c.parent, r.Table)
 			} else {
-				b, err = viewDiagram(c.parent, r.SVG, qn)
+				var name string
+				if name, err = e.names.name(v.ID); err == nil {
+					b, err = viewDiagram(c.parent, r.SVG, name)
+				}
 			}
 			if err != nil {
 				return nil, err
@@ -95,18 +99,33 @@ func registerView(g *asciidoctor.ExtensionGroup, e *env) {
 		})
 }
 
-// viewDiagram is a diagram as an open block holding the SVG.
-func viewDiagram(parent asciidoctor.StructuralNode, svg []byte, qn string) (asciidoctor.StructuralNode, error) {
-	b, err := asciidoctor.CreateOpenBlock(parent, nil, nil, nil)
-	if err != nil {
-		return nil, err
+// svgDataURI is how a diagram's SVG is put in its image block's target.
+const svgDataURI = "data:image/svg+xml;base64,"
+
+// viewDiagram is a diagram as an image block: its target the SVG as a
+// data: URI, so the picture needs no file, its alternative text the view's
+// name.
+func viewDiagram(parent asciidoctor.StructuralNode, svg []byte, name string) (asciidoctor.StructuralNode, error) {
+	return asciidoctor.CreateImageBlock(parent, asciidoctor.Attributes{
+		"target": svgDataURI + base64.StdEncoding.EncodeToString(svg),
+		"alt":    name,
+	}, nil)
+}
+
+// ViewSVG is the SVG of a diagram sysml-view put in, for a converter that
+// writes it elsewhere than in the page (an attachment): n is the image
+// block, carrying AttrView. ok is false for any other node.
+func ViewSVG(n asciidoctor.Node) (svg []byte, ok bool) {
+	if _, isView := n.Attr(AttrView).(string); !isView {
+		return nil, false
 	}
-	pass, err := asciidoctor.CreatePassBlock(b, inlineSVG(svg, qn), nil, nil)
-	if err != nil {
-		return nil, err
+	target, _ := n.Attr("target").(string)
+	data, isSVG := strings.CutPrefix(target, svgDataURI)
+	if !isSVG {
+		return nil, false
 	}
-	b.Append(pass)
-	return b, nil
+	svg, err := base64.StdEncoding.DecodeString(data)
+	return svg, err == nil
 }
 
 // viewTarget is the view a sysml-view target names (MC-15), or the page's
@@ -175,22 +194,4 @@ func viewTable(parent asciidoctor.StructuralNode, rows [][]string) (asciidoctor.
 	}
 	tbl.AssignColumnWidths()
 	return tbl, nil
-}
-
-// svgRefRx finds the ids an SVG declares and its references to them.
-var svgRefRx = regexp.MustCompile(`(\sid="|[\s:]href="#|url\(#)`)
-
-// inlineSVG is an SVG document as an element to put in HTML: without what
-// comes before <svg> (the XML declaration, the doctype, comments), and with
-// its ids prefixed per view, so that the ids of two views on one page
-// (Graphviz numbers them node1, edge1, ... in every picture) do not clash.
-func inlineSVG(svg []byte, qualifiedName string) string {
-	s := string(svg)
-	if i := strings.Index(s, "<svg"); i > 0 {
-		s = s[i:]
-	}
-	h := fnv.New32a()
-	h.Write([]byte(qualifiedName))
-	prefix := fmt.Sprintf("sysml-view-%08x-", h.Sum32())
-	return svgRefRx.ReplaceAllString(strings.TrimSpace(s), "${1}"+prefix)
 }
