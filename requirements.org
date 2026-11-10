@@ -45,7 +45,9 @@
   =-log-format json=. =-v= shall add debug records giving the duration of
   each stage (parse, query, page tree, each page, render, write), and the
   page tree record shall count the model's queries, element reads and
-  cache hits (DS-4).
+  cache hits (DS-4). Asciidoctor's own messages about a representation
+  shall be records too, at their severity, naming the page's element and
+  the model file and line they are about.
 - CLI-7 :: Interrupting the tool (Ctrl-C, SIGTERM) shall stop it, write
   nothing, and exit with status 130.
 

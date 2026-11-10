@@ -53,7 +53,8 @@ type Site struct {
 // rendering (CLI-7): between pages, inside a conversion at asciidoctorg's
 // next checkpoint (before each block is parsed or converted, and at each
 // macro), and inside macro evaluations. logger receives
-// debug records (page durations); nil uses slog.Default. A macro that fails
+// debug records (page durations) and Asciidoctor's own messages, with the
+// page and model location (asciidocLog); nil uses slog.Default. A macro that fails
 // leaves a placeholder on its page and a warning, and rendering goes on
 // (MC-19); only a cancelled ctx or a rendering bug returns an error.
 func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, error) {
@@ -87,6 +88,9 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 	}
 	if _, err := macros.Register(ctx, ad, t.Model.Model, t, warn); err != nil {
 		return nil, err
+	}
+	if _, err := ad.RegisterLogHandler(asciidocLog{r: r, logger: logger}); err != nil {
+		return nil, fmt.Errorf("routing asciidoctorg's messages: %w", err)
 	}
 
 	// Titles come from the converted bodies, and every page's sidebar shows
@@ -140,9 +144,11 @@ type renderer struct {
 	bodies  map[*tree.Node]*body
 	titles  map[*tree.Node]title
 	sources *sources
-	// current is the representation being converted, for the location of
-	// macro warnings.
-	current *tree.Rep
+	// current is the representation being converted and currentPage the
+	// page it is converted for, for the location of macro warnings and of
+	// Asciidoctor's messages.
+	current     *tree.Rep
+	currentPage *tree.Node
 }
 
 // title is a page title: HTML for the page heading, which may carry inline
@@ -199,9 +205,9 @@ func (r *renderer) convert(ctx context.Context, n *tree.Node, rep tree.Rep, b *b
 	if b.docTitle != nil {
 		attrs = attrs.Set("showtitle", "")
 	}
-	r.current = &rep
+	r.current, r.currentPage = &rep, n
 	doc, out, err := r.ad.ConvertDocumentContext(ctx, rep.Body, &asciidoctor.Options{Attributes: attrs})
-	r.current = nil
+	r.current, r.currentPage = nil, nil
 	if err != nil {
 		return "", fmt.Errorf("converting the representation of %s on the page of %s: %w", r.owner(rep).QualifiedName, n.QualifiedName, err)
 	}

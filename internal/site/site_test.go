@@ -268,3 +268,49 @@ func TestConversionStopsWhenCancelled(t *testing.T) {
 		t.Errorf("live conversion: out %q, err %v", out, err)
 	}
 }
+
+// Asciidoctor's own messages reach the run's logger as records with the
+// page's element and the model line they are about (CLI-6), once per page
+// that shows the representation; the cases are the // notes in
+// testdata/asciidoc-messages/messages.sysml. Macro warnings are not mixed in.
+func TestAsciidocMessagesAreLogged(t *testing.T) {
+	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", "asciidoc-messages")}.Load(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { m.Close() })
+	tr, err := tree.Build(t.Context(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf strings.Builder
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	}))
+	s, err := Render(t.Context(), tr, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join("..", "..", "testdata", "asciidoc-messages", "messages.sysml")
+	var got []string
+	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		if strings.Contains(line, "asciidoc:") {
+			got = append(got, line)
+		}
+	}
+	var want []string
+	for _, el := range []string{"M::pd", "M::u"} {
+		want = append(want, `level=WARN msg="asciidoc: section title out of sequence: expected level 1, got level 3" element=`+el+" location="+file+":18")
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("records:\n got %q\nwant %q", got, want)
+	}
+	if len(s.Warnings) != 0 {
+		t.Errorf("site warnings %q, want none", s.Warnings)
+	}
+}

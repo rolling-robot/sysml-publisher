@@ -34,11 +34,7 @@ func newSources(files []string) *sources {
 // not in it (a macro in a doc that sysml-doc inserted). It is empty when the
 // representation is not found.
 func (s *sources) locate(rep tree.Rep, macro string) string {
-	start, ok := s.start[rep.ID]
-	if !ok {
-		start = s.find(rep.Body)
-		s.start[rep.ID] = start
-	}
+	start := s.startOf(rep)
 	if start.line == 0 {
 		return ""
 	}
@@ -55,6 +51,42 @@ func (s *sources) locate(rep tree.Rep, macro string) string {
 		}
 	}
 	return start.file + ":" + strconv.Itoa(line)
+}
+
+// lineOf is where line n (1-based) of rep's body, as Asciidoctor counts the
+// body's lines, is in the model, file:line; empty when the representation
+// is not found or n is outside the body.
+func (s *sources) lineOf(rep tree.Rep, n int) string {
+	start := s.startOf(rep)
+	// start is the body's first non-blank line; Asciidoctor counts the
+	// blank lines before it too.
+	n -= leadingBlankLines(rep.Body)
+	if start.line == 0 || n < 1 || n > len(bodyLines(rep.Body)) {
+		return ""
+	}
+	return start.file + ":" + strconv.Itoa(start.line+n-1)
+}
+
+// startOf is where rep's body starts in the model files, found once.
+func (s *sources) startOf(rep tree.Rep) location {
+	start, ok := s.start[rep.ID]
+	if !ok {
+		start = s.find(rep.Body)
+		s.start[rep.ID] = start
+	}
+	return start
+}
+
+// leadingBlankLines counts the blank lines before body's first non-blank one.
+func leadingBlankLines(body string) int {
+	n := 0
+	for _, l := range strings.Split(body, "\n") {
+		if strings.TrimSpace(l) != "" {
+			break
+		}
+		n++
+	}
+	return n
 }
 
 // find is where body starts in the model files.

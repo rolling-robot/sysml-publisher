@@ -50,3 +50,45 @@ package P {
 		})
 	}
 }
+
+// Asciidoctor's line numbers count the body's lines, the blank ones before
+// its text included; lineOf turns them into model lines (CLI-6).
+func TestLineOf(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "m.sysml")
+	src := `package P {
+    part a {
+        rep language "adoc"
+            /*
+            First.
+
+            Third.
+            */
+    }
+}
+`
+	if err := os.WriteFile(f, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := newSources([]string{f})
+	cases := []struct {
+		name, body string
+		n          int
+		want       string
+	}{
+		{"first line", "First.\n\nThird.\n", 1, f + ":5"},
+		{"third line", "First.\n\nThird.\n", 3, f + ":7"},
+		{"blank lines before the text count", "\n\nFirst.\n\nThird.\n", 5, f + ":7"},
+		{"a leading blank line itself: unknown", "\nFirst.\n\nThird.\n", 1, ""},
+		{"past the body", "First.\n\nThird.\n", 4, ""},
+		{"body not in the files", "Nowhere.", 1, ""},
+	}
+	for i, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rep := tree.Rep{ID: string(rune('a' + i)), Body: c.body}
+			if got := s.lineOf(rep, c.n); got != c.want {
+				t.Errorf("lineOf(%d) = %q, want %q", c.n, got, c.want)
+			}
+		})
+	}
+}

@@ -425,6 +425,10 @@ Exit status:
   and the warning names the file and line where the macro is written, the
   page and the macro (`model/parts.sysml:5: Model::pd: sysml-value:mas[]:
   ...`); every failing macro on every page is reported;
+- Asciidoctor's own warnings about a representation, such as a skipped
+  section level, with the page's element and the model line
+  (`msg="asciidoc: section title out of sequence: ..." element=Model::pd
+  location=model/parts.sysml:7`);
 - a representation in another language than AsciiDoc;
 - an unnamed element with a page;
 - a `sysml-value` whose attribute is composite (made of attributes of its

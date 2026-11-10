@@ -229,6 +229,16 @@ is what messages and `Evaluate` use; the **page title** is decided later in
   `<file>:<line>: <page>: <macro>: <message>`. Deduplication is by those
   fields, never by the text, so rewording a message cannot change it
   (`TestWarningsOncePerPageAndMacro`).
+- **Asciidoctor's messages** (`asciidoclog.go`, CLI-6): without a log
+  handler, Asciidoctor writes raw lines to stderr (`asciidoctor: WARNING:
+  <stdin>: line 3: ...`), outside slog and the JSON format. `Render`
+  registers `asciidocLog`, asciidoctorg's `SlogHandler` adapted: the record
+  goes to `Render`'s logger at the message's severity, as
+  `msg="asciidoc: <message>"` with `element` (the page's element) and
+  `location` (`sources.lineOf`: the body line Asciidoctor reports, turned
+  into the model's file:line; Asciidoctor counts the body's leading blank
+  lines, which OpenSysML keeps). An inherited representation's message is
+  logged on each page that shows it. They are not `Site.Warnings`.
 - **Source locations** (`source.go`, MC-19): the model gives no source
   positions (§13, 15), so `Render` fills `Warning.Location` itself. Macros
   warn while a representation is converted (`renderer.current`); `sources`
@@ -374,9 +384,11 @@ message.
 - **Logging (CLI-6)**: every message is a `log/slog` record on stderr: text
   without timestamps by default, JSON with `-log-format json`; `-v` enables
   Debug records with a `duration` for each stage and each page. Model
-  errors are logged one record each (`msg="model error" diagnostic=...`),
-  and every error is logged exactly once, in `run`; the packages return
-  errors and never log them.
+  errors are logged one record each (`msg="model error" diagnostic=...`).
+  Every error is logged exactly once, in `run`; the packages return errors
+  and never log them. The exception is what is not an error:
+  Asciidoctor's own messages go to `site.Render`'s logger as they happen
+  (`asciidocLog`, §5.3).
 - **Loggers are passed explicitly** (`model.Folder.Logger`, `site.Render`'s
   `logger`), not taken from `slog.Default`; see the asciidoctorg quirk in §9.
 - **Cancellation (CLI-7)**: `main` uses `signal.NotifyContext`; the context
