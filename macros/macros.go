@@ -1,4 +1,4 @@
-// Package macros holds the sysml-* AsciiDoc macros (requirements MC-1..19),
+// Package macros holds the sysml-* AsciiDoc macros (requirements MC-1..20),
 // which put facts from a SysML v2 model into AsciiDoc text: names, docs,
 // members, metadata, evaluated values. Each macro lives in its own file;
 // Register adds them all to an asciidoctorg instance.
@@ -8,8 +8,14 @@
 //
 //	m, err := sysml.Open(ctx, client, parsed) // an OpenSysML-parsed model
 //	ad, err := asciidoctor.New()
-//	err = macros.Register(ctx, ad, m, pages, warn)
+//	r, err := macros.Register(ctx, ad, m, pages, warn)
+//	err = r.Inline("my-macro", func(c *macros.Call) (string, error) { ... })
 //	html, err := ad.Convert(body, &asciidoctor.Options{Attributes: macros.Attributes(elementID)})
+//
+// Macros of the caller's own (Registry.Inline, Registry.Block) get a Call:
+// the page's element, the target, name lookup, links, evaluation and
+// warnings, the way the sysml-* macros have them; an error they return
+// leaves a placeholder and a warning instead of stopping the conversion.
 package macros
 
 import (
@@ -73,14 +79,15 @@ func (w Warning) String() string {
 // Warn receives a warning from a macro. A nil Warn drops warnings.
 type Warn func(Warning)
 
-// Register adds every macro to ad. The macros read the model m (DS-4), link
-// to the pages pages gives, report warnings to warn and stop reading and
-// evaluating when ctx is cancelled. ctx is the context of the rendering ad
-// is registered for; register again for another. m must stay open while ad
-// converts.
-func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, m *sysml.Model, pages Pages, warn Warn) error {
+// Register adds every sysml-* macro to ad. The macros read the model m
+// (DS-4), link to the pages pages gives, report warnings to warn and stop
+// reading and evaluating when ctx is cancelled. ctx is the context of the
+// rendering ad is registered for; register again for another. m must stay
+// open while ad converts. The Registry adds macros of the caller's own
+// (MC-20).
+func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, m *sysml.Model, pages Pages, warn Warn) (*Registry, error) {
 	if m == nil {
-		return errors.New("registering the sysml macros: no model")
+		return nil, errors.New("registering the sysml macros: no model")
 	}
 	if warn == nil {
 		warn = func(Warning) {}
@@ -97,9 +104,9 @@ func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, m *sysml.Model, 
 	registerMetadataTable(g, e)
 	registerValue(g, e)
 	if err := g.Register(); err != nil {
-		return fmt.Errorf("registering the sysml macros: %w", err)
+		return nil, fmt.Errorf("registering the sysml macros: %w", err)
 	}
-	return nil
+	return &Registry{ad: ad, e: e}, nil
 }
 
 // env is what every macro of one rendering shares: the rendering's

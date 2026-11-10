@@ -351,6 +351,30 @@ out, err := ad.Convert(body, &asciidoctor.Options{Attributes: macros.Attributes(
 complete, runnable version is `Example` in
 [macros/example_test.go](macros/example_test.go).
 
+`Register` returns a `*macros.Registry`, which adds macros of your own
+(`Inline`, `Block`). They behave like the `sysml-*` ones: a `Call` gives the
+page's element, the target read as `sysml-name` reads it, links to your
+pages, evaluation and warnings, and an error leaves a placeholder and a
+warning instead of stopping the conversion:
+
+```go
+r, _ := macros.Register(ctx, ad, m, pages, warn)
+r.Inline("my-mass", func(c *macros.Call) (string, error) {
+	el, err := c.Element()             // the page's element, or the one the target names
+	if err != nil {
+		return "", err                 // placeholder + warning
+	}
+	v, err := c.Evaluate(el, "mass")
+	if err != nil {
+		return "", err
+	}
+	return c.Link(el.ID, html.EscapeString(macros.FormatValue(v))), nil
+})
+```
+
+Names starting with `sysml-` are reserved for this tool's macros. See
+`ExampleRegistry_Inline` in the same file.
+
 ## Command line
 
 ```

@@ -29,7 +29,7 @@ func setupFixture(t *testing.T, fixture string) (*tree.Tree, *asciidoctor.Asciid
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { ad.Close() })
-	if err := Register(context.Background(), ad, tr.Model.Model, tr, record(t, ad)); err != nil {
+	if _, err := Register(context.Background(), ad, tr.Model.Model, tr, record(t, ad)); err != nil {
 		t.Fatal(err)
 	}
 	return tr, ad

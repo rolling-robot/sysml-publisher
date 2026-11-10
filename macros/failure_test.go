@@ -122,7 +122,7 @@ func TestCancelledIsNoFailure(t *testing.T) {
 	}
 	t.Cleanup(func() { ad.Close() })
 	ctx, cancel := context.WithCancel(t.Context())
-	if err := Register(ctx, ad, tr.Model.Model, tr, record(t, ad)); err != nil {
+	if _, err := Register(ctx, ad, tr.Model.Model, tr, record(t, ad)); err != nil {
 		t.Fatal(err)
 	}
 	cancel()

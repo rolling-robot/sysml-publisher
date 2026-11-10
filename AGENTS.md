@@ -246,8 +246,19 @@ is what messages and `Evaluate` use; the **page title** is decided later in
 package (`TestNoInternalImports` keeps it so) and its API names no
 internal type:
 
-- `Register(ctx, ad, m *sysml.Model, pages Pages, warn Warn)` adds every
-  macro in one `ExtensionGroup` named `sysml` (MC-4).
+- `Register(ctx, ad, m *sysml.Model, pages Pages, warn Warn)
+  (*Registry, error)` adds every macro in one `ExtensionGroup` named
+  `sysml` (MC-4).
+- **Custom macros (MC-20, `custom.go`)**: `Registry.Inline(name, fn,
+  positional...)` and `Registry.Block(...)` add the caller's own macros,
+  each in its own group (asciidoctorg replaces a group registered again),
+  through the same `inline`/`block` path as the built-ins, so failures
+  become placeholders and warnings. `fn` gets a `*Call`: `Page`, `Target`,
+  `Macro`, `Attr`, `Element()` (`nameTarget`), `Resolve` (`nameIndex`),
+  `Name`, `Evaluate`, `Link`, `Warn`, `Model`, `Context`, `Parent`;
+  `FormatValue` and `Passthrough` are the built-ins' formatting. Names must
+  be macro names and not start with `sysml-` (`checkName`). This is public
+  API: changing `Call` or these functions breaks other modules' macros.
 - `Pages` is the host's say on links: `Href(fromID, toID) (href, ok)`.
   `*tree.Tree` implements it for this tool; nil links nothing.
 - `Attributes(elementID)` are the document attributes to convert a
@@ -255,8 +266,9 @@ internal type:
 - `Warning{Page, Macro, Message, Location}`: `Page` is the page element's
   qualified (or positional) name.
 
-`Example` (`example_test.go`, package `macros_test`) is the outside
-caller's view: it parses a model, `sysml.Open`s it, registers with a map as
+`Example` and `ExampleRegistry_Inline` (`example_test.go`) and
+`custom_test.go`, all in package `macros_test`, are the outside caller's
+view: it parses a model, `sysml.Open`s it, registers with a map as
 `Pages` and converts, importing only public packages. Shared pieces in
 `macros.go`:
 

@@ -34,7 +34,7 @@ func TestValue(t *testing.T) {
 	}
 	defer ad.Close()
 	var warnings []string
-	if err := Register(context.Background(), ad, tr.Model.Model, tr, func(w Warning) { warnings = append(warnings, w.String()) }); err != nil {
+	if _, err := Register(context.Background(), ad, tr.Model.Model, tr, func(w Warning) { warnings = append(warnings, w.String()) }); err != nil {
 		t.Fatal(err)
 	}
 

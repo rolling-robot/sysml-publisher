@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"go/build"
+	"html"
 	"log"
 	"strings"
 	"testing"
@@ -60,7 +61,7 @@ func Example() {
 	}
 	defer ad.Close()
 	warn := func(w macros.Warning) { fmt.Println("warning:", w) }
-	if err := macros.Register(ctx, ad, m, site, warn); err != nil {
+	if _, err := macros.Register(ctx, ad, m, site, warn); err != nil {
 		log.Fatal(err)
 	}
 
@@ -89,6 +90,81 @@ func Example() {
 	// </div>
 	// <div class="paragraph">
 	// <p>Missing: <span class="sysml-failed">sysml-name:Boat[]: the model has no element named &#34;Boat&#34;</span>.</p>
+	// </div>
+}
+
+// A macro of your own works like the sysml-* ones: Element reads the target
+// as sysml-name does (here the short name W), Link links to the host's
+// pages, FormatValue shows values as sysml-value does, and an error leaves
+// a placeholder and a warning instead of stopping the conversion.
+func ExampleRegistry_Inline() {
+	ctx := context.Background()
+	client, err := opensysml.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+	parsed, err := client.ParseFiles(ctx, []string{"../testdata/external/vehicles.sysml"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	m, err := sysml.Open(ctx, client, parsed)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer m.Close()
+	car, err := m.Props(ctx, "Vehicles::Car", "name")
+	if err != nil {
+		log.Fatal(err)
+	}
+	wheel, err := m.Props(ctx, "Vehicles::Wheel", "name")
+	if err != nil {
+		log.Fatal(err)
+	}
+	site := pages{car.Element.ID: "car.html", wheel.Element.ID: "wheel.html"}
+
+	ad, err := asciidoctor.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ad.Close()
+	r, err := macros.Register(ctx, ad, m, site, func(w macros.Warning) { fmt.Println("warning:", w) })
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// my-mass:[<element>]: the element's mass, its name linked to its page.
+	err = r.Inline("my-mass", func(c *macros.Call) (string, error) {
+		el, err := c.Element()
+		if err != nil {
+			return "", err
+		}
+		v, err := c.Evaluate(el, "mass")
+		if err != nil {
+			return "", err
+		}
+		name, err := c.Name(el.ID)
+		if err != nil {
+			return "", err
+		}
+		return c.Link(el.ID, html.EscapeString(name)) + " weighs " + html.EscapeString(macros.FormatValue(v)), nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// On the page of Wheel, so Car's name links to its page.
+	out, err := ad.Convert("my-mass:Car[].\n\nmy-mass:Boat[].", &asciidoctor.Options{Attributes: macros.Attributes(wheel.Element.ID)})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(out)
+	// Output:
+	// warning: Vehicles::Wheel: my-mass:Boat[]: the model has no element named "Boat"
+	// <div class="paragraph">
+	// <p><a href="car.html">Car</a> weighs 1200.</p>
+	// </div>
+	// <div class="paragraph">
+	// <p><span class="sysml-failed">my-mass:Boat[]: the model has no element named &#34;Boat&#34;</span>.</p>
 	// </div>
 }
 

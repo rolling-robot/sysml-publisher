@@ -83,7 +83,7 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 		}
 		s.Warnings = append(s.Warnings, w.String())
 	}
-	if err := macros.Register(ctx, ad, t.Model.Model, t, warn); err != nil {
+	if _, err := macros.Register(ctx, ad, t.Model.Model, t, warn); err != nil {
 		return nil, err
 	}
 

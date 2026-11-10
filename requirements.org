@@ -281,6 +281,13 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   run shall go on and succeed, so every failing macro on every page is
   reported in one run; the rest of the page is rendered as usual. Only an
   interrupted run (CLI-7) stops rendering.
+- MC-20 :: Other Go programs shall be able to use the macros (package
+  =macros=, without internal packages) and to add AsciiDoc macros of their
+  own that behave like the =sysml-*= ones: they read the same model, name
+  elements as MC-15 says, link to pages as MC-18 does, show values as
+  =sysml-value= does (MC-14), and a failing one leaves a placeholder and a
+  warning (MC-19). Names starting with =sysml-= stay reserved for this
+  tool's macros (MC-1).
 * Open questions
 - TBD-9 :: For AM-3: how a view becomes a picture. OpenSysML's public Go API
   (=RenderView=) gives only the view's data (nodes, edges, geometry); its
