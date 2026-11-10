@@ -79,8 +79,9 @@ go vet ./...
 cmd/sysml-publish/main.go   CLI: flags, wiring, messages, exit codes
 internal/model/             find + parse the files (OpenSysML in-process), diagnostics; embeds *sysml.Model
 internal/tree/              which elements get pages, inheritance, names, paths (reads the model, writes nothing)
-internal/site/              render pages (asciidoctorg + html/template), titles, write;
+internal/render/            convert representations per page (asciidoctorg), titles;
                             source.go (where a macro is written, for warnings)
+internal/site/              lay a render result out as HTML files (html/template), write
 internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT) + layout.css
 internal/site/page.html.tmpl
 sysml/                      public: reads a parsed model (Query, Props, element facts, Evaluate)
@@ -110,12 +111,16 @@ requirements.org            requirements, decisions, open questions
         │    owner chains up to the tops -> ancestors; ownedMember order
         ▼
  tree.Tree { Root, Pages (pre-order), ByID, Model, Warnings }
-        │  site.Render
+        │  render.Tree(ctx, t, Options{Logger, Pages})
         ▼
- asciidoctorg instance + macros.Register(ad, model, tree as Pages, warn)
+ asciidoctorg instance + macros.Register(ad, model, Pages (default: the tree), warn)
    pass 1: convert every page's representations (per page — MC-3)
    pass 2: assign page titles per sibling group (PG-8, PG-9)
-   pass 3: execute page.html.tmpl for every page + landing page
+        ▼
+ render.Result { Tree, Pages map[node]*Page{Title, Own, Inherited}, Warnings }
+        │  site.New              (site.Render = render.Tree + site.New)
+        ▼
+   execute page.html.tmpl for every page + landing page, add assets + marker
         ▼
  site.Site { Files map[path][]byte, Warnings }
         │  Site.Write            replaces the out folder only if it carries .sysml-publish
@@ -202,12 +207,20 @@ the constant `UnnamedName`, when it has none); `Node.QualifiedName` is the
 is what messages and `Evaluate` use; the **page title** is decided later in
 `site` (PG-8) and is not stored on the node.
 
-### 5.3 `internal/site`
+### 5.3 `internal/render` and `internal/site`
 
-- `Render` creates **one** asciidoctorg instance per run and registers the
-  macros on it.
+Rendering is split from output so another output (Confluence, say) can
+take the same converted pages: `internal/render` converts and titles,
+`internal/site` writes HTML files.
+
+`render.Tree(ctx, t, Options{Logger, Pages})`:
+
+- creates **one** asciidoctorg instance per call and registers the
+  macros on it, with `Options.Pages` deciding their links between pages
+  (MC-18; nil: the tree's relative links, `tree.Tree.Href`). An output
+  whose pages are not the site's folders passes its own.
 - **Pass 1** (`renderer.body`): each page converts each of its
-  representations with `ConvertDocument`, passing the page's element id as
+  representations with `ConvertDocumentContext`, passing the page's element id as
   the document attribute `sysml-element` (`macros.Attributes`). The first
   representation (page order: own, then inherited) with an AsciiDoc header
   (`= Title`) supplies the page title; later ones are converted with
@@ -215,32 +228,41 @@ is what messages and `Evaluate` use; the **page title** is decided later in
   counts — Asciidoctor's `Doctitle` would fall back to the first section.
 - **Pass 2** (`assignTitles`): per sibling group — document title, else
   `untitled-N`; empty ancestor pages use the element name; duplicates get
-  `-N` (PG-8, PG-9). A title has an HTML form (heading, keeps inline markup)
-  and a text form (tab and sidebar).
-- **Pass 3**: `page.html.tmpl` with the sidebar built from the tree.
-  Asciidoctor output is trusted as `template.HTML` (secure safe mode);
-  everything else is escaped by `html/template`.
+  `-N` (PG-8, PG-9). A `Title` has an HTML form (heading, keeps inline
+  markup) and a text form (tab and sidebar).
+- returns `Result{Tree, Pages, Warnings}`: a `Page{Title, Own,
+  Inherited}` (HTML fragments) for every page of `Tree.Pages`, none for
+  the root; `Warnings` as `macros.Warning`s, location filled.
+
+`site.New(result)` lays the result out: `page.html.tmpl` for every page
+and the landing page, with the sidebar built from the tree, the
+stylesheets and the marker. Asciidoctor output is trusted as
+`template.HTML` (secure safe mode); everything else is escaped by
+`html/template`. Its links are the tree's, so the result must be rendered
+with `Pages` nil. `site.Render(ctx, t, logger)` is `render.Tree` then
+`New`, and is what the CLI calls.
+
 - `Site.Write` refuses to replace a non-empty folder without the
   `.sysml-publish` marker, then `RemoveAll`s and writes (CLI-4). Not atomic:
   a crash mid-write leaves a partial site (still marked, so the next run
   replaces it).
 - Macro warnings arrive as `macros.Warning{Page, Macro, Message}` and are
-  kept once per (page, macro) in `Site.Warnings` (MC-7), as
-  `<file>:<line>: <page>: <macro>: <message>`. Deduplication is by those
+  kept once per (page, macro) in `Result.Warnings` (MC-7); `Site.Warnings`
+  are their lines, `<file>:<line>: <page>: <macro>: <message>`. Deduplication is by those
   fields, never by the text, so rewording a message cannot change it
   (`TestWarningsOncePerPageAndMacro`).
 - **Asciidoctor's messages** (`asciidoclog.go`, CLI-6): without a log
   handler, Asciidoctor writes raw lines to stderr (`asciidoctor: WARNING:
-  <stdin>: line 3: ...`), outside slog and the JSON format. `Render`
+  <stdin>: line 3: ...`), outside slog and the JSON format. `render.Tree`
   registers `asciidocLog`, asciidoctorg's `SlogHandler` adapted: the record
-  goes to `Render`'s logger at the message's severity, as
+  goes to `Options.Logger` at the message's severity, as
   `msg="asciidoc: <message>"` with `element` (the page's element) and
   `location` (`sources.lineOf`: the body line Asciidoctor reports, turned
   into the model's file:line; Asciidoctor counts the body's leading blank
   lines, which OpenSysML keeps). An inherited representation's message is
-  logged on each page that shows it. They are not `Site.Warnings`.
+  logged on each page that shows it. They are not `Result.Warnings`.
 - **Source locations** (`source.go`, MC-19): the model gives no source
-  positions (§13, 15), so `Render` fills `Warning.Location` itself. Macros
+  positions (§13, 15), so `render.Tree` fills `Warning.Location` itself. Macros
   warn while a representation is converted (`renderer.current`); `sources`
   finds that representation's body in the model files by its text (lines
   compared without surrounding whitespace, since OpenSysML strips the
@@ -351,7 +373,7 @@ view: it parses a model, `sysml.Open`s it, registers with a map as
   a problem while still producing output, a failure included. The macro
   fills the first three and never formats the page or macro into
   `Message`; `Location` is left to the renderer (§5.3). `Warning.String()`
-  builds the reported line, and `site.Render` deduplicates on (page, macro)
+  builds the reported line, and `render.Tree` deduplicates on (page, macro)
   (MC-7).
 
 | Macro | Form | Reads | Notes |
@@ -372,7 +394,7 @@ warnings into a failing exit code. `TestMacroFailureLeavesPlaceholder`
 (site), `TestMacroFailuresAreWarnings` (CLI) and `TestFailurePlaceholder`,
 `TestEveryFailureReported`, `TestCancelledIsNoFailure` (macros) pin it.
 Errors that still stop the run (cancellation) keep their Go chain through
-asciidoctorg's Ruby: `site.convert` wraps an `*asciidoctor.Error` whose
+asciidoctorg's Ruby: `render`'s `convert` wraps an `*asciidoctor.Error` whose
 `Cause` is the macro's error; identify them by type or `ctx.Err()`, not by
 message.
 
@@ -387,7 +409,7 @@ message.
   errors are logged one record each (`msg="model error" diagnostic=...`).
   Every error is logged exactly once, in `run`; the packages return errors
   and never log them. The exception is what is not an error:
-  Asciidoctor's own messages go to `site.Render`'s logger as they happen
+  Asciidoctor's own messages go to the rendering's logger as they happen
   (`asciidocLog`, §5.3).
 - **Loggers are passed explicitly** (`model.Folder.Logger`, `site.Render`'s
   `logger`), not taken from `slog.Default`; see the asciidoctorg quirk in §9.
@@ -495,7 +517,7 @@ Rules for new tests:
   check theirs by type (`errors.As`).
 - After writing a test for a rule, break the rule once in the code (drop the
   `%w`, remove the dedup) and see the test fail.
-- `TestRenderKeepsTheDefaultLogger` changes the global logger: it must not
+- `TestTreeKeepsTheDefaultLogger` (render) changes the global logger: it must not
   run in parallel with anything. Do not add `t.Parallel()` until separate
   asciidoctorg instances are known to be safe to use concurrently.
 
@@ -579,8 +601,8 @@ Known gaps (from the test review, November 2026):
 - **`asciidoctor.New()` replaces the process-wide default slog logger**
   (still in `v0.2.0`) with
   a `*log.ConfdHandler` from its `confd` dependency, which drops Debug
-  records. `site.newAsciidoctor` restores the previous default
-  (`TestRenderKeepsTheDefaultLogger` guards it); never rely on
+  records. `render.newAsciidoctor` restores the previous default
+  (`TestTreeKeepsTheDefaultLogger` guards it); never rely on
   `slog.Default()` inside rendering code.
 
 **SysML gotchas met so far**: `derived`, `standard`, `flow` are keywords (quote
@@ -680,7 +702,7 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
 ## 12. Upstream issues (to report or fix in the dependencies)
 
 - **asciidoctorg**: `asciidoctor.New()` replaces the process-wide default
-  slog logger (via `confd`). Worked around in `site.newAsciidoctor`; a
+  slog logger (via `confd`). Worked around in `render.newAsciidoctor`; a
   library should not change a program's global logger.
 - **OpenSysML**: see §13.
 
@@ -767,6 +789,6 @@ rather than deleting it, and drop the workaround once `go.mod` has the fix.
     written: OpenSysML strips the common indentation and the line break
     after `/*`. Seen: the representation
     `/*⏎    At sysml-value:position[], …⏎    */` reads back as
-    `"At sysml-value:position[], …\n"`. Workaround: `site.sources` matches
+    `"At sysml-value:position[], …\n"`. Workaround: `render.sources` matches
     the body's lines, whitespace aside, between `/*` and `*/` in the model
     files to place macro warnings (MC-19, §5.3).

@@ -1,5 +1,6 @@
-// Package site renders a page tree to HTML and writes it to the site folder
-// (requirements PG-3, PT-5, SB-1..3, CLI-4).
+// Package site lays a rendered page tree (package render) out as a static
+// HTML site and writes it to the site folder (requirements PT-1, PT-5,
+// SB-1..3, CLI-4).
 package site
 
 import (
@@ -15,11 +16,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
-	asciidoctor "github.com/rolling-robot/asciidoctorg"
+	"github.com/rolling-robot/sysml-publisher/internal/render"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
-	"github.com/rolling-robot/sysml-publisher/macros"
 )
 
 // Marker is the file a generated site folder carries, so a later run knows it
@@ -47,74 +46,32 @@ type Site struct {
 	Warnings []string
 }
 
-// Render renders every page of t, and the landing page. Representation bodies
-// are converted with asciidoctorg on every page that shows them, since macros
-// may render them differently per page (MC-3). Cancelling ctx stops the
-// rendering (CLI-7): between pages, inside a conversion at asciidoctorg's
-// next checkpoint (before each block is parsed or converted, and at each
-// macro), and inside macro evaluations. logger receives
-// debug records (page durations) and Asciidoctor's own messages, with the
-// page and model location (asciidocLog); nil uses slog.Default. A macro that fails
-// leaves a placeholder on its page and a warning, and rendering goes on
-// (MC-19); only a cancelled ctx or a rendering bug returns an error.
+// Render renders t (render.Tree) and lays it out as a site (New). logger is
+// render.Options.Logger.
 func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, error) {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	ad, err := newAsciidoctor()
+	res, err := render.Tree(ctx, t, render.Options{Logger: logger})
 	if err != nil {
-		return nil, fmt.Errorf("starting asciidoctorg: %w", err)
+		return nil, err
 	}
-	defer ad.Close()
+	return New(res)
+}
+
+// New lays out res as a site: a page per page of the tree in its folder
+// (PT-1), with the tree as a sidebar on every page (SB-1..3), the landing
+// page (PT-5), the stylesheets and Marker. Links between pages are the
+// tree's relative ones, so res must be rendered with render.Options.Pages
+// nil.
+func New(res *render.Result) (*Site, error) {
 	s := &Site{Files: map[string][]byte{}}
-	r := &renderer{t: t, ad: ad, bodies: map[*tree.Node]*body{}, titles: map[*tree.Node]title{},
-		sources: newSources(t.Model.Files)}
-	// One warning per page and macro (MC-7): a macro written twice on a
-	// page, or shown there by two representations, warns once; every page
-	// that shows it warns on its own. Macros warn while a representation is
-	// converted, so the warning is placed in that one (MC-19).
-	type key struct{ page, macro string }
-	seen := map[key]bool{}
-	warn := func(w macros.Warning) {
-		k := key{w.Page, w.Macro}
-		if seen[k] {
-			return
-		}
-		seen[k] = true
-		if r.current != nil && w.Location == "" {
-			w.Location = r.sources.locate(*r.current, w.Macro)
-		}
+	for _, w := range res.Warnings {
 		s.Warnings = append(s.Warnings, w.String())
 	}
-	if _, err := macros.Register(ctx, ad, t.Model.Model, t, warn); err != nil {
+	l := &layout{t: res.Tree, pages: res.Pages}
+	if err := l.page(s, res.Tree.Root); err != nil {
 		return nil, err
 	}
-	if _, err := ad.RegisterLogHandler(asciidocLog{r: r, logger: logger}); err != nil {
-		return nil, fmt.Errorf("routing asciidoctorg's messages: %w", err)
-	}
-
-	// Titles come from the converted bodies, and every page's sidebar shows
-	// every title, so convert all bodies first, then title, then write.
-	for _, n := range t.Pages {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		start := time.Now()
-		b, err := r.body(ctx, n)
-		if err != nil {
-			return nil, err
-		}
-		r.bodies[n] = b
-		logger.DebugContext(ctx, "page converted", "element", n.QualifiedName,
-			"representations", len(n.Own)+len(n.Inherited), "duration", time.Since(start))
-	}
-	r.assignTitles(t.Root)
-
-	if err := r.page(s, t.Root); err != nil {
-		return nil, err
-	}
-	for _, n := range t.Pages {
-		if err := r.page(s, n); err != nil {
+	for _, n := range res.Tree.Pages {
+		if err := l.page(s, n); err != nil {
 			return nil, err
 		}
 	}
@@ -129,138 +86,10 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 	return s, nil
 }
 
-// newAsciidoctor starts asciidoctorg. Starting it replaces the process-wide
-// default slog logger (a dependency installs its own handler, which drops
-// debug records), so the previous default is put back.
-func newAsciidoctor() (*asciidoctor.Asciidoctor, error) {
-	previous := slog.Default()
-	defer slog.SetDefault(previous)
-	return asciidoctor.New()
-}
-
-type renderer struct {
-	t       *tree.Tree
-	ad      *asciidoctor.Asciidoctor
-	bodies  map[*tree.Node]*body
-	titles  map[*tree.Node]title
-	sources *sources
-	// current is the representation being converted and currentPage the
-	// page it is converted for, for the location of macro warnings and of
-	// Asciidoctor's messages.
-	current     *tree.Rep
-	currentPage *tree.Node
-}
-
-// title is a page title: HTML for the page heading, which may carry inline
-// markup, and Text, without markup, for the browser tab and the sidebar.
-// Text is HTML-escaped already.
-type title struct {
-	HTML, Text template.HTML
-}
-
-func plainTitle(s string) title {
-	escaped := template.HTML(template.HTMLEscapeString(s))
-	return title{HTML: escaped, Text: escaped}
-}
-
-func (t title) suffixed(n int) title {
-	suffix := template.HTML(fmt.Sprintf("-%d", n))
-	return title{HTML: t.HTML + suffix, Text: t.Text + suffix}
-}
-
-// body is a page's converted representations, and the document title of the
-// first of them that has one (PG-8).
-type body struct {
-	own, inherited []repView
-	docTitle       *title
-}
-
-// body converts the representations of n as shown on its page.
-func (r *renderer) body(ctx context.Context, n *tree.Node) (*body, error) {
-	b := &body{}
-	for _, rep := range n.Own {
-		h, err := r.convert(ctx, n, rep, b)
-		if err != nil {
-			return nil, err
-		}
-		b.own = append(b.own, repView{HTML: h})
-	}
-	for _, rep := range n.Inherited {
-		h, err := r.convert(ctx, n, rep, b)
-		if err != nil {
-			return nil, err
-		}
-		b.inherited = append(b.inherited, repView{HTML: h})
-	}
-	return b, nil
-}
-
-// convert converts rep as shown on the page of n, which macros may refer to.
-// The first document title found becomes the page title and is left out of
-// the body; the titles of later representations stay in theirs (PG-10).
-// Cancelling ctx stops the conversion; the error then satisfies
-// errors.Is(err, ctx.Err()).
-func (r *renderer) convert(ctx context.Context, n *tree.Node, rep tree.Rep, b *body) (template.HTML, error) {
-	attrs := macros.Attributes(n.ID)
-	if b.docTitle != nil {
-		attrs = attrs.Set("showtitle", "")
-	}
-	r.current, r.currentPage = &rep, n
-	doc, out, err := r.ad.ConvertDocumentContext(ctx, rep.Body, &asciidoctor.Options{Attributes: attrs})
-	r.current, r.currentPage = nil, nil
-	if err != nil {
-		return "", fmt.Errorf("converting the representation of %s on the page of %s: %w", r.owner(rep).QualifiedName, n.QualifiedName, err)
-	}
-	if b.docTitle == nil && doc.HasHeader() {
-		// Both are asciidoctorg output: the converted title, and the same
-		// title with its markup removed.
-		t := title{HTML: template.HTML(doc.Doctitle())}
-		if st := doc.StructuredDoctitle(true); st != nil {
-			t.Text = template.HTML(st.Combined)
-		}
-		if strings.TrimSpace(string(t.Text)) != "" {
-			b.docTitle = &t
-		}
-	}
-	return template.HTML(out), nil // asciidoctorg output, secure safe mode
-}
-
-// assignTitles titles the children of parent, then their children. A page
-// takes its document title, or untitled-N when its representations have
-// none (PG-8); an empty ancestor page takes its element's name (PG-6). A
-// title a sibling already has gets a -N suffix (PG-9).
-func (r *renderer) assignTitles(parent *tree.Node) {
-	untitled := 0
-	taken := map[template.HTML]bool{}
-	for _, c := range parent.Children {
-		var t title
-		switch b := r.bodies[c]; {
-		case !c.Documented():
-			t = plainTitle(c.Name)
-		case b != nil && b.docTitle != nil:
-			t = *b.docTitle
-		default:
-			untitled++
-			t = plainTitle(fmt.Sprintf("untitled-%d", untitled))
-		}
-		if taken[t.Text] {
-			i := 2
-			for taken[t.suffixed(i).Text] {
-				i++
-			}
-			t = t.suffixed(i)
-		}
-		taken[t.Text] = true
-		r.titles[c] = t
-		r.assignTitles(c)
-	}
-}
-
-func (r *renderer) owner(rep tree.Rep) *tree.Node {
-	if n := r.t.ByID[rep.Owner]; n != nil {
-		return n
-	}
-	return &tree.Node{Name: rep.Owner, QualifiedName: rep.Owner}
+// layout writes the pages of a rendered tree.
+type layout struct {
+	t     *tree.Tree
+	pages map[*tree.Node]*render.Page
 }
 
 // file is where node n's page is written.
@@ -269,10 +98,6 @@ func file(n *tree.Node) string {
 		return "index.html"
 	}
 	return n.Dir + "/index.html"
-}
-
-type repView struct {
-	HTML template.HTML
 }
 
 type navItem struct {
@@ -289,34 +114,33 @@ type pageView struct {
 	AssetsHref, HomeHref string
 	SiteTitle            string
 	Landing, Empty       bool
-	Own, Inherited       []repView
+	Own, Inherited       []template.HTML
 	Nav                  []navItem
 }
 
-func (r *renderer) page(s *Site, n *tree.Node) error {
-	root := r.t.Root
-	t, ok := r.titles[n]
-	if n == root {
-		t, ok = plainTitle(LandingTitle), true
-	}
-	if !ok {
-		return fmt.Errorf("no title assigned to %s", n.QualifiedName)
-	}
+func (l *layout) page(s *Site, n *tree.Node) error {
+	root := l.t.Root
 	v := pageView{
-		TitleHTML:  t.HTML,
-		TitleText:  t.Text,
 		SiteTitle:  LandingTitle,
 		AssetsHref: strings.TrimSuffix(tree.Href(n, root), "index.html") + "assets/",
 		HomeHref:   tree.Href(n, root),
 		Landing:    n == root,
 		Empty:      n != root && !n.Documented(),
-		Nav:        r.nav(n, root.Children),
+		Nav:        l.nav(n, root.Children),
+	}
+	if n == root {
+		t := render.PlainTitle(LandingTitle)
+		v.TitleHTML, v.TitleText = t.HTML, t.Text
+	} else {
+		p := l.pages[n]
+		if p == nil {
+			return fmt.Errorf("%s was not rendered", n.QualifiedName)
+		}
+		v.TitleHTML, v.TitleText = p.Title.HTML, p.Title.Text
+		v.Own, v.Inherited = p.Own, p.Inherited
 	}
 	if !v.Landing && !n.Unnamed {
 		v.QualifiedName = n.QualifiedName
-	}
-	if b := r.bodies[n]; b != nil {
-		v.Own, v.Inherited = b.own, b.inherited
 	}
 	var buf bytes.Buffer
 	if err := page.Execute(&buf, v); err != nil {
@@ -326,15 +150,19 @@ func (r *renderer) page(s *Site, n *tree.Node) error {
 	return nil
 }
 
-func (r *renderer) nav(current *tree.Node, nodes []*tree.Node) []navItem {
+func (l *layout) nav(current *tree.Node, nodes []*tree.Node) []navItem {
 	items := make([]navItem, 0, len(nodes))
 	for _, c := range nodes {
+		var title template.HTML
+		if p := l.pages[c]; p != nil {
+			title = p.Title.Text
+		}
 		items = append(items, navItem{
-			Title:    r.titles[c].Text,
+			Title:    title,
 			Href:     tree.Href(current, c),
 			Current:  c == current,
 			Empty:    !c.Documented(),
-			Children: r.nav(current, c.Children),
+			Children: l.nav(current, c.Children),
 		})
 	}
 	return items

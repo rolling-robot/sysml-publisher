@@ -1,10 +1,7 @@
 package site
 
 import (
-	"context"
 	"errors"
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,10 +10,9 @@ import (
 
 	"github.com/rolling-robot/sysml-publisher/internal/model"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
-	"github.com/rolling-robot/sysml-publisher/macros"
 )
 
-func render(t *testing.T, fixture string) *Site {
+func renderSite(t *testing.T, fixture string) *Site {
 	t.Helper()
 	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", fixture)}.Load(t.Context())
 	if err != nil {
@@ -48,7 +44,7 @@ func mustContain(t *testing.T, s *Site, file string, wants ...string) {
 }
 
 func TestRenderSmoke(t *testing.T) {
-	s := render(t, "smoke")
+	s := renderSite(t, "smoke")
 	want := []string{"Model/aaaa/index.html", "Model/bbb/index.html", "Model/index.html", "Model/pd/index.html", "index.html"}
 	if got := s.Pages(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("pages = %v, want %v", got, want)
@@ -132,7 +128,7 @@ func TestWriteReplacesOnlyItsOwnFolder(t *testing.T) {
 // pd's representation uses sysml-element-name:[], so it renders differently
 // on each page that shows it (MC-2, MC-3).
 func TestRepresentationRendersPerPage(t *testing.T) {
-	s := render(t, "macros")
+	s := renderSite(t, "macros")
 	mustContain(t, s, "M/pd/index.html", "<p>Name: pd.</p>")
 	mustContain(t, s, "M/a_b/index.html", "<p>Name: a&lt;b.</p>")
 	mustContain(t, s, "M/unnamed-1/index.html", "<p>Name: Unnamed.</p>")
@@ -144,7 +140,7 @@ func TestRepresentationRendersPerPage(t *testing.T) {
 // testdata/macroerror/macroerror.sysml. OpenSysML's wording of the
 // evaluation error is not pinned.
 func TestMacroFailureLeavesPlaceholder(t *testing.T) {
-	s := render(t, "macroerror")
+	s := renderSite(t, "macroerror")
 	file := filepath.Join("..", "..", "testdata", "macroerror", "macroerror.sysml")
 	// message is empty where it is OpenSysML's.
 	want := []struct{ prefix, message string }{
@@ -170,7 +166,7 @@ func TestMacroFailureLeavesPlaceholder(t *testing.T) {
 // Macro warnings are reported once per page and macro (MC-7); the cases are
 // the // notes in testdata/warnings/warnings.sysml.
 func TestWarningsOncePerPageAndMacro(t *testing.T) {
-	s := render(t, "warnings")
+	s := renderSite(t, "warnings")
 	// Each warning is placed where the macro is first written in the
 	// representation that warned first on that page: Tagged's own, else
 	// Pump's (PG-7: nearest first).
@@ -191,7 +187,7 @@ func TestWarningsOncePerPageAndMacro(t *testing.T) {
 // Page titles come from the first representation's document title, with
 // macros resolved; untitled-N and -N suffixes number siblings (PG-8, PG-9).
 func TestPageTitles(t *testing.T) {
-	s := render(t, "titles")
+	s := renderSite(t, "titles")
 	cases := []struct{ dir, h1, sidebar string }{
 		{"T/titled", "Element: titled", "Element: titled"},
 		{"T/plain1", "untitled-1", "untitled-1"},
@@ -217,100 +213,4 @@ func TestPageTitles(t *testing.T) {
 	}
 	// The empty package page keeps the element name (PG-6).
 	mustContain(t, s, "T/index.html", "<h1>T</h1>")
-}
-
-// Starting asciidoctorg replaces the default slog logger (a dependency
-// installs a handler that drops debug records); Render must put it back.
-func TestRenderKeepsTheDefaultLogger(t *testing.T) {
-	previous := slog.Default()
-	t.Cleanup(func() { slog.SetDefault(previous) })
-	mine := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	slog.SetDefault(mine)
-	render(t, "smoke")
-	if slog.Default().Handler() != mine.Handler() {
-		t.Errorf("default logger replaced by %T", slog.Default().Handler())
-	}
-}
-
-// Cancelling stops a conversion itself, not only the loop between pages
-// (CLI-7): a representation without model-reading macros, which nothing
-// but asciidoctorg's checkpoints could stop, fails with the context's
-// error, and converts when the context is live.
-func TestConversionStopsWhenCancelled(t *testing.T) {
-	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", "titles")}.Load(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { m.Close() })
-	tr, err := tree.Build(t.Context(), m)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ad, err := newAsciidoctor()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { ad.Close() })
-	if _, err := macros.Register(t.Context(), ad, m.Model, tr, nil); err != nil {
-		t.Fatal(err)
-	}
-	r := &renderer{t: tr, ad: ad, sources: newSources(m.Files)}
-	n := tr.Pages[0]
-	rep := tree.Rep{ID: "plain", Body: "Plain *text*.\n\n* one\n* two\n"}
-
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	if _, err := r.convert(ctx, n, rep, &body{}); !errors.Is(err, context.Canceled) {
-		t.Errorf("cancelled conversion: err = %v, want context.Canceled", err)
-	}
-	out, err := r.convert(t.Context(), n, rep, &body{})
-	if err != nil || !strings.Contains(string(out), "<strong>text</strong>") {
-		t.Errorf("live conversion: out %q, err %v", out, err)
-	}
-}
-
-// Asciidoctor's own messages reach the run's logger as records with the
-// page's element and the model line they are about (CLI-6), once per page
-// that shows the representation; the cases are the // notes in
-// testdata/asciidoc-messages/messages.sysml. Macro warnings are not mixed in.
-func TestAsciidocMessagesAreLogged(t *testing.T) {
-	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", "asciidoc-messages")}.Load(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { m.Close() })
-	tr, err := tree.Build(t.Context(), m)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var buf strings.Builder
-	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{
-		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey {
-				return slog.Attr{}
-			}
-			return a
-		},
-	}))
-	s, err := Render(t.Context(), tr, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
-	file := filepath.Join("..", "..", "testdata", "asciidoc-messages", "messages.sysml")
-	var got []string
-	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
-		if strings.Contains(line, "asciidoc:") {
-			got = append(got, line)
-		}
-	}
-	var want []string
-	for _, el := range []string{"M::pd", "M::u"} {
-		want = append(want, `level=WARN msg="asciidoc: section title out of sequence: expected level 1, got level 3" element=`+el+" location="+file+":18")
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("records:\n got %q\nwant %q", got, want)
-	}
-	if len(s.Warnings) != 0 {
-		t.Errorf("site warnings %q, want none", s.Warnings)
-	}
 }
