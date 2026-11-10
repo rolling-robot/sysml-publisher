@@ -1,6 +1,7 @@
 package site
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/rolling-robot/sysml-publisher/internal/model"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
+	"github.com/rolling-robot/sysml-publisher/macros"
 )
 
 func render(t *testing.T, fixture string) *Site {
@@ -227,5 +229,42 @@ func TestRenderKeepsTheDefaultLogger(t *testing.T) {
 	render(t, "smoke")
 	if slog.Default().Handler() != mine.Handler() {
 		t.Errorf("default logger replaced by %T", slog.Default().Handler())
+	}
+}
+
+// Cancelling stops a conversion itself, not only the loop between pages
+// (CLI-7): a representation without model-reading macros, which nothing
+// but asciidoctorg's checkpoints could stop, fails with the context's
+// error, and converts when the context is live.
+func TestConversionStopsWhenCancelled(t *testing.T) {
+	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", "titles")}.Load(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { m.Close() })
+	tr, err := tree.Build(t.Context(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ad, err := newAsciidoctor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ad.Close() })
+	if _, err := macros.Register(t.Context(), ad, m.Model, tr, nil); err != nil {
+		t.Fatal(err)
+	}
+	r := &renderer{t: tr, ad: ad, sources: newSources(m.Files)}
+	n := tr.Pages[0]
+	rep := tree.Rep{ID: "plain", Body: "Plain *text*.\n\n* one\n* two\n"}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := r.convert(ctx, n, rep, &body{}); !errors.Is(err, context.Canceled) {
+		t.Errorf("cancelled conversion: err = %v, want context.Canceled", err)
+	}
+	out, err := r.convert(t.Context(), n, rep, &body{})
+	if err != nil || !strings.Contains(string(out), "<strong>text</strong>") {
+		t.Errorf("live conversion: out %q, err %v", out, err)
 	}
 }

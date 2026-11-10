@@ -380,8 +380,10 @@ message.
 - **Loggers are passed explicitly** (`model.Folder.Logger`, `site.Render`'s
   `logger`), not taken from `slog.Default`; see the asciidoctorg quirk in §9.
 - **Cancellation (CLI-7)**: `main` uses `signal.NotifyContext`; the context
-  flows into `Load`, `Render` (checked between pages) and `sysml-value`'s
-  evaluations. An interrupted run writes nothing and exits 130. Detect it
+  flows into `Load`, `Render` (checked between pages, and passed to
+  `ConvertDocumentContext`, which stops a conversion at asciidoctorg's next
+  checkpoint: before each block is parsed or converted, and at each macro),
+  every model read and `sysml-value`'s evaluations. An interrupted run writes nothing and exits 130. Detect it
   with `ctx.Err()`: OpenSysML's cancellation error does not wrap
   `context.Canceled`.
 - Exit codes: 0 ok, 1 failure, 2 usage error, 130 interrupted.
@@ -487,9 +489,9 @@ Rules for new tests:
 
 Known gaps (from the test review, November 2026):
 
-1. **Untested behaviour**: cancellation *during* rendering (the between-pages
-   check in `Render` and the check before `Write` in `publish`; the CLI test
-   cancels before parsing); `Site.Write` into an existing empty folder or onto
+1. **Untested behaviour**: the between-pages check in `Render` and the
+   check before `Write` in `publish` (the CLI test cancels before parsing;
+   `TestConversionStopsWhenCancelled` covers a cancelled conversion); `Site.Write` into an existing empty folder or onto
    a file; the refused replacement at CLI level; cycle safety of inheritance;
    `-h` and the usage-error text; the examples in `docs/macros.adoc`.
 2. **Weak assertions**: the whitespace-dependent `"<h1>Second</h1>\n<div"`

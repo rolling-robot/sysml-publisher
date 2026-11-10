@@ -50,7 +50,9 @@ type Site struct {
 // Render renders every page of t, and the landing page. Representation bodies
 // are converted with asciidoctorg on every page that shows them, since macros
 // may render them differently per page (MC-3). Cancelling ctx stops the
-// rendering between pages and inside macro evaluations. logger receives
+// rendering (CLI-7): between pages, inside a conversion at asciidoctorg's
+// next checkpoint (before each block is parsed or converted, and at each
+// macro), and inside macro evaluations. logger receives
 // debug records (page durations); nil uses slog.Default. A macro that fails
 // leaves a placeholder on its page and a warning, and rendering goes on
 // (MC-19); only a cancelled ctx or a rendering bug returns an error.
@@ -94,7 +96,7 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 			return nil, err
 		}
 		start := time.Now()
-		b, err := r.body(n)
+		b, err := r.body(ctx, n)
 		if err != nil {
 			return nil, err
 		}
@@ -168,17 +170,17 @@ type body struct {
 }
 
 // body converts the representations of n as shown on its page.
-func (r *renderer) body(n *tree.Node) (*body, error) {
+func (r *renderer) body(ctx context.Context, n *tree.Node) (*body, error) {
 	b := &body{}
 	for _, rep := range n.Own {
-		h, err := r.convert(n, rep, b)
+		h, err := r.convert(ctx, n, rep, b)
 		if err != nil {
 			return nil, err
 		}
 		b.own = append(b.own, repView{HTML: h})
 	}
 	for _, rep := range n.Inherited {
-		h, err := r.convert(n, rep, b)
+		h, err := r.convert(ctx, n, rep, b)
 		if err != nil {
 			return nil, err
 		}
@@ -190,13 +192,15 @@ func (r *renderer) body(n *tree.Node) (*body, error) {
 // convert converts rep as shown on the page of n, which macros may refer to.
 // The first document title found becomes the page title and is left out of
 // the body; the titles of later representations stay in theirs (PG-10).
-func (r *renderer) convert(n *tree.Node, rep tree.Rep, b *body) (template.HTML, error) {
+// Cancelling ctx stops the conversion; the error then satisfies
+// errors.Is(err, ctx.Err()).
+func (r *renderer) convert(ctx context.Context, n *tree.Node, rep tree.Rep, b *body) (template.HTML, error) {
 	attrs := macros.Attributes(n.ID)
 	if b.docTitle != nil {
 		attrs = attrs.Set("showtitle", "")
 	}
 	r.current = &rep
-	doc, out, err := r.ad.ConvertDocument(rep.Body, &asciidoctor.Options{Attributes: attrs})
+	doc, out, err := r.ad.ConvertDocumentContext(ctx, rep.Body, &asciidoctor.Options{Attributes: attrs})
 	r.current = nil
 	if err != nil {
 		return "", fmt.Errorf("converting the representation of %s on the page of %s: %w", r.owner(rep).QualifiedName, n.QualifiedName, err)
