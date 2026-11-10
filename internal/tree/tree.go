@@ -45,34 +45,13 @@ type Node struct {
 	// Inherited are those it inherits, nearest specialization first (PG-7).
 	Own       []Rep
 	Inherited []Rep
-	// Docs are the bodies of the element's own doc comments, in declaration
-	// order (MC-10).
-	Docs []string
-	// ShortName is the element's short name (the <a> of part <a> aaaa), ""
-	// when it has none (MC-11).
-	ShortName string
-	// Members are the element's owned members, in declaration order, without
-	// annotations and multiplicities (MC-12).
-	Members  []Member
-	Parent   *Node
-	Children []*Node
+	Parent    *Node
+	Children  []*Node
 }
 
 // Documented reports whether the element has representations of its own or
 // inherited ones; other nodes are empty ancestor pages (PG-6).
 func (n *Node) Documented() bool { return len(n.Own)+len(n.Inherited) > 0 }
-
-// Member is an owned member of a page's element.
-type Member struct {
-	ID        string
-	Name      string // its name, or UnnamedName
-	Metaclass string // PartUsage, AttributeUsage, ...
-	// Types are the names of the member's types (part w : Wheel gives
-	// Wheel), in declaration order, including those a usage gets through
-	// what it subsets or redefines (part front :> wheels gives Wheel); none
-	// for a definition or an untyped usage.
-	Types []string
-}
 
 // Tree is the page tree of a model.
 type Tree struct {
@@ -88,33 +67,15 @@ type Tree struct {
 	Warnings []string
 }
 
-// Specializes reports whether element specific is typed by, subclasses or
-// subsets element general, directly or through a chain of such relationships
-// (part spare : Sport with Sport :> Wheel specializes Wheel; MC-12). No
-// element specializes itself.
-func (t *Tree) Specializes(ctx context.Context, specific, general string) (bool, error) {
-	seen := map[string]bool{specific: true}
-	queue, err := t.Model.Generals(ctx, specific)
-	if err != nil {
-		return false, err
+// Href is the link, relative to the page of element from, to the page of
+// element to, both by id; ok is false when either has no page. It makes
+// the tree the macros' Pages (macros.Pages).
+func (t *Tree) Href(from, to string) (href string, ok bool) {
+	f, d := t.ByID[from], t.ByID[to]
+	if f == nil || d == nil {
+		return "", false
 	}
-	for len(queue) > 0 {
-		g := queue[0]
-		queue = queue[1:]
-		if g == general {
-			return true, nil
-		}
-		if seen[g] {
-			continue
-		}
-		seen[g] = true
-		next, err := t.Model.Generals(ctx, g)
-		if err != nil {
-			return false, err
-		}
-		queue = append(queue, next...)
-	}
-	return false, nil
+	return Href(f, d), true
 }
 
 // Build computes the page tree of m:
@@ -305,18 +266,6 @@ func (b *builder) add(parent *Node, e model.Ref) error {
 	if err != nil {
 		return err
 	}
-	docs, err := b.m.Docs(b.ctx, e.ID)
-	if err != nil {
-		return err
-	}
-	short, err := b.m.ShortName(b.ctx, e.ID)
-	if err != nil {
-		return err
-	}
-	members, err := b.members(e.ID)
-	if err != nil {
-		return err
-	}
 	n := &Node{
 		ID:            e.ID,
 		Name:          name,
@@ -324,9 +273,6 @@ func (b *builder) add(parent *Node, e model.Ref) error {
 		QualifiedName: qn,
 		Own:           b.reps[e.ID],
 		Inherited:     b.inheritedOf[e.ID],
-		Docs:          docs,
-		ShortName:     short,
-		Members:       members,
 		Parent:        parent,
 	}
 	if n.Unnamed {
@@ -369,55 +315,6 @@ func (b *builder) walk(parent *Node) {
 		b.t.ByID[n.ID] = n
 		b.walk(n)
 	}
-}
-
-// notMembers are the metaclasses of owned members that sysml-members-list
-// leaves out (MC-12): annotations, which annotate the owner rather than make
-// it up, and multiplicities, which are part of the owner's declaration
-// (OpenSysML gives every usage one, its implicit [1..1] included).
-var notMembers = map[string]bool{
-	"Comment": true, "Documentation": true, "TextualRepresentation": true,
-	"MetadataUsage": true, "MetadataFeature": true,
-	"Multiplicity": true, "MultiplicityRange": true,
-}
-
-// members are id's owned members other than annotations and multiplicities.
-func (b *builder) members(id string) ([]Member, error) {
-	owned, err := b.m.Members(b.ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	var out []Member
-	for _, r := range owned {
-		if notMembers[r.Metaclass] {
-			continue
-		}
-		name, err := b.m.Name(b.ctx, r.ID)
-		if err != nil {
-			return nil, err
-		}
-		if name == "" {
-			name = UnnamedName
-		}
-		types, err := b.m.Types(b.ctx, r.ID)
-		if err != nil {
-			return nil, err
-		}
-		var typeNames []string
-		for _, typ := range types {
-			tn := typ.Name() // from the qualified name: library types need no read
-			if tn == "" {
-				if tn, err = b.m.Name(b.ctx, typ.ID); err != nil {
-					return nil, err
-				}
-			}
-			if tn != "" {
-				typeNames = append(typeNames, tn)
-			}
-		}
-		out = append(out, Member{ID: r.ID, Name: name, Metaclass: r.Metaclass, Types: typeNames})
-	}
-	return out, nil
 }
 
 // segment makes a name usable as one folder name on any filesystem.

@@ -8,8 +8,7 @@ import (
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
-	"github.com/rolling-robot/sysml-publisher/internal/model"
-	"github.com/rolling-robot/sysml-publisher/internal/tree"
+	"github.com/rolling-robot/sysml-publisher/sysml"
 )
 
 // MetadataTable is the block macro sysml-metadata-table::<metadata def>[],
@@ -32,7 +31,7 @@ func registerMetadataTable(g *asciidoctor.ExtensionGroup, e *env) {
 			if err != nil {
 				return nil, err
 			}
-			usages, err := md.usages(c.page.ID, def.ID)
+			usages, err := md.usages(c.page.id, def.ID)
 			if err != nil {
 				return nil, err
 			}
@@ -64,32 +63,32 @@ func registerMetadataTable(g *asciidoctor.ExtensionGroup, e *env) {
 // Props (DS-4).
 type metadataIndex struct {
 	ctx   context.Context
-	m     *model.Model
+	m     *sysml.Model
 	names *nameIndex
 }
 
 // definition finds the metadata def a macro names, the way every macro reads
 // a name (nameIndex.resolve), among metadata defs only: Info, Plant::Info,
 // or a short name.
-func (md *metadataIndex) definition(target string, n *tree.Node) (model.Ref, error) {
+func (md *metadataIndex) definition(target string, n element) (sysml.Ref, error) {
 	if target == "" {
-		return model.Ref{}, fmt.Errorf("no metadata def named; write %s::<metadata def>[]", MetadataTable)
+		return sysml.Ref{}, fmt.Errorf("no metadata def named; write %s::<metadata def>[]", MetadataTable)
 	}
-	def, err := md.names.resolve(target, n, func(r model.Ref) bool { return r.Metaclass == "MetadataDefinition" })
+	def, err := md.names.resolve(target, n, func(r sysml.Ref) bool { return r.Metaclass == "MetadataDefinition" })
 	if errors.Is(err, errNoSuchName) {
-		return model.Ref{}, fmt.Errorf("the model has no metadata def %q", target)
+		return sysml.Ref{}, fmt.Errorf("the model has no metadata def %q", target)
 	}
 	return def, err
 }
 
 // usages are the metadata usages the element owns that are typed by def, in
 // declaration order. Both @def and the prefix form #def give one.
-func (md *metadataIndex) usages(elementID, def string) ([]model.Ref, error) {
+func (md *metadataIndex) usages(elementID, def string) ([]sysml.Ref, error) {
 	members, err := md.m.Members(md.ctx, elementID)
 	if err != nil {
 		return nil, err
 	}
-	var out []model.Ref
+	var out []sysml.Ref
 	for _, r := range members {
 		if r.Metaclass != "MetadataUsage" {
 			continue
@@ -107,8 +106,8 @@ func (md *metadataIndex) usages(elementID, def string) ([]model.Ref, error) {
 
 // attributes are the attributes of def: its own, then those of its
 // supertypes, nearest first. One a nearer def redefines is not repeated.
-func (md *metadataIndex) attributes(def string) ([]model.Ref, error) {
-	var out []model.Ref
+func (md *metadataIndex) attributes(def string) ([]sysml.Ref, error) {
+	var out []sysml.Ref
 	redefined := map[string]bool{}
 	visited := map[string]bool{}
 	queue := []string{def}
@@ -248,7 +247,7 @@ func (md *metadataIndex) exprText(expr string, top bool) (string, error) {
 
 // referenceText writes a reference: an enumeration literal with its
 // enumeration's name (Level::low), anything else by its name.
-func (md *metadataIndex) referenceText(r model.Ref) (string, error) {
+func (md *metadataIndex) referenceText(r sysml.Ref) (string, error) {
 	name, err := md.names.name(r.ID)
 	if err != nil {
 		return "", err
@@ -269,7 +268,7 @@ func (md *metadataIndex) referenceText(r model.Ref) (string, error) {
 
 // table is the attribute table of usage u, titled with the metadata def's
 // name.
-func (md *metadataIndex) table(parent asciidoctor.StructuralNode, def, u model.Ref, attrs []model.Ref) (*asciidoctor.Table, error) {
+func (md *metadataIndex) table(parent asciidoctor.StructuralNode, def, u sysml.Ref, attrs []sysml.Ref) (*asciidoctor.Table, error) {
 	tbl, err := asciidoctor.CreateTable(parent, nil)
 	if err != nil {
 		return nil, err

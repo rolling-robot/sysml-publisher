@@ -6,7 +6,7 @@ import (
 
 	"github.com/Open-MBEE/OpenSysML/client/opensysml"
 
-	"github.com/rolling-robot/sysml-publisher/internal/model"
+	"github.com/rolling-robot/sysml-publisher/sysml"
 )
 
 // sysmlKinds are the SysML metaclasses an element can be written as, as the
@@ -46,7 +46,7 @@ var sysmlKinds = []string{
 // letter case (partUsage, PartUsage).
 type kindIndex map[string]string // lower-case name → metaclass
 
-func newKindIndex(ctx context.Context, m *model.Model) (kindIndex, error) {
+func newKindIndex(ctx context.Context, m *sysml.Model) (kindIndex, error) {
 	k := kindIndex{}
 	for _, kind := range sysmlKinds {
 		k[strings.ToLower(kind)] = kind

@@ -29,7 +29,7 @@ func setup(t *testing.T) (*tree.Tree, *asciidoctor.Asciidoctor) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { ad.Close() })
-	if err := Register(context.Background(), ad, tr, record(t, ad)); err != nil {
+	if err := Register(context.Background(), ad, tr.Model.Model, tr, record(t, ad)); err != nil {
 		t.Fatal(err)
 	}
 	return tr, ad
@@ -68,7 +68,7 @@ func TestName(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			out, err := ad.Convert("Name: "+c.src+".", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
+			out, err := ad.Convert("Name: "+c.src+".", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page).ID)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -81,7 +81,7 @@ func TestName(t *testing.T) {
 
 func TestNameErrors(t *testing.T) {
 	tr, ad := setup(t)
-	page := Attributes(pageAt(t, tr, "M/pd"))
+	page := Attributes(pageAt(t, tr, "M/pd").ID)
 	cases := []struct{ name, src, want string }{
 		{"unknown element", "sysml-name:Nothing[]",
 			`M::pd: sysml-name:Nothing[]: the model has no element named "Nothing"`},
@@ -118,7 +118,7 @@ func TestNameMetadata(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			out, err := ad.Convert("N: sysml-name:"+c.target+"[].", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
+			out, err := ad.Convert("N: sysml-name:"+c.target+"[].", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page).ID)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -131,7 +131,7 @@ func TestNameMetadata(t *testing.T) {
 
 func TestNameMetadataErrors(t *testing.T) {
 	tr, ad := setupFixture(t, "metadata-table")
-	page := Attributes(pageAt(t, tr, "Meta/bound"))
+	page := Attributes(pageAt(t, tr, "Meta/bound").ID)
 	cases := []struct{ name, target, want string }{
 		{"metadata the element does not carry", "@Derived", "Meta::bound has no @Derived metadata"},
 		{"unknown attribute", "@Info::nothing", `metadata def Info has no attribute "nothing"`},

@@ -1,6 +1,7 @@
 package macros
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -56,7 +57,7 @@ func TestMembersList(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			out, err := ad.Convert(c.macro+"\n\nAfter.", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
+			out, err := ad.Convert(c.macro+"\n\nAfter.", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page).ID)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -80,7 +81,7 @@ func TestMembersList(t *testing.T) {
 
 func TestMembersListErrors(t *testing.T) {
 	tr, ad := setupFixture(t, "members-list")
-	page := Attributes(pageAt(t, tr, "M/pd"))
+	page := Attributes(pageAt(t, tr, "M/pd").ID)
 	cases := []struct{ name, macro, want string }{
 		{"unknown element", "sysml-members-list::Nothing[]",
 			`M::pd: sysml-members-list::Nothing[]: the model has no element named "Nothing", and it is no element kind (such as partUsage)`},
@@ -91,5 +92,36 @@ func TestMembersListErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			mustFail(t, ad, c.macro, page, c.want)
 		})
+	}
+}
+
+// The members a list is made of: owned members without annotations and
+// multiplicities, each with its metaclass and its types, those a usage
+// gets through subsetting or redefinition included (MC-12).
+func TestMembers(t *testing.T) {
+	tr, _ := setupFixture(t, "members-list")
+	e := newEnv(t.Context(), tr.Model.Model, tr, nil)
+	ms, err := members(e, pageAt(t, tr, "M/pd").ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, m := range ms {
+		got = append(got, fmt.Sprintf("%s %s %v", m.name, m.metaclass, m.types))
+	}
+	want := []string{
+		"mass AttributeUsage [Real]",
+		"a*b*+++c PortUsage []",
+		"sub PartUsage []",
+		"Unnamed PartUsage [other]",
+		"wheels PartUsage [Wheel]",
+		"front PartUsage [Wheel]",
+		"spare PartUsage [Sport]",
+		"Racing PartDefinition []",
+		"both PartUsage [Wheel Sport]",
+		"link InterfaceUsage []",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("members:\n got %q\nwant %q", got, want)
 	}
 }

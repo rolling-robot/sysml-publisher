@@ -70,10 +70,7 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 	// page, or shown there by two representations, warns once; every page
 	// that shows it warns on its own. Macros warn while a representation is
 	// converted, so the warning is placed in that one (MC-19).
-	type key struct {
-		page  *tree.Node
-		macro string
-	}
+	type key struct{ page, macro string }
 	seen := map[key]bool{}
 	warn := func(w macros.Warning) {
 		k := key{w.Page, w.Macro}
@@ -86,7 +83,7 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger) (*Site, erro
 		}
 		s.Warnings = append(s.Warnings, w.String())
 	}
-	if err := macros.Register(ctx, ad, t, warn); err != nil {
+	if err := macros.Register(ctx, ad, t.Model.Model, t, warn); err != nil {
 		return nil, err
 	}
 
@@ -194,7 +191,7 @@ func (r *renderer) body(n *tree.Node) (*body, error) {
 // The first document title found becomes the page title and is left out of
 // the body; the titles of later representations stay in theirs (PG-10).
 func (r *renderer) convert(n *tree.Node, rep tree.Rep, b *body) (template.HTML, error) {
-	attrs := macros.Attributes(n)
+	attrs := macros.Attributes(n.ID)
 	if b.docTitle != nil {
 		attrs = attrs.Set("showtitle", "")
 	}

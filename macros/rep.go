@@ -25,7 +25,7 @@ func registerRep(g *asciidoctor.ExtensionGroup, e *env) {
 			if language == "" {
 				return "", fmt.Errorf("no language named; write %s:[<element>][<language>]", Rep)
 			}
-			id, name := c.page.ID, c.page.QualifiedName
+			id, name := c.page.id, c.page.qualifiedName
 			if c.target != "" {
 				var err error
 				if id, err = nameTarget(c.target, c.page, e); err != nil {

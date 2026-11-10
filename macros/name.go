@@ -6,8 +6,7 @@ import (
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
-	"github.com/rolling-robot/sysml-publisher/internal/model"
-	"github.com/rolling-robot/sysml-publisher/internal/tree"
+	"github.com/rolling-robot/sysml-publisher/sysml"
 )
 
 // Name is the inline macro sysml-name:[<element>], replaced by an element's
@@ -20,16 +19,14 @@ import (
 const Name = "sysml-name"
 
 func registerName(g *asciidoctor.ExtensionGroup, e *env) {
-	registerText(g, e, Name,
-		func(n *tree.Node) string { return n.Name },
-		e.names.name)
+	registerText(g, e, Name, e.names.name)
 }
 
 // nameTarget is the element a sysml-name target names: an element (MC-15),
 // or metadata applied to an element and one of its attributes, written
 // [<element>::]@<metadata>[::<attribute>] (MC-8): the metadata def, or the
 // attribute.
-func nameTarget(target string, n *tree.Node, e *env) (string, error) {
+func nameTarget(target string, n element, e *env) (string, error) {
 	ref, err := parseMetadataRef(target, n, e)
 	switch {
 	case err != nil:
@@ -47,9 +44,9 @@ func nameTarget(target string, n *tree.Node, e *env) (string, error) {
 // names: metadata applied to an element, and one of its attributes.
 type metadataRef struct {
 	element string      // the element carrying the metadata
-	def     model.Ref   // the metadata def
-	usages  []model.Ref // the element's usages of def, at least one
-	attr    model.Ref   // the zero Ref when the target names no attribute
+	def     sysml.Ref   // the metadata def
+	usages  []sysml.Ref // the element's usages of def, at least one
+	attr    sysml.Ref   // the zero Ref when the target names no attribute
 }
 
 // parseMetadataRef reads a target of the form
@@ -57,7 +54,7 @@ type metadataRef struct {
 // target with no @ segment. The element defaults to the page's; the metadata
 // is a metadata def's name or short name; the attribute is one of the def's
 // attributes, its supertypes' included, by name or short name.
-func parseMetadataRef(target string, n *tree.Node, e *env) (*metadataRef, error) {
+func parseMetadataRef(target string, n element, e *env) (*metadataRef, error) {
 	segs := splitQualified(target)
 	at := slices.IndexFunc(segs, func(s string) bool { return strings.HasPrefix(s, "@") })
 	if at < 0 {
@@ -67,7 +64,7 @@ func parseMetadataRef(target string, n *tree.Node, e *env) (*metadataRef, error)
 	if meta == "" || len(segs) > at+2 {
 		return nil, fmt.Errorf("write [<element>::]@<metadata>[::<attribute>]")
 	}
-	element, elementName := n.ID, n.QualifiedName
+	element, elementName := n.id, n.qualifiedName
 	if at > 0 {
 		quoted := make([]string, at)
 		for i, seg := range segs[:at] {

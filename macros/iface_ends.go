@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
-	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
 // IfaceEnds is the block macro sysml-iface-ends::[<element>][], replaced by
@@ -38,7 +37,7 @@ func registerIfaceEnds(g *asciidoctor.ExtensionGroup, e *env) {
 			if err != nil {
 				return nil, err
 			}
-			id, name := c.page.ID, c.page.QualifiedName
+			id, name := c.page.id, c.page.qualifiedName
 			if c.target != "" {
 				if id, err = nameTarget(c.target, c.page, e); err != nil {
 					return nil, err
@@ -164,7 +163,7 @@ func connectorEnds(e *env, id string) ([]connectorEnd, error) {
 // first element followed by the chain, cut to its last depth segments and
 // joined by :: (source: aircraft::engine::air). An end that connects nothing
 // (an interface def's) shows its name only.
-func endText(page *tree.Node, end connectorEnd, e *env, depth int) (string, error) {
+func endText(page element, end connectorEnd, e *env, depth int) (string, error) {
 	ids, sep := end.path, "."
 	if depth != depthAsWritten && len(end.path) > 0 {
 		outer, err := owners(e, end.path[0])
@@ -187,8 +186,8 @@ func endText(page *tree.Node, end connectorEnd, e *env, depth int) (string, erro
 			name = quoteName(name)
 		}
 		segs[i] = html.EscapeString(name)
-		if target := e.t.ByID[id]; target != nil {
-			segs[i] = `<a href="` + tree.Href(page, target) + `">` + segs[i] + `</a>`
+		if href, ok := e.href(page.id, id); ok {
+			segs[i] = `<a href="` + html.EscapeString(href) + `">` + segs[i] + `</a>`
 		}
 	}
 	path := strings.Join(segs, sep)

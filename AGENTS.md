@@ -77,14 +77,16 @@ go vet ./...
 
 ```
 cmd/sysml-publish/main.go   CLI: flags, wiring, messages, exit codes
-internal/model/             load + parse (OpenSysML in-process); Query, Props (cached element reads), Evaluate
+internal/model/             find + parse the files (OpenSysML in-process), diagnostics; embeds *sysml.Model
 internal/tree/              which elements get pages, inheritance, names, paths (reads the model, writes nothing)
 internal/site/              render pages (asciidoctorg + html/template), titles, write;
                             source.go (where a macro is written, for warnings)
 internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT) + layout.css
 internal/site/page.html.tmpl
-macros/                     the sysml-* AsciiDoc macros, one file per macro;
-                            names.go (element lookup), kinds.go (metaclass names)
+sysml/                      public: reads a parsed model (Query, Props, element facts, Evaluate)
+macros/                     public: the sysml-* AsciiDoc macros, one file per macro;
+                            names.go (element lookup), kinds.go (metaclass names);
+                            example_test.go (use from another module)
 model/                      the user's model (default input)
 testdata/<case>/            fixture models, one folder per test case
 docs/macros.adoc            user reference for the macros
@@ -110,7 +112,7 @@ requirements.org            requirements, decisions, open questions
  tree.Tree { Root, Pages (pre-order), ByID, Model, Warnings }
         │  site.Render
         ▼
- asciidoctorg instance + macros.Register(ad, tree, warn)
+ asciidoctorg instance + macros.Register(ad, model, tree as Pages, warn)
    pass 1: convert every page's representations (per page — MC-3)
    pass 2: assign page titles per sibling group (PG-8, PG-9)
    pass 3: execute page.html.tmpl for every page + landing page
@@ -125,7 +127,12 @@ Everything is in memory until `Site.Write`; a failing run writes nothing.
 
 ## 5. Packages
 
-### 5.1 `internal/model`
+### 5.1 `internal/model` and `sysml`
+
+`internal/model` finds and parses the files and splits the diagnostics; the
+public package `sysml` reads the parsed model (`sysml.Open(ctx, client,
+parsed)`), for this tool and for other modules. `model.Model` embeds
+`*sysml.Model`, so its read methods are the model's.
 
 - `Folder{Dir}.Load` walks the folder for `*.sysml`/`*.kerml` (sorted, so runs
   are deterministic; hidden files and folders skipped, DS-2), parses them **as one model** (`ParseFiles`, so
@@ -146,7 +153,8 @@ Everything is in memory until `Site.Write`; a failing run writes nothing.
   (positional name `M::@2` for an unnamed element, counted in the owner's
   `ownedMember`), `Owner`, `Members`, `Types`, `Docs`,
   `Representation(s)`, `Generals` (all owned specializations),
-  `Redefined`. `Generals` of a library element are none and unread (§13,
+  `Specializes` (transitive typing, subclassification or subsetting over
+  `Generals`; `sysml-members-list`), `Redefined`. `Generals` of a library element are none and unread (§13,
   13).
 - `Stats()` counts queries, element reads and cache hits; the CLI logs them
   with the page tree record.
@@ -181,23 +189,18 @@ and reads only the elements that get pages and their surroundings.
 - **Paths**: `Dir` is the slash path of folder segments (PT-1). Segments are
   made filesystem-safe; unnamed siblings become `unnamed-N` (PT-6); clashes
   (case-insensitive) get `-2`, `-3`.
-- **Per-node data for macros**: `Docs` (own `doc` bodies, trimmed),
-  `ShortName`, `Members` (owned members minus annotations and
-  multiplicities, each with its `Metaclass` and the names of its `Types`,
-  library types named from the reference, unread).
-- **`Tree.Specializes(ctx, specific, general)`**: transitive typing,
-  subclassification or subsetting (redefinition included), over the same
-  `Model.Generals` that representation inheritance walks. Used by
-  `sysml-members-list`.
+- Nodes carry what pages need (name, qualified name, folder,
+  representations), nothing for macros: macros read the model themselves.
 - `Href(from, to)` is the one relative-link function (shortest path,
-  segments URL-escaped, `+` as `%2B`).
+  segments URL-escaped, `+` as `%2B`). `Tree.Href(fromID, toID)` is the
+  same by element id, `ok` false when either has no page: it makes the tree
+  the macros' `macros.Pages`.
 
 Three names, kept apart: `Node.Name` is the element's **name** (`Unnamed`,
 the constant `UnnamedName`, when it has none); `Node.QualifiedName` is the
 **qualified name**, or the positional name `M::@2` for an unnamed element, and
 is what messages and `Evaluate` use; the **page title** is decided later in
-`site` (PG-8) and is not stored on the node. `Member.Name` is a member's
-name, like `Node.Name`.
+`site` (PG-8) and is not stored on the node.
 
 ### 5.3 `internal/site`
 
@@ -239,19 +242,38 @@ name, like `Node.Name`.
 
 ### 5.4 `macros`
 
-`Register(ad, tree, warn)` adds every macro in one `ExtensionGroup` named
-`sysml` (MC-4). Shared pieces in `macros.go`:
+**Usable from other modules.** The package imports no `internal/`
+package (`TestNoInternalImports` keeps it so) and its API names no
+internal type:
 
-- `pageElement(parent, tree)`: reads `sysml-element` from
-  `parent.Document()` and looks it up in `tree.ByID`. This is how every macro
-  knows the page's element (MC-2, MC-5). A missing or unknown id is a
-  renderer bug and returns an error.
+- `Register(ctx, ad, m *sysml.Model, pages Pages, warn Warn)` adds every
+  macro in one `ExtensionGroup` named `sysml` (MC-4).
+- `Pages` is the host's say on links: `Href(fromID, toID) (href, ok)`.
+  `*tree.Tree` implements it for this tool; nil links nothing.
+- `Attributes(elementID)` are the document attributes to convert a
+  representation with for an element.
+- `Warning{Page, Macro, Message, Location}`: `Page` is the page element's
+  qualified (or positional) name.
+
+`Example` (`example_test.go`, package `macros_test`) is the outside
+caller's view: it parses a model, `sysml.Open`s it, registers with a map as
+`Pages` and converts, importing only public packages. Shared pieces in
+`macros.go`:
+
+- `pageElement(parent, e)`: reads `sysml-element` from
+  `parent.Document()` and the element's qualified name from the model, as
+  an `element{id, qualifiedName}`. This is how every macro knows the page's
+  element (MC-2, MC-5); it need not have a page. A missing attribute or an
+  id the model lacks is a renderer bug and returns an error.
 - `env` (`macros.go`): what the macros of one rendering share — the
-  rendering's context, the tree, the model, `nameIndex`, `metadataIndex`
-  and the lazily built `kindIndex`. `Register` makes one and passes it to
-  every `register<Name>(g, e)`. Macros read the model only through
-  `model.Model` (`Props`, `Query`, the element facts, `Evaluate`), never a
-  raw element map.
+  rendering's context, the model, the host's `Pages`, `nameIndex`,
+  `metadataIndex` and the lazily built `kindIndex`. `Register` makes one
+  and passes it to every `register<Name>(g, e)`. Macros read the model only
+  through `sysml.Model` (`Props`, `Query`, the element facts, `Specializes`,
+  `Evaluate`), never a raw element map, and never through the page tree.
+- `e.href(from, to)` asks `Pages`; `e.linkTo(from, to, text)` links text
+  unless the element has no page, is the page itself, or the text is empty
+  (MC-18). `sysml-members-list` and `sysml-iface-ends` link through `href`.
 - **Failing macros (MC-19)**: every macro is registered through
   `inline(g, e, name, opts, written, body)` or `block(...)`. They read the
   page's element, unescape inline targets, write the macro as it appears in
@@ -268,8 +290,8 @@ name, like `Node.Name`.
 - `registerText(g, e, name, ofPage, ofElement)`: an inline macro
   `name:[<element>]` returning escaped text: `ofPage(node)` without a
   target, `ofElement(id)` for the element `nameTarget` resolves.
-  `sysml-name`, `sysml-qualified-name` and `sysml-short-name` are a few
-  lines each on top of it; the element facts of `model.Model` answer for
+  `sysml-name`, `sysml-qualified-name` and `sysml-short-name` are a line
+  each on top of it; the element facts of `model.Model` answer for
   any element, page or not. The text links to the element's page when it
   has one and is not the page itself (`linkTo`, MC-18).
 - **Inline targets** (`macros.go`, `value.go`): Asciidoctor's inline forms
@@ -312,12 +334,12 @@ name, like `Node.Name`.
 
 | Macro | Form | Reads | Notes |
 |---|---|---|---|
-| `sysml-name:[<element>]` | inline | `Node.Name`, `nameIndex`, `metadataIndex` | escaped text, linked to the element's page if it has one and it is not this page (MC-18); no target: page's element; target resolved by MC-15; `[<element>::]@<metadata>[::<attribute>]` gives the metadata def's or attribute's name (`nameTarget`) |
+| `sysml-name:[<element>]` | inline | `nameIndex`, `metadataIndex` | escaped text, linked to the element's page if it has one and it is not this page (MC-18); no target: page's element; target resolved by MC-15; `[<element>::]@<metadata>[::<attribute>]` gives the metadata def's or attribute's name (`nameTarget`) |
 | `sysml-rep:[<element>][<language>]` | inline | `Model.Representations`, `nameTarget` | body of the element's own representation in that language (case-insensitive, several joined), escaped plain text; target as `sysml-name` |
-| `sysml-short-name:[<element>]` | inline | `Node.ShortName`, `Model.ShortName` | empty when none; linked as `sysml-name`; target as `sysml-name` |
-| `sysml-qualified-name:[<element>]` | inline | `Node.QualifiedName`, `Model.QualifiedName` | positional name for unnamed; linked as `sysml-name`; target as `sysml-name` |
-| `sysml-doc::[<element>][]` | block | `Node.Docs`, `Tree.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block; target as `sysml-name`; macros in the docs still see the page's element |
-| `sysml-members-list::[<element or kind>][]` | block | `Node.Members`, `Tree.Specializes` | ulist; links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
+| `sysml-short-name:[<element>]` | inline | `Model.ShortName` | empty when none; linked as `sysml-name`; target as `sysml-name` |
+| `sysml-qualified-name:[<element>]` | inline | `Model.QualifiedName` | positional name for unnamed; linked as `sysml-name`; target as `sysml-name` |
+| `sysml-doc::[<element>][]` | block | `Model.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block; target as `sysml-name`; macros in the docs still see the page's element |
+| `sysml-members-list::[<element or kind>][]` | block | `members` (`Model.Members`, `Model.Types`), `Model.Specializes` | ulist; owned members minus annotations and multiplicities (`notMembers`); links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
 | `sysml-iface-ends::[<element>][]` | block | `Props` (`connectorEnds`: `ownedFeature`, `isEnd`, `ownedReferenceSubsetting`, `chainingFeature`), `nameTarget` | ulist of owned ends (`isEnd`): end name (`name`) and the connected feature from its `ReferenceSubsetting` (a `chainingFeature` path), segments linked; the end named `source` first; no ends → failure; `depth` (named or positional): last n segments of owners(chain[0]) + chain, `::`-joined and quoted, `all` the whole path; none: chain as written with `.` |
 | `sysml-metadata-table::<def>[]` | block | `metadataIndex` (`Props`) | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
 | `sysml-value:<feature>[]` | inline | `Model.Evaluate` | target must be a feature reference (`featureRefRx`: names, `::`, `.`), not an expression, or `[<element>::]@<metadata>::<attribute>` (`parseMetadataRef`, value read as `sysml-metadata-table` does, not evaluated); OpenSysML evaluates it with the page element as subject; units formatted; composite → `[composite]` + warning |
@@ -400,7 +422,7 @@ message.
    - Never read a standard-library element you only need the name of: its
      `Ref` carries the qualified name, and a read is slow (§13, 13).
 4. Test in `macros/<name>_test.go`: convert a snippet with
-   `ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(node)})`.
+   `ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(node.ID)})`.
    Cover: the page's own element, an inherited representation (the usage's
    page, not the owner's), an unnamed element, the "nothing to show" case,
    escaping, and failures: `mustFail(t, ad, src, attrs, "<page>: <macro>:
@@ -500,7 +522,7 @@ Known gaps (from the test review, November 2026):
   out).
 - Every usage owns a `Multiplicity` member, its implicit `[1..1]` included
   (unnamed, through an `OwningMembership`); `tree` leaves multiplicities out
-  of `Node.Members`.
+  of the members `sysml-members-list` lists.
 - Derived properties are answered by `ElementProperties` (`name`, `type`,
   `documentation`, `textualRepresentation`, `owner`, `ownedMember`, ...);
   one the metaclass does not declare reads as empty (`Unsupported`).
@@ -575,12 +597,10 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    usage's and definition's specializations once (`-v` logs the counts).
    Fine for small models; a definition shared by hundreds of usages
    multiplies the conversions.
-3. **Rendering needs the open engine.** Macros read `tree.Node` fields and,
-   for anything else, the model through `model.Model`; both reads and
-   evaluation need the OpenSysML engine open until rendering ends, so
-   rendering is tied to the parser's lifetime. The macros still take the
-   concrete `*tree.Tree`, which keeps the `macros` package unusable from
-   other modules (`internal/`).
+3. **Rendering needs the open engine.** Macros read the model through
+   `sysml.Model`; reads and evaluation need the OpenSysML engine open until
+   rendering ends, so rendering is tied to the parser's lifetime, for this
+   tool and for any module using the macros.
 4. **Source locations are found by text.** The model gives no source
    positions (§13, 15), so a failing macro's file and line come from
    matching the representation's body against the model files (§5.3): two
@@ -686,7 +706,7 @@ rather than deleting it, and drop the workaround once `go.mod` has the fix.
    data (TBD-9).
 10. **Export changes between v0.12.1 and develop** (not bugs, but they
     changed this tool's output): every usage owns an unnamed `Multiplicity`
-    member, its implicit `[1..1]` included (left out of `Node.Members`); a
+    member, its implicit `[1..1]` included (left out of the members `sysml-members-list` lists); a
     usage's `type` includes the types it gets through subsetting or
     redefinition.
 11. **`develop` needs goldmark v1.8.7** while v0.12.1 used v1.8.6; a module

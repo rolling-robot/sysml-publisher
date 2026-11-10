@@ -61,14 +61,14 @@ func registerValue(g *asciidoctor.ExtensionGroup, e *env) {
 			}
 			// The page's element is the subject, so the feature reads its
 			// value: its own, a redefinition's, or one from its types.
-			v, err := e.m.Evaluate(e.ctx, n.QualifiedName, target)
+			v, err := e.m.Evaluate(e.ctx, n.qualifiedName, target)
 			if err != nil {
 				return "", err
 			}
 			text, kind := formatValue(v)
 			switch kind {
 			case valueComposite:
-				e.warn(Warning{Page: n, Macro: c.macro, Message: fmt.Sprintf("%s is composite; shown as %s", target, CompositeText)})
+				e.warn(Warning{Page: n.qualifiedName, Macro: c.macro, Message: fmt.Sprintf("%s is composite; shown as %s", target, CompositeText)})
 				text = CompositeText
 			case valueNone:
 				text = NoValue

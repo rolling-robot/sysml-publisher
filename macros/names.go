@@ -8,8 +8,7 @@ import (
 	"strings"
 
 	"github.com/Open-MBEE/OpenSysML/client/opensysml"
-	"github.com/rolling-robot/sysml-publisher/internal/model"
-	"github.com/rolling-robot/sysml-publisher/internal/tree"
+	"github.com/rolling-robot/sysml-publisher/sysml"
 )
 
 // errNoSuchName matches (errors.Is) the error resolve returns when nothing
@@ -31,16 +30,16 @@ func (e unknownNameError) Is(target error) bool { return target == errNoSuchName
 // It reads the model through Props and Query (DS-4).
 type nameIndex struct {
 	ctx context.Context
-	m   *model.Model
+	m   *sysml.Model
 	// tops are the top-level elements: the members of each file's root
 	// namespace.
-	tops []model.Ref
+	tops []sysml.Ref
 	// byName caches the elements Query found with a name or short name.
-	byName map[string][]model.Ref
+	byName map[string][]sysml.Ref
 }
 
-func newNameIndex(ctx context.Context, t *tree.Tree) *nameIndex {
-	return &nameIndex{ctx: ctx, m: t.Model, tops: t.Model.Tops, byName: map[string][]model.Ref{}}
+func newNameIndex(ctx context.Context, m *sysml.Model) *nameIndex {
+	return &nameIndex{ctx: ctx, m: m, tops: m.Tops, byName: map[string][]sysml.Ref{}}
 }
 
 // names are the name and the short name of an element (a redefinition
@@ -69,13 +68,13 @@ func (x *nameIndex) names(id string) ([]string, error) {
 //
 // Each segment of a qualified name may be a name or a short name, quoted or
 // not. An unknown name gives an error matching errNoSuchName.
-func (x *nameIndex) resolve(name string, n *tree.Node, accept func(model.Ref) bool) (model.Ref, error) {
+func (x *nameIndex) resolve(name string, n element, accept func(sysml.Ref) bool) (sysml.Ref, error) {
 	if accept == nil {
-		accept = func(model.Ref) bool { return true }
+		accept = func(sysml.Ref) bool { return true }
 	}
 	segs := splitQualified(name)
-	keep := func(refs []model.Ref) []model.Ref {
-		var out []model.Ref
+	keep := func(refs []sysml.Ref) []sysml.Ref {
+		var out []sysml.Ref
 		for _, r := range refs {
 			if accept(r) && !slices.Contains(out, r) {
 				out = append(out, r)
@@ -83,11 +82,11 @@ func (x *nameIndex) resolve(name string, n *tree.Node, accept func(model.Ref) bo
 		}
 		return out
 	}
-	tries := func(yield func([]model.Ref, error) bool) {
+	tries := func(yield func([]sysml.Ref, error) bool) {
 		if !yield(x.walk(x.tops, segs)) {
 			return
 		}
-		for scope := n.ID; scope != ""; {
+		for scope := n.id; scope != ""; {
 			members, err := x.m.Members(x.ctx, scope)
 			if err != nil {
 				yield(nil, err)
@@ -112,7 +111,7 @@ func (x *nameIndex) resolve(name string, n *tree.Node, accept func(model.Ref) bo
 	}
 	for refs, err := range tries {
 		if err != nil {
-			return model.Ref{}, err
+			return sysml.Ref{}, err
 		}
 		refs = keep(refs)
 		switch {
@@ -123,22 +122,22 @@ func (x *nameIndex) resolve(name string, n *tree.Node, accept func(model.Ref) bo
 			for _, r := range refs {
 				qn, err := x.qualifiedName(r.ID)
 				if err != nil {
-					return model.Ref{}, err
+					return sysml.Ref{}, err
 				}
 				qns = append(qns, qn)
 			}
-			return model.Ref{}, fmt.Errorf("%q names several elements (%s); use a qualified name", name, strings.Join(qns, ", "))
+			return sysml.Ref{}, fmt.Errorf("%q names several elements (%s); use a qualified name", name, strings.Join(qns, ", "))
 		}
 	}
-	return model.Ref{}, unknownNameError{name}
+	return sysml.Ref{}, unknownNameError{name}
 }
 
 // walk follows segs from the elements start: the first segment names one of
 // them, each later one a member of the element before.
-func (x *nameIndex) walk(start []model.Ref, segs []string) ([]model.Ref, error) {
+func (x *nameIndex) walk(start []sysml.Ref, segs []string) ([]sysml.Ref, error) {
 	cur := start
 	for i, seg := range segs {
-		var next []model.Ref
+		var next []sysml.Ref
 		for _, r := range cur {
 			names, err := x.names(r.ID)
 			if err != nil {
@@ -165,12 +164,12 @@ func (x *nameIndex) walk(start []model.Ref, segs []string) ([]model.Ref, error) 
 
 // library is the standard-library element with that qualified name, if
 // any: the model reads library elements by qualified name.
-func (x *nameIndex) library(name string) ([]model.Ref, error) {
+func (x *nameIndex) library(name string) ([]sysml.Ref, error) {
 	if !strings.Contains(name, "::") {
 		return nil, nil
 	}
 	p, err := x.m.Props(x.ctx, name, "owner")
-	if errors.Is(err, model.ErrNoSuchElement) {
+	if errors.Is(err, sysml.ErrNoSuchElement) {
 		return nil, nil
 	}
 	if err != nil {
@@ -179,12 +178,12 @@ func (x *nameIndex) library(name string) ([]model.Ref, error) {
 	if p.Element.QualifiedName != name {
 		return nil, nil // read by another kind of id, not a qualified name
 	}
-	return []model.Ref{p.Element}, nil
+	return []sysml.Ref{p.Element}, nil
 }
 
 // named are the model's elements whose name or short name is name, in
 // model order.
-func (x *nameIndex) named(name string) ([]model.Ref, error) {
+func (x *nameIndex) named(name string) ([]sysml.Ref, error) {
 	if refs, ok := x.byName[name]; ok {
 		return refs, nil
 	}
@@ -193,7 +192,7 @@ func (x *nameIndex) named(name string) ([]model.Ref, error) {
 	if err != nil {
 		return nil, err
 	}
-	var refs []model.Ref
+	var refs []sysml.Ref
 	for _, e := range els {
 		p, err := x.m.Props(x.ctx, e.ID, "owner")
 		if err != nil {
@@ -210,7 +209,7 @@ func (x *nameIndex) named(name string) ([]model.Ref, error) {
 func (x *nameIndex) name(id string) (string, error) {
 	n, err := x.m.Name(x.ctx, id)
 	if n == "" && err == nil {
-		n = tree.UnnamedName
+		n = sysml.UnnamedName
 	}
 	return n, err
 }

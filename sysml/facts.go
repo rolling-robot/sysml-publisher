@@ -207,3 +207,32 @@ func (m *Model) Redefined(ctx context.Context, id string) ([]string, error) {
 	}
 	return out, nil
 }
+
+// Specializes reports whether element specific is typed by, subclasses or
+// subsets element general, directly or through a chain of such
+// relationships (part spare : Sport with Sport :> Wheel specializes Wheel).
+// No element specializes itself.
+func (m *Model) Specializes(ctx context.Context, specific, general string) (bool, error) {
+	seen := map[string]bool{specific: true}
+	queue, err := m.Generals(ctx, specific)
+	if err != nil {
+		return false, err
+	}
+	for len(queue) > 0 {
+		g := queue[0]
+		queue = queue[1:]
+		if g == general {
+			return true, nil
+		}
+		if seen[g] {
+			continue
+		}
+		seen[g] = true
+		next, err := m.Generals(ctx, g)
+		if err != nil {
+			return false, err
+		}
+		queue = append(queue, next...)
+	}
+	return false, nil
+}

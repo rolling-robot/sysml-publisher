@@ -12,7 +12,7 @@ func TestDocumentation(t *testing.T) {
 	src := "Before.\n\nsysml-doc::[]\n\nAfter."
 	convert := func(dir string) string {
 		t.Helper()
-		out, err := ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, dir))})
+		out, err := ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, dir).ID)})
 		if err != nil {
 			t.Fatalf("%s: %v", dir, err)
 		}
@@ -49,7 +49,7 @@ func TestDocumentation(t *testing.T) {
 // it (MC-15), whether it has a page or not.
 func TestDocumentationTarget(t *testing.T) {
 	tr, ad := setup(t)
-	page := Attributes(pageAt(t, tr, "M/pd"))
+	page := Attributes(pageAt(t, tr, "M/pd").ID)
 	cases := []struct {
 		name, target string
 		want         []string // paragraphs in the doc block; nil: no block

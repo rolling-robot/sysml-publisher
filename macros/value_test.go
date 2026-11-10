@@ -34,7 +34,7 @@ func TestValue(t *testing.T) {
 	}
 	defer ad.Close()
 	var warnings []string
-	if err := Register(context.Background(), ad, tr, func(w Warning) { warnings = append(warnings, w.String()) }); err != nil {
+	if err := Register(context.Background(), ad, tr.Model.Model, tr, func(w Warning) { warnings = append(warnings, w.String()) }); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,7 +56,7 @@ func TestValue(t *testing.T) {
 		if len(n.Inherited) != 1 {
 			t.Fatalf("%s: want Pump's representation inherited", dir)
 		}
-		out, err := ad.Convert(n.Inherited[0].Body, &asciidoctor.Options{Attributes: Attributes(n)})
+		out, err := ad.Convert(n.Inherited[0].Body, &asciidoctor.Options{Attributes: Attributes(n.ID)})
 		if err != nil {
 			t.Fatalf("%s: %v", dir, err)
 		}
@@ -90,7 +90,7 @@ func TestValue(t *testing.T) {
 // feature chains and quoted names with spaces (MC-14).
 func TestValueTargets(t *testing.T) {
 	tr, ad := setupFixture(t, "values")
-	page := Attributes(pageAt(t, tr, "Values/typical"))
+	page := Attributes(pageAt(t, tr, "Values/typical").ID)
 	cases := []struct{ name, target, want string }{
 		{"own attribute", "count", "3"},
 		{"quoted name with a space", "'rated power'", "2 kW"},
@@ -117,7 +117,7 @@ func TestValueTargets(t *testing.T) {
 // (MC-14). count<5 also checks that the escaped < is read back as <.
 func TestValueRejectsExpressions(t *testing.T) {
 	tr, ad := setupFixture(t, "values")
-	page := Attributes(pageAt(t, tr, "Values/typical"))
+	page := Attributes(pageAt(t, tr, "Values/typical").ID)
 	cases := []struct{ name, target string }{
 		{"arithmetic", "count*2"},
 		{"comparison with <, escaped by Asciidoctor before the macro", "count<5"},
@@ -140,12 +140,12 @@ func TestValueRejectsExpressions(t *testing.T) {
 // written.
 func TestValueErrors(t *testing.T) {
 	tr, ad := setupFixture(t, "values")
-	page := Attributes(pageAt(t, tr, "Values/typical"))
+	page := Attributes(pageAt(t, tr, "Values/typical").ID)
 	ws := recorded[ad]
 	if _, err := ad.Convert("sysml-value:missing[]", &asciidoctor.Options{Attributes: page}); err != nil {
 		t.Fatal(err)
 	}
-	if len(*ws) != 1 || (*ws)[0].Macro != "sysml-value:missing[]" || (*ws)[0].Page.QualifiedName != "Values::typical" || (*ws)[0].Message == "" {
+	if len(*ws) != 1 || (*ws)[0].Macro != "sysml-value:missing[]" || (*ws)[0].Page != "Values::typical" || (*ws)[0].Message == "" {
 		t.Errorf("warnings %q, want one for sysml-value:missing[] on Values::typical", *ws)
 	}
 	*ws = nil
@@ -193,7 +193,7 @@ func TestFormatValue(t *testing.T) {
 // notes in testdata/metadata-table.
 func TestValueMetadata(t *testing.T) {
 	tr, ad := setupFixture(t, "metadata-table")
-	page := Attributes(pageAt(t, tr, "Meta/bound"))
+	page := Attributes(pageAt(t, tr, "Meta/bound").ID)
 	cases := []struct{ name, target, want string }{
 		{"bound string, without quotes", "@Info::owner", "pete"},
 		{"bound integer", "@Info::count", "7"},
@@ -220,7 +220,7 @@ func TestValueMetadata(t *testing.T) {
 
 func TestValueMetadataErrors(t *testing.T) {
 	tr, ad := setupFixture(t, "metadata-table")
-	page := Attributes(pageAt(t, tr, "Meta/bound"))
+	page := Attributes(pageAt(t, tr, "Meta/bound").ID)
 	cases := []struct{ name, target, want string }{
 		{"no attribute", "@Info", "no attribute named; write sysml-value:[<element>::]@<metadata>::<attribute>[]"},
 		{"unknown attribute", "@Info::missing", `metadata def Info has no attribute "missing"`},

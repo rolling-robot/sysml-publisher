@@ -1,7 +1,6 @@
 package tree
 
 import (
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -174,48 +173,10 @@ func TestSegment(t *testing.T) {
 	}
 }
 
-// The data a page carries for the macros: every doc, the short name, the
-// positional name of an unnamed element, and the members with their
-// metaclasses and types.
-func TestNodeFields(t *testing.T) {
-	tr := build(t, "macros")
-	t.Run("docs in order", func(t *testing.T) {
-		n := page(t, tr, "M/a_b")
-		if want := []string{"The *a<b* part.", "Second doc."}; !reflect.DeepEqual(n.Docs, want) {
-			t.Errorf("docs = %q, want %q", n.Docs, want)
-		}
-	})
-	t.Run("short name", func(t *testing.T) {
-		if got := page(t, tr, "M/pd").ShortName; got != "P" {
-			t.Errorf("short name = %q, want P", got)
-		}
-	})
-	t.Run("positional name", func(t *testing.T) {
-		n := page(t, tr, "M/unnamed-1")
-		if n.QualifiedName != "M::@2" || n.Name != UnnamedName || !n.Unnamed {
-			t.Errorf("name %q, qualified %q, unnamed %v; want Unnamed, M::@2, true", n.Name, n.QualifiedName, n.Unnamed)
-		}
-	})
-	tr = build(t, "members-list")
-	t.Run("members", func(t *testing.T) {
-		var got []string
-		for _, m := range page(t, tr, "M/pd").Members {
-			got = append(got, fmt.Sprintf("%s %s %v", m.Name, m.Metaclass, m.Types))
-		}
-		want := []string{
-			"mass AttributeUsage [Real]",
-			"a*b*+++c PortUsage []",
-			"sub PartUsage []",
-			"Unnamed PartUsage [other]",
-			"wheels PartUsage [Wheel]",
-			"front PartUsage [Wheel]",
-			"spare PartUsage [Sport]",
-			"Racing PartDefinition []",
-			"both PartUsage [Wheel Sport]",
-			"link InterfaceUsage []",
-		}
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("members:\n got %q\nwant %q", got, want)
-		}
-	})
+// An unnamed element's page carries its positional name (PG-5).
+func TestUnnamedNode(t *testing.T) {
+	n := page(t, build(t, "macros"), "M/unnamed-1")
+	if n.QualifiedName != "M::@2" || n.Name != UnnamedName || !n.Unnamed {
+		t.Errorf("name %q, qualified %q, unnamed %v; want Unnamed, M::@2, true", n.Name, n.QualifiedName, n.Unnamed)
+	}
 }

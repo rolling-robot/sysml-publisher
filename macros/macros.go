@@ -1,28 +1,45 @@
-// Package macros holds the tool's AsciiDoc macros (requirements MC-1..14).
-// Each macro lives in its own file; Register adds them all to an asciidoctorg
-// instance.
+// Package macros holds the sysml-* AsciiDoc macros (requirements MC-1..19),
+// which put facts from a SysML v2 model into AsciiDoc text: names, docs,
+// members, metadata, evaluated values. Each macro lives in its own file;
+// Register adds them all to an asciidoctorg instance.
+//
+// The package is usable from other modules. It reads the model through
+// package sysml, and links to the host's pages through Pages:
+//
+//	m, err := sysml.Open(ctx, client, parsed) // an OpenSysML-parsed model
+//	ad, err := asciidoctor.New()
+//	err = macros.Register(ctx, ad, m, pages, warn)
+//	html, err := ad.Convert(body, &asciidoctor.Options{Attributes: macros.Attributes(elementID)})
 package macros
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"regexp"
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
-	"github.com/rolling-robot/sysml-publisher/internal/model"
-	"github.com/rolling-robot/sysml-publisher/internal/tree"
+	"github.com/rolling-robot/sysml-publisher/sysml"
 )
 
-// AttrElement is the document attribute naming the page's element by @id,
+// AttrElement is the document attribute naming the page's element by id,
 // set by the renderer on every representation it converts (MC-5).
 const AttrElement = "sysml-element"
 
 // Attributes are the document attributes a representation is converted with
-// on the page of n.
-func Attributes(n *tree.Node) asciidoctor.Attributes {
-	return asciidoctor.Attributes{}.Set(AttrElement, n.ID)
+// for the element id: on its page, macros describe that element (MC-2).
+func Attributes(id string) asciidoctor.Attributes {
+	return asciidoctor.Attributes{}.Set(AttrElement, id)
+}
+
+// Pages is how the host places elements on pages, for the links macros
+// write (MC-18, MC-12, MC-17). A nil Pages links nothing.
+type Pages interface {
+	// Href is the link, relative to the page of element from, to the page
+	// of element to (both by id); ok is false when to has no page.
+	Href(from, to string) (href string, ok bool)
 }
 
 // Warning is a problem a macro reports while still producing output, such as
@@ -30,8 +47,9 @@ func Attributes(n *tree.Node) asciidoctor.Attributes {
 // (MC-19). Its parts are kept apart so the receiver can tell
 // repeats without parsing the text (MC-7: one warning per page and macro).
 type Warning struct {
-	// Page is the page the macro was converted for.
-	Page *tree.Node
+	// Page is the qualified name (or positional name, M::@2) of the element
+	// the macro was converted for.
+	Page string
 	// Macro is the macro as written: sysml-value:position[].
 	Macro string
 	// Message says what is wrong, without the page or the macro.
@@ -45,7 +63,7 @@ type Warning struct {
 // String is the warning as reported: "<location>: <page>: <macro>:
 // <message>", without the location when it is unknown.
 func (w Warning) String() string {
-	s := w.Page.QualifiedName + ": " + w.Macro + ": " + w.Message
+	s := w.Page + ": " + w.Macro + ": " + w.Message
 	if w.Location != "" {
 		s = w.Location + ": " + s
 	}
@@ -55,15 +73,19 @@ func (w Warning) String() string {
 // Warn receives a warning from a macro. A nil Warn drops warnings.
 type Warn func(Warning)
 
-// Register adds every macro to ad. The macros read the page tree t and,
-// through it, the model (DS-4); they report warnings to warn and stop
-// reading and evaluating when ctx is cancelled. ctx is the context of the
-// rendering ad is registered for; register again for another.
-func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, t *tree.Tree, warn Warn) error {
+// Register adds every macro to ad. The macros read the model m (DS-4), link
+// to the pages pages gives, report warnings to warn and stop reading and
+// evaluating when ctx is cancelled. ctx is the context of the rendering ad
+// is registered for; register again for another. m must stay open while ad
+// converts.
+func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, m *sysml.Model, pages Pages, warn Warn) error {
+	if m == nil {
+		return errors.New("registering the sysml macros: no model")
+	}
 	if warn == nil {
 		warn = func(Warning) {}
 	}
-	e := newEnv(ctx, t, warn)
+	e := newEnv(ctx, m, pages, warn)
 	g := ad.Extensions().Group("sysml")
 	registerName(g, e)
 	registerRep(g, e)
@@ -81,12 +103,13 @@ func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, t *tree.Tree, wa
 }
 
 // env is what every macro of one rendering shares: the rendering's
-// context, the page tree, the model, and the lookups built on it, so a
-// name or a metadata def read by one macro is not read again by the next.
+// context, the model, the host's pages, and the lookups built on the
+// model, so a name or a metadata def read by one macro is not read again by
+// the next.
 type env struct {
 	ctx   context.Context
-	t     *tree.Tree
-	m     *model.Model
+	m     *sysml.Model
+	pages Pages
 	warn  Warn
 	names *nameIndex
 	md    *metadataIndex
@@ -94,29 +117,49 @@ type env struct {
 	kindIndex kindIndex
 }
 
-func newEnv(ctx context.Context, t *tree.Tree, warn Warn) *env {
-	names := newNameIndex(ctx, t)
+func newEnv(ctx context.Context, m *sysml.Model, pages Pages, warn Warn) *env {
+	names := newNameIndex(ctx, m)
 	return &env{
 		ctx:   ctx,
-		t:     t,
-		m:     t.Model,
+		m:     m,
+		pages: pages,
 		warn:  warn,
 		names: names,
-		md:    &metadataIndex{ctx: ctx, m: t.Model, names: names},
+		md:    &metadataIndex{ctx: ctx, m: m, names: names},
 	}
 }
 
-// pageElement is the element whose page is being rendered (MC-2).
-func pageElement(parent asciidoctor.Node, t *tree.Tree) (*tree.Node, error) {
+// element is the element a representation is converted for: the page's
+// element (MC-2), which macros without a target describe.
+type element struct {
+	id string
+	// qualifiedName is its qualified name, or its positional name (M::@2);
+	// what warnings name and what Evaluate takes as subject.
+	qualifiedName string
+}
+
+// pageElement is the element whose page is being rendered (MC-2), named by
+// the document attribute sysml-element. A missing attribute, or one naming
+// no element of the model, is the renderer's mistake: an error.
+func pageElement(parent asciidoctor.Node, e *env) (element, error) {
 	id, _ := parent.Document().Attr(AttrElement).(string)
 	if id == "" {
-		return nil, fmt.Errorf("attribute %s is not set", AttrElement)
+		return element{}, fmt.Errorf("attribute %s is not set", AttrElement)
 	}
-	n := t.ByID[id]
-	if n == nil {
-		return nil, fmt.Errorf("attribute %s names %q, which has no page", AttrElement, id)
+	qn, err := e.m.QualifiedName(e.ctx, id)
+	if err != nil {
+		return element{}, fmt.Errorf("attribute %s names %q: %w", AttrElement, id, err)
 	}
-	return n, nil
+	return element{id: id, qualifiedName: qn}, nil
+}
+
+// href is the link from the page of element from to the page of element
+// to, and whether there is one: none when to has no page.
+func (e *env) href(from, to string) (string, bool) {
+	if e.pages == nil {
+		return "", false
+	}
+	return e.pages.Href(from, to)
 }
 
 // optionalTargetRx is the pattern of an inline macro whose target is
@@ -137,7 +180,7 @@ const FailedRole = "sysml-failed"
 type call[P asciidoctor.Node] struct {
 	parent P
 	// page is the element whose page is being rendered (MC-2).
-	page *tree.Node
+	page element
 	// target is the target as written, unescaped.
 	target string
 	attrs  map[string]any
@@ -164,7 +207,7 @@ func inline(g *asciidoctor.ExtensionGroup, e *env, name string, opts *asciidocto
 	}
 	g.InlineMacro(name, asciidoctor.InlineMacroProcessorFunc(
 		func(parent asciidoctor.Node, target string, attrs map[string]any) (*asciidoctor.PhraseNode, error) {
-			n, err := pageElement(parent, e.t)
+			n, err := pageElement(parent, e)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", name, err)
 			}
@@ -190,7 +233,7 @@ func block(g *asciidoctor.ExtensionGroup, e *env, name string, opts *asciidoctor
 	}
 	g.BlockMacro(name, asciidoctor.BlockMacroProcessorFunc(
 		func(parent asciidoctor.StructuralNode, target string, attrs map[string]any) (asciidoctor.StructuralNode, error) {
-			n, err := pageElement(parent, e.t)
+			n, err := pageElement(parent, e)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", name, err)
 			}
@@ -212,11 +255,11 @@ func block(g *asciidoctor.ExtensionGroup, e *env, name string, opts *asciidoctor
 // in the macro's place, so the run goes on and every failing page is
 // reported. A cancelled rendering is no macro failure: its error is returned,
 // which stops the conversion.
-func (e *env) fail(n *tree.Node, macro string, err error) error {
+func (e *env) fail(n element, macro string, err error) error {
 	if e.ctx.Err() != nil {
 		return err
 	}
-	e.warn(Warning{Page: n, Macro: macro, Message: err.Error()})
+	e.warn(Warning{Page: n.qualifiedName, Macro: macro, Message: err.Error()})
 	return nil
 }
 
@@ -227,36 +270,38 @@ func failedText(macro string, err error) string {
 }
 
 // registerText registers the inline macro name:[<element>], replaced by text
-// about an element: ofPage gives it for the page's element when there is no
-// target; ofElement for the element a target names, read by nameTarget
-// (MC-15, MC-8).
-func registerText(g *asciidoctor.ExtensionGroup, e *env, name string, ofPage func(*tree.Node) string, ofElement func(id string) (string, error)) {
+// about an element: ofElement gives it for the page's element when there is
+// no target, else for the element the target names, read by nameTarget
+// (MC-15, MC-8). The text links to the element's page (MC-18).
+func registerText(g *asciidoctor.ExtensionGroup, e *env, name string, ofElement func(id string) (string, error)) {
 	inline(g, e, name, &asciidoctor.MacroOptions{Regexp: optionalTargetRx(name)}, nil,
 		func(c call[asciidoctor.Node]) (string, error) {
-			text, id := ofPage(c.page), c.page.ID
+			id := c.page.id
 			if c.target != "" {
 				var err error
 				if id, err = nameTarget(c.target, c.page, e); err != nil {
 					return "", err
 				}
-				if text, err = ofElement(id); err != nil {
-					return "", err
-				}
+			}
+			text, err := ofElement(id)
+			if err != nil {
+				return "", err
 			}
 			// An unquoted phrase is written out verbatim, so escape the text:
 			// SysML names may contain <, > and &.
-			return linkTo(c.page, e.t.ByID[id], html.EscapeString(text)), nil
+			return e.linkTo(c.page.id, id, html.EscapeString(text)), nil
 		})
 }
 
-// linkTo is the HTML text linked, on the page of from, to the page to
-// (MC-18): unlinked when to is nil (the element has no page), when to is
-// from itself, or when the text is empty, which leaves nothing to click.
-func linkTo(from, to *tree.Node, text string) string {
-	if to == nil || to == from || text == "" {
+// linkTo is the HTML text linked, on the page of element from, to the page
+// of element to (MC-18): unlinked when to has no page, when to is from
+// itself, or when the text is empty, which leaves nothing to click.
+func (e *env) linkTo(from, to, text string) string {
+	href, ok := e.href(from, to)
+	if !ok || from == to || text == "" {
 		return text
 	}
-	return `<a href="` + tree.Href(from, to) + `">` + text + `</a>`
+	return `<a href="` + html.EscapeString(href) + `">` + text + `</a>`
 }
 
 // passthrough is AsciiDoc for finished HTML: an inline passthrough, which

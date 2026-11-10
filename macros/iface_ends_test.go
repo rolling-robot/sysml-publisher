@@ -32,7 +32,7 @@ func TestIfaceEnds(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			out, err := ad.Convert("sysml-iface-ends::"+c.target+"[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
+			out, err := ad.Convert("sysml-iface-ends::"+c.target+"[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page).ID)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -50,7 +50,7 @@ func TestIfaceEnds(t *testing.T) {
 // A segment whose element has a page is a link to it.
 func TestIfaceEndsLinks(t *testing.T) {
 	tr, ad := setupFixture(t, "iface-ends")
-	out, err := ad.Convert("sysml-iface-ends::i1[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "I/sys"))})
+	out, err := ad.Convert("sysml-iface-ends::i1[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "I/sys").ID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestIfaceEndsLinks(t *testing.T) {
 // written, joined by dots.
 func TestIfaceEndsDepth(t *testing.T) {
 	tr, ad := setupFixture(t, "iface-ends")
-	page := Attributes(pageAt(t, tr, "I/sys"))
+	page := Attributes(pageAt(t, tr, "I/sys").ID)
 	cases := []struct {
 		name, src string
 		want      []string
@@ -101,7 +101,7 @@ func TestIfaceEndsDepth(t *testing.T) {
 // With depth, every segment that has a page is a link, owners included.
 func TestIfaceEndsDepthLinks(t *testing.T) {
 	tr, ad := setupFixture(t, "iface-ends")
-	out, err := ad.Convert("sysml-iface-ends::i1[depth=all]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "I/sys"))})
+	out, err := ad.Convert("sysml-iface-ends::i1[depth=all]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "I/sys").ID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestIfaceEndsDepthLinks(t *testing.T) {
 
 func TestIfaceEndsErrors(t *testing.T) {
 	tr, ad := setupFixture(t, "iface-ends")
-	page := Attributes(pageAt(t, tr, "I/sys"))
+	page := Attributes(pageAt(t, tr, "I/sys").ID)
 	cases := []struct{ name, src, want string }{
 		{"no ends: the page's part", "sysml-iface-ends::[]", "I::sys: sysml-iface-ends::[]: I::sys has no ends; name an interface or connection"},
 		{"no ends: a target", "sysml-iface-ends::x[]", "I::sys: sysml-iface-ends::x[]: I::sys::x has no ends; name an interface or connection"},

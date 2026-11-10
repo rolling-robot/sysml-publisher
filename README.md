@@ -329,6 +329,28 @@ flowRate, inlet (FluidPort), outlet (FluidPort).
 The full reference, with every option, rule and example, is
 [docs/macros.adoc](docs/macros.adoc).
 
+### Using the macros in another Go program
+
+The macros are a public package, `github.com/rolling-robot/sysml-publisher/macros`,
+so another tool can put model data into its own AsciiDoc. It reads the model
+through the public package `github.com/rolling-robot/sysml-publisher/sysml`,
+and tells the macros where its pages are, for links:
+
+```go
+client, _ := opensysml.New()                       // OpenSysML, in-process
+parsed, _ := client.ParseFiles(ctx, files)
+m, _ := sysml.Open(ctx, client, parsed)            // keep open while converting
+defer m.Close()
+
+ad, _ := asciidoctor.New()                         // github.com/rolling-robot/asciidoctorg
+err := macros.Register(ctx, ad, m, pages, warn)    // pages: Href(fromID, toID) (string, bool)
+out, err := ad.Convert(body, &asciidoctor.Options{Attributes: macros.Attributes(elementID)})
+```
+
+`pages` may be nil (no links); `warn` receives each failing macro. A
+complete, runnable version is `Example` in
+[macros/example_test.go](macros/example_test.go).
+
 ## Command line
 
 ```

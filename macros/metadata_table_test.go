@@ -29,7 +29,7 @@ func setupFixture(t *testing.T, fixture string) (*tree.Tree, *asciidoctor.Asciid
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { ad.Close() })
-	if err := Register(context.Background(), ad, tr, record(t, ad)); err != nil {
+	if err := Register(context.Background(), ad, tr.Model.Model, tr, record(t, ad)); err != nil {
 		t.Fatal(err)
 	}
 	return tr, ad
@@ -83,7 +83,7 @@ func TestMetadataTable(t *testing.T) {
 		"Meta/plain":       {},
 	}
 	for dir, want := range cases {
-		out, err := ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, dir))})
+		out, err := ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, dir).ID)})
 		if err != nil {
 			t.Fatalf("%s: %v", dir, err)
 		}
@@ -95,7 +95,7 @@ func TestMetadataTable(t *testing.T) {
 
 func TestMetadataTableByQualifiedName(t *testing.T) {
 	tr, ad := setupFixture(t, "metadata-table")
-	out, err := ad.Convert("sysml-metadata-table::Meta::Derived[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "Meta/specialized"))})
+	out, err := ad.Convert("sysml-metadata-table::Meta::Derived[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "Meta/specialized").ID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestMetadataTableByQualifiedName(t *testing.T) {
 // A metadata def is found by its short name too (<drv> Derived).
 func TestMetadataTableByShortName(t *testing.T) {
 	tr, ad := setupFixture(t, "metadata-table")
-	out, err := ad.Convert("sysml-metadata-table::drv[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "Meta/specialized"))})
+	out, err := ad.Convert("sysml-metadata-table::drv[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "Meta/specialized").ID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestMetadataTableByShortName(t *testing.T) {
 
 func TestMetadataTableErrors(t *testing.T) {
 	tr, ad := setupFixture(t, "metadata-table")
-	page := Attributes(pageAt(t, tr, "Meta/bound"))
+	page := Attributes(pageAt(t, tr, "Meta/bound").ID)
 	cases := []struct{ name, src, want string }{
 		{"unknown metadata def", "sysml-metadata-table::Missing[]",
 			`Meta::bound: sysml-metadata-table::Missing[]: the model has no metadata def "Missing"`},

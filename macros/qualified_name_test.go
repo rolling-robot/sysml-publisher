@@ -20,7 +20,7 @@ func TestQualifiedName(t *testing.T) {
 	}
 	for _, c := range cases {
 		n := pageAt(t, tr, c.dir)
-		out, err := ad.Convert("QN: sysml-qualified-name:[].", &asciidoctor.Options{Attributes: Attributes(n)})
+		out, err := ad.Convert("QN: sysml-qualified-name:[].", &asciidoctor.Options{Attributes: Attributes(n.ID)})
 		if err != nil {
 			t.Fatalf("%s: %v", c.dir, err)
 		}
@@ -41,7 +41,7 @@ func TestQualifiedNameTarget(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			out, err := ad.Convert("QN: sysml-qualified-name:"+c.target+"[].", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
+			out, err := ad.Convert("QN: sysml-qualified-name:"+c.target+"[].", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page).ID)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -50,6 +50,6 @@ func TestQualifiedNameTarget(t *testing.T) {
 			}
 		})
 	}
-	mustFail(t, ad, "sysml-qualified-name:Nothing[]", Attributes(pageAt(t, tr, "M/pd")),
+	mustFail(t, ad, "sysml-qualified-name:Nothing[]", Attributes(pageAt(t, tr, "M/pd").ID),
 		`M::pd: sysml-qualified-name:Nothing[]: the model has no element named "Nothing"`)
 }

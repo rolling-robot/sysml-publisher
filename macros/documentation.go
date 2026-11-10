@@ -18,18 +18,19 @@ const DocRole = "sysml-doc"
 func registerDoc(g *asciidoctor.ExtensionGroup, e *env) {
 	block(g, e, Doc, nil, nil,
 		func(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNode, error) {
-			docs, owner := c.page.Docs, c.page.QualifiedName
+			id, owner := c.page.id, c.page.qualifiedName
 			if c.target != "" {
-				id, err := nameTarget(c.target, c.page, e)
-				if err != nil {
-					return nil, err
-				}
-				if docs, err = e.m.Docs(e.ctx, id); err != nil {
+				var err error
+				if id, err = nameTarget(c.target, c.page, e); err != nil {
 					return nil, err
 				}
 				if owner, err = e.names.qualifiedName(id); err != nil {
 					return nil, err
 				}
+			}
+			docs, err := e.m.Docs(e.ctx, id)
+			if err != nil {
+				return nil, err
 			}
 			if len(docs) == 0 {
 				return nil, nil // nothing to insert; the macro line is dropped

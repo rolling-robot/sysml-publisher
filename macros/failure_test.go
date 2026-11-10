@@ -57,7 +57,7 @@ func mustFail(t *testing.T, ad *asciidoctor.Asciidoctor, src string, attrs ascii
 // converted (MC-19).
 func TestFailurePlaceholder(t *testing.T) {
 	tr, ad := setup(t)
-	page := Attributes(pageAt(t, tr, "M/pd"))
+	page := Attributes(pageAt(t, tr, "M/pd").ID)
 	t.Run("inline", func(t *testing.T) {
 		out := mustFail(t, ad, "Before sysml-name:Nothing[] after.", page,
 			`M::pd: sysml-name:Nothing[]: the model has no element named "Nothing"`)
@@ -95,7 +95,7 @@ func TestEveryFailureReported(t *testing.T) {
 	tr, ad := setup(t)
 	ws := recorded[ad]
 	src := "sysml-name:Nothing[] and sysml-short-name:Nobody[].\n\nsysml-doc::Nowhere[]"
-	if _, err := ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "M/pd"))}); err != nil {
+	if _, err := ad.Convert(src, &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "M/pd").ID)}); err != nil {
 		t.Fatal(err)
 	}
 	var got []string
@@ -122,11 +122,11 @@ func TestCancelledIsNoFailure(t *testing.T) {
 	}
 	t.Cleanup(func() { ad.Close() })
 	ctx, cancel := context.WithCancel(t.Context())
-	if err := Register(ctx, ad, tr, record(t, ad)); err != nil {
+	if err := Register(ctx, ad, tr.Model.Model, tr, record(t, ad)); err != nil {
 		t.Fatal(err)
 	}
 	cancel()
-	_, err = ad.Convert("sysml-value:mass[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "M/pd"))})
+	_, err = ad.Convert("sysml-value:mass[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "M/pd").ID)})
 	if err == nil {
 		t.Error("conversion succeeded after cancellation")
 	}

@@ -20,7 +20,7 @@ func TestRep(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			out, err := ad.Convert("Rep: "+c.src+".", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page))})
+			out, err := ad.Convert("Rep: "+c.src+".", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, c.page).ID)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -43,7 +43,7 @@ func TestRepErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			mustFail(t, ad, c.src, Attributes(pageAt(t, tr, c.page)), c.want)
+			mustFail(t, ad, c.src, Attributes(pageAt(t, tr, c.page).ID), c.want)
 		})
 	}
 }
