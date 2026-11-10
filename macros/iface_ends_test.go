@@ -47,15 +47,39 @@ func TestIfaceEnds(t *testing.T) {
 	}
 }
 
-// A segment whose element has a page is a link to it.
+// A segment whose element has a page is a link to it, an anchor the
+// document's converter writes (MC-18): <a href> in html5, its own markup in
+// another converter's output.
 func TestIfaceEndsLinks(t *testing.T) {
 	tr, ad := setupFixture(t, "iface-ends")
-	out, err := ad.Convert("sysml-iface-ends::i1[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "I/sys").ID)})
+	base, err := ad.BuiltinConverter("xhtml5")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := `source: <a href="x/index.html">x</a>.p`; !strings.Contains(out, want) {
-		t.Errorf("output %q does not contain %q", out, want)
+	other := asciidoctor.ConverterFunc(func(n asciidoctor.Node, transform string, opts map[string]any) (string, error) {
+		if to, ok := n.Attr(AttrLink).(string); ok && transform == "inline_anchor" {
+			return "[" + to + ": " + n.(*asciidoctor.PhraseNode).Text() + "]", nil
+		}
+		return base.Convert(n, transform, opts)
+	})
+	if err := ad.RegisterConverter(other, &asciidoctor.BackendTraits{Basebackend: "html", HTMLSyntax: "xml"}, "other"); err != nil {
+		t.Fatal(err)
+	}
+	x := pageAt(t, tr, "I/sys/x").ID
+	cases := []struct{ backend, want string }{
+		{"html5", `source: <a href="x/index.html">x</a>.p`},
+		{"other", "source: [" + x + ": x].p"},
+	}
+	for _, c := range cases {
+		t.Run(c.backend, func(t *testing.T) {
+			out, err := ad.Convert("sysml-iface-ends::i1[]", &asciidoctor.Options{Backend: c.backend, Attributes: Attributes(pageAt(t, tr, "I/sys").ID)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out, c.want) {
+				t.Errorf("output %q does not contain %q", out, c.want)
+			}
+		})
 	}
 }
 

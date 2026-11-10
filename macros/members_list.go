@@ -53,7 +53,11 @@ func registerMembersList(g *asciidoctor.ExtensionGroup, e *env) {
 				return nil, err
 			}
 			for _, m := range members {
-				item, err := asciidoctor.CreateListItem(list, memberText(n, m, e, c.target == ""))
+				text, err := memberText(c.parent, n, m, e, c.target == "")
+				if err != nil {
+					return nil, err
+				}
+				item, err := asciidoctor.CreateListItem(list, text)
 				if err != nil {
 					return nil, err
 				}
@@ -124,12 +128,15 @@ func members(e *env, id string) ([]member, error) {
 // memberText is a list item's AsciiDoc: the member's name, linked to its
 // page when it has one, and its types in parentheses when withTypes is set
 // and it has any: mass (Real).
-func memberText(page element, m member, e *env, withTypes bool) string {
-	text := e.linkTo(page.id, m.id, html.EscapeString(m.name))
+func memberText(parent asciidoctor.Node, page element, m member, e *env, withTypes bool) (string, error) {
+	text, err := e.linkTo(parent, page.id, m.id, html.EscapeString(m.name))
+	if err != nil {
+		return "", err
+	}
 	if withTypes && len(m.types) > 0 {
 		text += " (" + html.EscapeString(strings.Join(m.types, ", ")) + ")"
 	}
-	return passthrough(text)
+	return passthrough(text), nil
 }
 
 // membersFilter is which members target keeps: an element's specializations

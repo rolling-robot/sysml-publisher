@@ -58,7 +58,7 @@ func registerIfaceEnds(g *asciidoctor.ExtensionGroup, e *env) {
 				return nil, err
 			}
 			for _, end := range ends {
-				text, err := endText(c.page, end, e, depth)
+				text, err := endText(c.parent, c.page, end, e, depth)
 				if err != nil {
 					return nil, err
 				}
@@ -163,7 +163,7 @@ func connectorEnds(e *env, id string) ([]connectorEnd, error) {
 // first element followed by the chain, cut to its last depth segments and
 // joined by :: (source: aircraft::engine::air). An end that connects nothing
 // (an interface def's) shows its name only.
-func endText(page element, end connectorEnd, e *env, depth int) (string, error) {
+func endText(parent asciidoctor.Node, page element, end connectorEnd, e *env, depth int) (string, error) {
 	ids, sep := end.path, "."
 	if depth != depthAsWritten && len(end.path) > 0 {
 		outer, err := owners(e, end.path[0])
@@ -187,7 +187,9 @@ func endText(page element, end connectorEnd, e *env, depth int) (string, error) 
 		}
 		segs[i] = html.EscapeString(name)
 		if href, ok := e.href(page.id, id); ok {
-			segs[i] = `<a href="` + html.EscapeString(href) + `">` + segs[i] + `</a>`
+			if segs[i], err = link(parent, id, href, segs[i]); err != nil {
+				return "", err
+			}
 		}
 	}
 	path := strings.Join(segs, sep)

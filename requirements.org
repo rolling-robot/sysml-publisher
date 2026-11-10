@@ -274,7 +274,11 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   it is the page's own element (the link would lead back to the same page),
   or when the text is empty (an element without a short name). In a
   document title, the link is kept in the page heading and dropped from the
-  browser tab and the sidebar (PG-8).
+  browser tab and the sidebar (PG-8). Every link a macro makes to a page
+  (these, =sysml-members-list=, =sysml-iface-ends=, custom macros' links,
+  MC-20) shall be an Asciidoctor link written by the output's converter,
+  marked with the element it leads to, so that an output whose links are
+  not =<a href>= (Confluence's =<ac:link>=) writes its own.
 - MC-19 :: A macro that fails (one that cannot do what is written, e.g. it
   names an element the model does not have) shall leave a visible
   placeholder where it is written, showing the macro and the problem, and

@@ -315,9 +315,21 @@ view: it parses a model, `sysml.Open`s it, registers with a map as
   and passes it to every `register<Name>(g, e)`. Macros read the model only
   through `sysml.Model` (`Props`, `Query`, the element facts, `Specializes`,
   `Evaluate`), never a raw element map, and never through the page tree.
-- `e.href(from, to)` asks `Pages`; `e.linkTo(from, to, text)` links text
-  unless the element has no page, is the page itself, or the text is empty
-  (MC-18). `sysml-members-list` and `sysml-iface-ends` link through `href`.
+- **Links (MC-18)**: `e.href(from, to)` asks `Pages`; `e.linkTo(parent,
+  from, to, text)` links text unless the element has no page, is the page
+  itself, or the text is empty. Every link goes through `link(parent, to,
+  href, text)`: an anchor node of type `link` (`CreateAnchor`) carrying
+  `AttrLink` (`sysml-link`, the target element's id), converted at once
+  by the document's converter (`PhraseNode.Convert`). html5 writes it as
+  `<a href>`, exactly as before; a converter for another output
+  recognises `AttrLink` on `inline_anchor` and writes its own link
+  (Confluence's `<ac:link>`). Converting at once, rather than returning the
+  node, lets the same path serve list items and table cells, whose text is
+  AsciiDoc embedding finished markup (`passthrough`). `sysml-name` & co.,
+  `sysml-members-list` and `Call.Link` use `linkTo`; `sysml-iface-ends`
+  calls `e.href` and `link` itself, so it also links a segment that is the
+  page's own element. Never write `<a href>` in a macro
+  (`TestLinksAreWrittenByTheConverter`, `TestIfaceEndsLinks`).
 - **Failing macros (MC-19)**: every macro is registered through
   `inline(g, e, name, opts, written, body)` or `block(...)`. They read the
   page's element, unescape inline targets, write the macro as it appears in

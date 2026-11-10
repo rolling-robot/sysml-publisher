@@ -40,6 +40,14 @@ func Attributes(id string) asciidoctor.Attributes {
 	return asciidoctor.Attributes{}.Set(AttrElement, id)
 }
 
+// AttrLink is the attribute of the anchor nodes macros link with (MC-18):
+// the id of the element whose page the link goes to. A link between pages
+// is an anchor node of type link, converted by the document's converter
+// like any link: html5 writes <a href>, and a converter for another output
+// can tell these links by AttrLink and write its own (Confluence's
+// <ac:link>).
+const AttrLink = "sysml-link"
+
 // Pages is how the host places elements on pages, for the links macros
 // write (MC-18, MC-12, MC-17). A nil Pages links nothing.
 type Pages interface {
@@ -296,19 +304,31 @@ func registerText(g *asciidoctor.ExtensionGroup, e *env, name string, ofElement 
 			}
 			// An unquoted phrase is written out verbatim, so escape the text:
 			// SysML names may contain <, > and &.
-			return e.linkTo(c.page.id, id, html.EscapeString(text)), nil
+			return e.linkTo(c.parent, c.page.id, id, html.EscapeString(text))
 		})
 }
 
 // linkTo is the HTML text linked, on the page of element from, to the page
 // of element to (MC-18): unlinked when to has no page, when to is from
 // itself, or when the text is empty, which leaves nothing to click.
-func (e *env) linkTo(from, to, text string) string {
+func (e *env) linkTo(parent asciidoctor.Node, from, to, text string) (string, error) {
 	href, ok := e.href(from, to)
 	if !ok || from == to || text == "" {
-		return text
+		return text, nil
 	}
-	return `<a href="` + html.EscapeString(href) + `">` + text + `</a>`
+	return link(parent, to, href, text)
+}
+
+// link is text, HTML already, linked to href, the page of element to: an
+// anchor node carrying AttrLink, converted by the document's converter, so
+// the output decides the markup.
+func link(parent asciidoctor.Node, to, href, text string) (string, error) {
+	a, err := asciidoctor.CreateAnchor(parent, text, asciidoctor.Attributes{AttrLink: to},
+		map[string]any{"type": "link", "target": html.EscapeString(href)})
+	if err != nil {
+		return "", err
+	}
+	return a.Convert()
 }
 
 // passthrough is AsciiDoc for finished HTML: an inline passthrough, which

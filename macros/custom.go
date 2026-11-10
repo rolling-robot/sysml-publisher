@@ -184,8 +184,17 @@ func (c *Call) Evaluate(subject Element, expression string) (opensysml.Value, er
 
 // Link is html linked to the page of element id from the page being
 // converted (MC-18): unlinked when id has no page, is the page's own
-// element, or html is empty. html must be escaped already.
-func (c *Call) Link(id, html string) string { return c.e.linkTo(c.Page.ID, id, html) }
+// element, or html is empty. html must be escaped already. The link is an
+// anchor node with AttrLink, written by the document's converter; when it
+// cannot be converted, html is returned unlinked with a warning.
+func (c *Call) Link(id, html string) string {
+	out, err := c.e.linkTo(c.parent, c.Page.ID, id, html)
+	if err != nil {
+		c.Warn("cannot link to " + id + ": " + err.Error())
+		return html
+	}
+	return out
+}
 
 // Warn reports a problem without failing the macro (MC-7): the warning names
 // the page and the macro, so message should not.
