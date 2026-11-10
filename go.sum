@@ -15,8 +15,8 @@ github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/Open-MBEE/OpenSysML v0.12.2-0.20261109213743-e074d3f40c95 h1:uLrbUV3bjE2g/qYaLK+5ZQAtmZb332bYqmRxeeSUwQc=
-github.com/Open-MBEE/OpenSysML v0.12.2-0.20261109213743-e074d3f40c95/go.mod h1:pP+I1tvUcaM77lEwd2cxua/052bu5LODjftsJ5gXejg=
+github.com/Open-MBEE/OpenSysML v0.12.2-0.20261110074652-6f9622b8a9d5 h1:E8GB27h7uEoRAgmxcU1yW7m+j4lF4+3UKPObdmL90/4=
+github.com/Open-MBEE/OpenSysML v0.12.2-0.20261110074652-6f9622b8a9d5/go.mod h1:pP+I1tvUcaM77lEwd2cxua/052bu5LODjftsJ5gXejg=
 github.com/RoaringBitmap/roaring/v2 v2.14.5 h1:ckd0o545JqDPeVJDgeFoaM21eBixUnlWfYgjE5VnyWw=
 github.com/RoaringBitmap/roaring/v2 v2.14.5/go.mod h1:eq4wdNXxtJIS/oikeCzdX1rBzek7ANzbth041hrU8Q4=
 github.com/abtreece/confd v0.41.2 h1:XN+ozNZmah6gIjJG2mN0iCr2JkE/KB5yEf2MDfLM2D8=
@@ -915,8 +915,8 @@ github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/rogpeppe/go-internal v1.16.0 h1:O9DK+vNMDVGLr2BeZqmpLeMjiMNkuXfcqntWbZV6S5g=
 github.com/rogpeppe/go-internal v1.16.0/go.mod h1:DrUVZyrJU+txYW5/1kwtXQSMFio52ZOxX7yM1VHvnxs=
-github.com/rolling-robot/asciidoctorg v0.2.0 h1:LEGsIwFa2ImWh0NSE5cMQnfYy8S/DY2HjEzUK/ldJQY=
-github.com/rolling-robot/asciidoctorg v0.2.0/go.mod h1:cqnGZKENoXSdStG3PA2L9veL9qAWx0JrJQX4eX3h4S4=
+github.com/rolling-robot/asciidoctorg v0.2.1 h1:LTPTZCKemJuIu69jvagiTCOYDOwOBrHCAWICa6IXRFk=
+github.com/rolling-robot/asciidoctorg v0.2.1/go.mod h1:cqnGZKENoXSdStG3PA2L9veL9qAWx0JrJQX4eX3h4S4=
 github.com/russellhaering/goxmldsig v1.6.1 h1:SB7R5ttvrGIDB2juJAK/i7DQ2Ivr7agG+ohfNJjwyYU=
 github.com/russellhaering/goxmldsig v1.6.1/go.mod h1:haZkRcLs9W/Xp989fIjP3BrTdbFQveRF0QNZSYoH09w=
 github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f/go.mod h1:sm1tb6uqfes/u+d4ooFouqFdy9/2g9QGwK3SQygK0Ts=

@@ -35,16 +35,16 @@ go vet ./...
 ```
 
 - **Dependencies are versions anyone can download** in `go.mod`: OpenSysML
-  at a `develop` commit (`v0.12.2-0.20261109213743-e074d3f40c95`, for the
+  at a `develop` commit (`v0.12.2-0.20261110074652-6f9622b8a9d5`, for the
   query properties `body`, `language` and `textualRepresentation` and for
   `Client.ElementProperties`, which no tag has yet; move to the next tag when it is released) and asciidoctorg
-  `v0.2.0`; `go install …/cmd/sysml-publish@latest` must work, so `go.mod`
+  `v0.2.1`; `go install …/cmd/sysml-publish@latest` must work, so `go.mod`
   never carries `replace` directives. OpenSysML pseudo-versions work: it
   has no submodules.
 - **asciidoctorg is installable only from a release tag.** Its `master` keeps
   the Asciidoctor and CodeRay Ruby sources as git submodules, which Go module
   downloads leave out, so `//go:embed` in `rubysrc/rubysrc.go` finds no files
-  and the build fails; its tags (`v0.1.0`, `v0.2.0`) commit the sources as plain
+  and the build fails; its tags (`v0.1.0`, `v0.2.0`, `v0.2.1`) commit the sources as plain
   folders. Never require an asciidoctorg pseudo-version (`@master`, a commit).
   A newer asciidoctorg API needs a new asciidoctorg tag first.
 - **Local development against checkouts** uses an untracked `go.work`
@@ -598,8 +598,12 @@ Known gaps (from the test review, November 2026):
 - An error returned by an extension comes back as `*asciidoctor.Error`:
   message `asciidoctor: <Go error text> (RuntimeError)`, with the Go error in
   `Cause` (reachable with `errors.Is`/`As`).
+- **Custom output formats**: `RegisterConverter` adds a Go converter for a
+  backend name; it can hand the nodes it does not handle to
+  `BuiltinConverter("xhtml5")` (since `v0.2.1`; `"html5"` leaves void
+  elements unclosed, which XML formats such as Confluence's reject).
 - **`asciidoctor.New()` replaces the process-wide default slog logger**
-  (still in `v0.2.0`) with
+  (still in `v0.2.1`) with
   a `*log.ConfdHandler` from its `confd` dependency, which drops Debug
   records. `render.newAsciidoctor` restores the previous default
   (`TestTreeKeepsTheDefaultLogger` guards it); never rely on
@@ -669,7 +673,7 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
 7. **`Site.Write` is not atomic** (remove, then write).
 8. **Pinned to an untagged OpenSysML**: `go.mod` uses an OpenSysML
    `develop` commit, whose behaviour can still change before it is tagged.
-   asciidoctorg is at its latest tag, `v0.2.0`; later fixes on its `master`
+   asciidoctorg is at its latest tag, `v0.2.1`; later fixes on its `master`
    reach users only with a new asciidoctorg tag.
 9. **Repository hygiene**: commits have missed files (a commit referenced
    `registerMetadata` without `metadata.go`; tests were committed for a
@@ -712,7 +716,9 @@ Problems met in OpenSysML while working on this tool: one entry each, with
 the version, what was seen, how to reproduce it, and the workaround used
 here. Add an entry whenever a new one is found; mark it **fixed in <version>**
 rather than deleting it, and drop the workaround once `go.mod` has the fix.
-"develop" means the commit `go.mod` pins (`e074d3f40c`, 2026-11-09).
+"develop" means the commit `go.mod` pins (`6f9622b8a9`, 2026-11-10). The
+entries were found at `e074d3f40c` (2026-11-09) or earlier and have not been
+re-checked since; the workarounds still pass the tests.
 
 1. **Query keeps one value per property** (v0.12.1, develop). The query
    evaluator stores only `values[0]` of each selected property
