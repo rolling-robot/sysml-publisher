@@ -50,6 +50,10 @@
   the model file and line they are about.
 - CLI-7 :: Interrupting the tool (Ctrl-C, SIGTERM) shall stop it, write
   nothing, and exit with status 130.
+- CLI-8 :: The user may give the commands views are rendered with (MC-21):
+  =-sysml= for OpenSysML's =sysml=, =-dot= for Graphviz's =dot=; if
+  omitted, =sysml= and =dot= shall be found on =PATH=. They are needed only
+  when a representation uses =sysml-view=.
 
 * Pages
 - PG-1 :: The tool shall generate exactly one page per documented element,
@@ -122,7 +126,7 @@
   =sysml-doc= (MC-10).
 - AM-2 :: (Not in the MVP, not yet scheduled.) AsciiDoc in a representation
   may link to other elements' pages (=xref:=).
-- AM-3 :: (To do, blocked by TBD-9.) The block macro =sysml-view::<view>[]=
+- AM-3 :: (Done: MC-21.) The block macro =sysml-view::<view>[]=
   shall be replaced by the named view as rendered by OpenSysML. The view is
   named relative to the page's element (MC-2) or by qualified name.
 
@@ -294,8 +298,23 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   =sysml-value= does (MC-14), and a failing one leaves a placeholder and a
   warning (MC-19). Names starting with =sysml-= stay reserved for this
   tool's macros (MC-1).
+- MC-21 :: The block macro =sysml-view::[<view>][]= (AM-3) shall be
+  replaced by the view as OpenSysML renders it, rendered by external
+  programs (TBD-9): OpenSysML's =sysml= command, and Graphviz's =dot= for
+  the layout. A diagram shall be put in the page as an SVG picture, a table
+  view (one =sysml= writes as CSV, not as a diagram) as a table. The target
+  names the view as MC-15 says; without a target, the page's element shall
+  be the view. A block title written above the macro (=.Title=) shall be
+  the picture's or the table's title. The block shall carry the view's
+  qualified name, so another output can write the picture its own way
+  (MC-18). A view shown on several pages shall be rendered once per run.
+  A target that names no view, a page's element that is not a view, a
+  program that cannot be run and a view =sysml= cannot render shall fail
+  the macro (MC-19), with the message the program gives.
 * Open questions
-- TBD-9 :: For AM-3: how a view becomes a picture. OpenSysML's public Go API
+- TBD-9 :: (Decided: 1, behind an interface, macros.Views, so an in-process
+  renderer can replace it once OpenSysML's API gives a picture; MC-21.)
+  For AM-3: how a view becomes a picture. OpenSysML's public Go API
   (=RenderView=) gives only the view's data (nodes, edges, geometry); its
   DOT and Mermaid writers are in an internal package this tool cannot
   import. Options:
