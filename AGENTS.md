@@ -38,13 +38,13 @@ go vet ./...
   at a `develop` commit (`v0.12.2-0.20261109213743-e074d3f40c95`, for the
   query properties `body`, `language` and `textualRepresentation` and for
   `Client.ElementProperties`, which no tag has yet; move to the next tag when it is released) and asciidoctorg
-  `v0.1.0`; `go install …/cmd/sysml-publish@latest` must work, so `go.mod`
+  `v0.2.0`; `go install …/cmd/sysml-publish@latest` must work, so `go.mod`
   never carries `replace` directives. OpenSysML pseudo-versions work: it
   has no submodules.
 - **asciidoctorg is installable only from a release tag.** Its `master` keeps
   the Asciidoctor and CodeRay Ruby sources as git submodules, which Go module
   downloads leave out, so `//go:embed` in `rubysrc/rubysrc.go` finds no files
-  and the build fails; its tags (`v0.1.0`) commit the sources as plain
+  and the build fails; its tags (`v0.1.0`, `v0.2.0`) commit the sources as plain
   folders. Never require an asciidoctorg pseudo-version (`@master`, a commit).
   A newer asciidoctorg API needs a new asciidoctorg tag first.
 - **Local development against checkouts** uses an untracked `go.work`
@@ -562,7 +562,8 @@ Known gaps (from the test review, November 2026):
 - An error returned by an extension comes back as `*asciidoctor.Error`:
   message `asciidoctor: <Go error text> (RuntimeError)`, with the Go error in
   `Cause` (reachable with `errors.Is`/`As`).
-- **`asciidoctor.New()` replaces the process-wide default slog logger** with
+- **`asciidoctor.New()` replaces the process-wide default slog logger**
+  (still in `v0.2.0`) with
   a `*log.ConfdHandler` from its `confd` dependency, which drops Debug
   records. `site.newAsciidoctor` restores the previous default
   (`TestRenderKeepsTheDefaultLogger` guards it); never rely on
@@ -630,11 +631,10 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    quotes; rationals become floats) are reasonable but unspecified for units
    with spaces or for values beyond float precision.
 7. **`Site.Write` is not atomic** (remove, then write).
-8. **Pinned to an untagged OpenSysML and an old asciidoctorg tag**: `go.mod`
-   uses an OpenSysML `develop` commit, whose behaviour can still change
-   before it is tagged, and asciidoctorg `v0.1.0`; fixes on asciidoctorg's `master` (three unpushed
-   commits as of November 2026, e.g. stopping Ruby threads on `Close`) reach
-   users only with a new asciidoctorg tag.
+8. **Pinned to an untagged OpenSysML**: `go.mod` uses an OpenSysML
+   `develop` commit, whose behaviour can still change before it is tagged.
+   asciidoctorg is at its latest tag, `v0.2.0`; later fixes on its `master`
+   reach users only with a new asciidoctorg tag.
 9. **Repository hygiene**: commits have missed files (a commit referenced
    `registerMetadata` without `metadata.go`; tests were committed for a
    while before their `testdata/` fixtures). Before committing, check

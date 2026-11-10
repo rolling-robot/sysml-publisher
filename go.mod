@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/Open-MBEE/OpenSysML v0.12.2-0.20261109213743-e074d3f40c95
-	github.com/rolling-robot/asciidoctorg v0.1.0
+	github.com/rolling-robot/asciidoctorg v0.2.0
 )
 
 require (
