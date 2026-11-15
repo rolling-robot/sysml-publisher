@@ -38,43 +38,56 @@ const CompositeText = "[composite]"
 func registerValue(g *asciidoctor.ExtensionGroup, e *env) {
 	inline(g, e, Value, &asciidoctor.MacroOptions{Regexp: valueMacroRx}, nil,
 		func(c call[asciidoctor.Node]) (string, error) {
-			n, target := c.page, c.target
-			if target == "" {
-				return "", fmt.Errorf("no feature named; write %s:<feature>[]", Value)
-			}
-			ref, err := parseMetadataRef(target, n, e)
+			text, kind, err := valueOfTarget(c, e)
 			if err != nil {
 				return "", err
 			}
-			if ref != nil {
-				if ref.attr.ID == "" {
-					return "", fmt.Errorf("no attribute named; write %s:[<element>::]@<metadata>::<attribute>[]", Value)
-				}
-				text, err := e.md.attributeValue(ref)
-				if err != nil {
-					return "", err
-				}
-				return html.EscapeString(text), nil
-			}
-			if !featureRefRx.MatchString(target) {
-				return "", fmt.Errorf("%q is not a feature name; write a name, a qualified name (A::b) or a feature chain (a.b), not an expression", target)
-			}
-			// The page's element is the subject, so the feature reads its
-			// value: its own, a redefinition's, or one from its types.
-			v, err := e.m.Evaluate(e.ctx, n.qualifiedName, target)
-			if err != nil {
-				return "", err
-			}
-			text, kind := formatValue(v)
 			switch kind {
 			case valueComposite:
-				e.warn(Warning{Page: n.qualifiedName, Macro: c.macro, Message: fmt.Sprintf("%s is composite; shown as %s", target, CompositeText)})
+				e.warn(Warning{Page: c.page.qualifiedName, Macro: c.macro, Message: fmt.Sprintf("%s is composite; shown as %s", c.target, CompositeText)})
 				text = CompositeText
 			case valueNone:
 				text = NoValue
 			}
 			return html.EscapeString(text), nil
 		})
+}
+
+// valueOfTarget is the value of a sysml-value target as text and its kind: a
+// metadata attribute (the value the element binds, else the def's, NoValue
+// when there is none), a feature of the page's element or a qualified name,
+// evaluated with the page's element as subject. An invalid target is an
+// error.
+func valueOfTarget(c call[asciidoctor.Node], e *env) (text string, kind valueKind, err error) {
+	n, target := c.page, c.target
+	if target == "" {
+		return "", 0, fmt.Errorf("no feature named; write %s:<feature>[]", Value)
+	}
+	ref, err := parseMetadataRef(target, n, e)
+	if err != nil {
+		return "", 0, err
+	}
+	if ref != nil {
+		if ref.attr.ID == "" {
+			return "", 0, fmt.Errorf("no attribute named; write %s:[<element>::]@<metadata>::<attribute>[]", Value)
+		}
+		text, err := e.md.attributeValue(ref)
+		if err != nil {
+			return "", 0, err
+		}
+		return text, valuePlain, nil
+	}
+	if !featureRefRx.MatchString(target) {
+		return "", 0, fmt.Errorf("%q is not a feature name; write a name, a qualified name (A::b) or a feature chain (a.b), not an expression", target)
+	}
+	// The page's element is the subject, so the feature reads its
+	// value: its own, a redefinition's, or one from its types.
+	v, err := e.m.Evaluate(e.ctx, n.qualifiedName, target)
+	if err != nil {
+		return "", 0, err
+	}
+	text, kind = formatValue(v)
+	return text, kind, nil
 }
 
 // attributeValue is the value of the metadata attribute ref names, as
