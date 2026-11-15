@@ -1,7 +1,7 @@
-/* sysml-publisher page layout: content on the left, page tree on the right (SB-1). */
+/* sysml-publisher page layout: page tree on the left, content on the right (SB-1). */
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 18rem;
+  grid-template-columns: 18rem minmax(0, 1fr);
   gap: 2rem;
   max-width: 82rem;
   margin: 0 auto;
@@ -22,8 +22,8 @@
   align-self: start;
   max-height: 100vh;
   overflow-y: auto;
-  padding: 1rem 0 1rem 1rem;
-  border-left: 1px solid #e7e7e9;
+  padding: 1rem 1rem 1rem 0;
+  border-right: 1px solid #e7e7e9;
   font-family: "Open Sans", "DejaVu Sans", sans-serif;
   font-size: .9rem;
   line-height: 1.5;
@@ -40,7 +40,7 @@
 .sidebar .empty > a { color: rgba(0, 0, 0, .6); }
 @media (max-width: 48rem) {
   .layout { grid-template-columns: minmax(0, 1fr); }
-  .sidebar { position: static; max-height: none; border-left: 0; border-top: 1px solid #e7e7e9; padding-left: 0; }
+  .sidebar { position: static; max-height: none; border-right: 0; border-bottom: 1px solid #e7e7e9; padding-right: 0; }
 }
 .sysml-metadata-table .no-value { color: rgba(0, 0, 0, .45); font-style: italic; }
 /* The placeholder a failing macro leaves (MC-19): visible, but not mistaken for content. */

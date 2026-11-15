@@ -262,7 +262,7 @@ site/
 - The page of `A::B::C` is `site/A/B/C/index.html`. A page keeps its path when
   unrelated parts of the model change (except the numbered `unnamed-N`
   folders).
-- Every page has the whole tree as a sidebar on the right, with the current
+- Every page has the whole tree as a sidebar on the left, with the current
   page marked.
 - All links are relative, so the site works from `file://`, from any web
   server, and from any sub-path.

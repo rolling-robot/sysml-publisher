@@ -103,7 +103,7 @@
   unnamed sibling may renumber them.
 
 * Sidebar
-- SB-1 :: Every page shall have a sidebar on the right showing the whole
+- SB-1 :: Every page shall have a sidebar on the left showing the whole
   page tree.
 - SB-2 :: Every element in the sidebar shall link to its page.
 - SB-3 :: The sidebar shall mark the current page.

@@ -9,6 +9,12 @@
 </head>
 <body class="article">
 <div class="layout">
+<aside class="sidebar" aria-label="Page tree">
+<nav>
+<a class="home" href="{{.HomeHref}}"{{if .Landing}} aria-current="page"{{end}}>{{.SiteTitle}}</a>
+{{template "tree" .Nav}}
+</nav>
+</aside>
 <main id="content">
 <h1>{{.TitleHTML}}</h1>
 {{- if .QualifiedName}}
@@ -31,12 +37,6 @@
 </section>
 {{- end}}
 </main>
-<aside class="sidebar" aria-label="Page tree">
-<nav>
-<a class="home" href="{{.HomeHref}}"{{if .Landing}} aria-current="page"{{end}}>{{.SiteTitle}}</a>
-{{template "tree" .Nav}}
-</nav>
-</aside>
 </div>
 </body>
 </html>
