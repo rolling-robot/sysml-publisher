@@ -1,3 +1,9 @@
+// Package views renders SysML v2 views, for the sysml-view macro
+// (requirement MC-21): OpenSysML writes a view in process with
+// sysml.Model.RenderView — DOT for a diagram, columns and rows for a table —
+// and Graphviz's dot lays the DOT out as SVG. A table needs no program.
+//
+//	reg.SetViews(&views.InProcess{Model: m}) // reg from macros.Register
 package views
 
 import (
@@ -28,6 +34,13 @@ type InProcess struct {
 }
 
 var _ macros.Views = (*InProcess)(nil)
+
+// result is one view's rendering, kept in InProcess.cache: the failure too,
+// so a view the service refuses is refused once.
+type result struct {
+	r   *macros.Rendering
+	err error
+}
 
 // Render renders the view with that qualified name: a diagram as SVG (the
 // rendering's DOT form, then dot -Tsvg), else a table, from the rows the

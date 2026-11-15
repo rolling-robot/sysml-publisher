@@ -59,8 +59,7 @@ func TestInProcessDiagram(t *testing.T) {
 	}
 }
 
-// A table view's rows are exactly the ones sysml-publish listed when it read
-// the table the sysml command wrote as CSV.
+// A table view's rows: its header, then one row per member of sys.
 func TestInProcessTable(t *testing.T) {
 	r, err := (&views.InProcess{Model: loadViews(t)}).Render(t.Context(), "V::partsTable")
 	if err != nil {

@@ -526,7 +526,7 @@ What the suite is:
 - Tests go through the real stack: fixtures are parsed by OpenSysML in
   process, rendered by asciidoctorg. No mocks, no build tags: nothing leaves
   the process, except where the code itself runs programs: the `views` tests
-  run `sysml` and `dot` and skip when they are not on `PATH`, and the
+  run `dot` and skip when it is not on `PATH`, and the
   `sysml-view` tests in `macros` render with a map (`fakeViews`), as the
   `Pages` of the examples is one. The whole suite runs in a few seconds (about 0.2 s of each
   macro or site test is parsing and starting asciidoctorg).
