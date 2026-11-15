@@ -50,10 +50,10 @@
   the model file and line they are about.
 - CLI-7 :: Interrupting the tool (Ctrl-C, SIGTERM) shall stop it, write
   nothing, and exit with status 130.
-- CLI-8 :: The user may give the commands views are rendered with (MC-21):
-  =-sysml= for OpenSysML's =sysml=, =-dot= for Graphviz's =dot=; if
-  omitted, =sysml= and =dot= shall be found on =PATH=. They are needed only
-  when a representation uses =sysml-view=.
+- CLI-8 :: The user may give the command a diagram is laid out with (MC-21):
+  =-dot= for Graphviz's =dot=; if omitted, =dot= shall be found on =PATH=.
+  It is needed only when a representation uses a =sysml-view= that is a
+  diagram: a table view is written from the rendering's rows.
 
 * Pages
 - PG-1 :: The tool shall generate exactly one page per documented element,
@@ -303,10 +303,11 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   warning (MC-19). Names starting with =sysml-= stay reserved for this
   tool's macros (MC-1).
 - MC-21 :: The block macro =sysml-view::[<view>][]= (AM-3) shall be
-  replaced by the view as OpenSysML renders it, rendered by external
-  programs (TBD-9): OpenSysML's =sysml= command, and Graphviz's =dot= for
-  the layout. A diagram shall be put in the page as an SVG picture, a table
-  view (one =sysml= writes as CSV, not as a diagram) as a table. The target
+  replaced by the view as OpenSysML renders it, in process through the
+  SysML v2 API's render-view operation (TBD-9); Graphviz's =dot= shall lay
+  a diagram out. A diagram shall be put in the page as an SVG picture, a
+  table view (one the rendering gives as columns and rows, not as a
+  diagram) as a table. The target
   names the view as MC-15 says; without a target, the page's element shall
   be the view. A block title written above the macro (=.Title=) shall be
   the picture's or the table's title. Like a link (MC-18), the picture and
@@ -315,8 +316,8 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   view's qualified name, so that an output whose pictures are not =<img>=
   (Confluence's attachments) writes its own. A view shown on several pages shall be rendered once per run.
   A target that names no view, a page's element that is not a view, a
-  program that cannot be run and a view =sysml= cannot render shall fail
-  the macro (MC-19), with the message the program gives.
+  program that cannot be run and a view the renderer cannot render shall
+  fail the macro (MC-19), with the message the renderer gives.
 - MC-23 :: The block macro =sysml-ifaces::[<element>][]= shall be replaced by
   a bullet list of the interfaces and connections the target is on: every
   =ConnectionUsage= and =InterfaceUsage= of the whole model whose ends
@@ -335,12 +336,12 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   and shared by every page (MC-3). A target naming no element, or that is
   not part-like, fails the macro (MC-19).
 * Open questions
-- TBD-9 :: (Decided: 1, behind an interface, macros.Views, so an in-process
-  renderer can replace it once OpenSysML's API gives a picture; MC-21.)
+- TBD-9 :: (Decided: 3, behind the interface macros.Views, with =dot
+  -Tsvg= for the layout as in 1; MC-21.)
   For AM-3: how a view becomes a picture. OpenSysML's public Go API
-  (=RenderView=) gives only the view's data (nodes, edges, geometry); its
-  DOT and Mermaid writers are in an internal package this tool cannot
-  import. Options:
+  (=RenderView=) gave only the view's data (nodes, edges, geometry) when
+  this was decided; its DOT and Mermaid writers were in an internal package
+  this tool cannot import. Options:
   1. Run =sysml -render <view> -render-form dot= and Graphviz =dot -Tsvg=,
      and put the SVG in the page: static pages, no JavaScript; needs the
      =sysml= command and Graphviz when building; the model is parsed again
@@ -350,7 +351,8 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
      JavaScript.
   3. Change OpenSysML to make its DOT or Mermaid writer public, and call it
      in-process: one parse, no extra programs, but a change to OpenSysML
-     first.
+     first. (Done: =RenderView= writes the view with =WithForm= since
+     develop =56febd38bcad=; a diagram is asked for as DOT, a table as
+     its data, and only Graphviz's =dot= is left for the layout.)
   4. Draw SVG in this tool from the view's data: no extra programs, but a
      large job, and the layout would be weaker than Graphviz's.
-  Suggested: 1.

@@ -607,13 +607,14 @@ element, which must then be a view.
 A title written above the macro (`.Wiring`) titles the picture or the table.
 The block has the role `sysml-view`, for styling.
 
-The view is rendered by two programs, which must be installed where the
-site is built: OpenSysML's `sysml` command writes the view, and Graphviz's
-`dot` lays a diagram out. `sysml-publish` finds them on `PATH`; `-sysml` and
-`-dot` name others. Each view is rendered once per run, however many pages
-show it. A target that names no view, a page's element that is not a view,
-a program that cannot be run and a view `sysml` cannot render fail the macro
-(<<failures>>), with the message the program gives.
+The view is rendered inside `sysml-publish`: OpenSysML writes the view, and
+a diagram is laid out by Graphviz's `dot`, which must therefore be installed
+where the site is built. `sysml-publish` finds `dot` on `PATH`; `-dot` names
+another. A table view needs no program at all. Each view is rendered once per
+run, however many pages show it. A target that names no view, a page's
+element that is not a view, a program that cannot be run and a view
+OpenSysML cannot render fail the macro (<<failures>>), with the message the
+renderer gives.
 
 Syntax:: `sysml-view::[]`, `sysml-view::<view>[]`
 

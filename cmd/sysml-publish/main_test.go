@@ -200,23 +200,22 @@ func TestInterruptedRunWritesNothing(t *testing.T) {
 	}
 }
 
-// -sysml and -dot choose the programs sysml-view renders with (CLI-8); one
-// that cannot be run fails the macro, not the run (MC-19). The fixture's
-// pages run sysml first, so its missing command is what each names.
+// -dot names the program that lays a diagram out (CLI-8); a view that needs
+// no program renders without one. A program that cannot be run fails the
+// macro, not the run (MC-19). The fixture's tables are written from the
+// rendering's rows, so they render with no program at all.
 func TestViewPrograms(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "site")
 	var log bytes.Buffer
-	args := []string{"-model", fixture("views"), "-out", out, "-sysml", "/nonexistent/sysml"}
+	args := []string{"-model", fixture("views"), "-out", out, "-dot", "/nonexistent/dot"}
 	if code := run(t.Context(), args, &log); code != exitOK {
 		t.Fatalf("exit %d, want %d; log:\n%s", code, exitOK, log.String())
 	}
 	file := filepath.Join(fixture("views"), "views.sysml")
 	// The rest of a missing program's message is Go's (os/exec).
-	missing := `cannot run sysml: `
+	missing := `cannot run dot: `
 	want := []string{
 		`level=WARN msg="` + file + `:14: V::sys: sysml-view::interfaces[]: ` + missing,
-		`level=WARN msg="` + file + `:17: V::sys: sysml-view::partsTable[]: ` + missing,
-		`level=WARN msg="` + file + `:40: V::partsTable: sysml-view::[]: ` + missing,
 		`level=WARN msg="` + file + `:48: V::notAView: sysml-view::sys[]: V::sys is a PartUsage, not a view"`,
 	}
 	var got []string
@@ -231,5 +230,14 @@ func TestViewPrograms(t *testing.T) {
 	}
 	if !ok {
 		t.Errorf("warnings:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	for _, page := range []string{"V/sys/index.html", "V/partsTable/index.html"} {
+		b, err := os.ReadFile(filepath.Join(out, filepath.FromSlash(page)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(b, []byte("<table")) {
+			t.Errorf("%s shows no table", page)
+		}
 	}
 }

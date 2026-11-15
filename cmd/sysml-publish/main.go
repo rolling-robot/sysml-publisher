@@ -49,10 +49,9 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	outDir := fs.String("out", "./site", "folder to write the pages to; replaced on every run")
 	verbose := fs.Bool("v", false, "also log debug records: the duration of every stage and page")
 	logFormat := fs.String("log-format", "text", "format of the log on stderr: text or json")
-	sysmlCmd := fs.String("sysml", "sysml", "OpenSysML's sysml command, which renders the views sysml-view shows")
 	dotCmd := fs.String("dot", "dot", "Graphviz's dot command, which lays out the diagrams sysml-view shows")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-sysml CMD] [-dot CMD]")
+		fmt.Fprintln(stderr, "Usage: sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]")
 		fmt.Fprintln(stderr, "\nBuilds a static HTML page tree from the AsciiDoc textual representations of a SysML v2 model.")
 		fmt.Fprintln(stderr)
 		fs.PrintDefaults()
@@ -77,7 +76,7 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	// Libraries that log through the default logger use the same one.
 	slog.SetDefault(logger)
 
-	err = publish(ctx, logger, *modelDir, *outDir, *sysmlCmd, *dotCmd)
+	err = publish(ctx, logger, *modelDir, *outDir, *dotCmd)
 	switch {
 	case err == nil:
 		return exitOK
@@ -124,9 +123,9 @@ func newLogger(w io.Writer, format string, verbose bool) (*slog.Logger, error) {
 	return nil, fmt.Errorf("unknown -log-format %q: want text or json", format)
 }
 
-// publish builds the site of the model in modelDir into outDir; sysmlCmd and
-// dotCmd render the views (views.CLI).
-func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir, sysmlCmd, dotCmd string) error {
+// publish builds the site of the model in modelDir into outDir; dotCmd lays
+// out the diagrams sysml-view shows (views.InProcess).
+func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir, dotCmd string) error {
 	start := time.Now()
 
 	stage := time.Now()
@@ -164,7 +163,7 @@ func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir, sysmlCm
 	}
 
 	stage = time.Now()
-	s, err := site.Render(ctx, t, logger, &views.CLI{Files: m.Files, Sysml: sysmlCmd, Dot: dotCmd})
+	s, err := site.Render(ctx, t, logger, &views.InProcess{Model: m.Model, Dot: dotCmd})
 	if err != nil {
 		return err
 	}

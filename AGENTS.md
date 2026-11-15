@@ -22,8 +22,8 @@ from the model (names, docs, members, metadata tables, evaluated attribute
 values).
 
 ```
-sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-sysml CMD] [-dot CMD]
-# defaults: ./model, ./site, sysml and dot from PATH
+sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
+# defaults: ./model, ./site, dot from PATH
 ```
 
 ## 2. Building, running, testing
@@ -87,11 +87,12 @@ internal/render/            convert representations per page (asciidoctorg), tit
 internal/site/              lay a render result out as HTML files (html/template), write
 internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT) + layout.css
 internal/site/page.html.tmpl
-sysml/                      public: reads a parsed model (Query, Props, element facts, Evaluate)
+sysml/                      public: reads a parsed model (Query, Props, element facts, Evaluate,
+                            RenderView)
 macros/                     public: the sysml-* AsciiDoc macros, one file per macro;
                             names.go (element lookup), kinds.go (metaclass names);
                             example_test.go (use from another module)
-views/                      public: renders views for sysml-view with the sysml and dot commands
+views/                      public: renders views for sysml-view in process, with Graphviz's dot
 model/                      the user's model (default input)
 testdata/<case>/            fixture models, one folder per test case
 docs/macros.adoc            user reference for the macros
@@ -300,7 +301,9 @@ internal type:
 - `Views` is the host's say on views (MC-21): `Render(ctx, qualifiedName)
   (*Rendering, error)`, a `Rendering` being an SVG or a table's rows;
   `Registry.SetViews` sets it after `Register`, so `Register`'s signature
-  did not change. `views.CLI` (package `views`) is this tool's; a view's
+  did not change. `views.InProcess` (package `views`) is this tool's: the
+  model's `RenderView` gives a diagram as DOT, laid out by Graphviz's `dot`,
+  or a table as its rows, which needs no program. A view's
   rendering does not depend on the page, so caching it per view does not
   break MC-3.
 - `Pages` is the host's say on links: `Href(fromID, toID) (href, ok)`.
@@ -446,9 +449,10 @@ message.
   (`asciidocLog`, §5.3).
 - **Loggers are passed explicitly** (`model.Folder.Logger`, `site.Render`'s
   `logger`), not taken from `slog.Default`; see the asciidoctorg quirk in §9.
-- **Views (MC-21, CLI-8)**: `publish` gives `site.Render` a `views.CLI`
-  with the model's files and the `-sysml`/`-dot` commands. Missing programs
-  are no usage error: only the `sysml-view` macros that need them fail.
+- **Views (MC-21, CLI-8)**: `publish` gives `site.Render` a `views.InProcess`
+  with the loaded model and the `-dot` command. A view is rendered in
+  process; a missing program is no usage error, and only a diagram's
+  `sysml-view` macro fails without `dot` (a table needs no program).
 - **Cancellation (CLI-7)**: `main` uses `signal.NotifyContext`; the context
   flows into `Load`, `Render` (checked between pages, and passed to
   `ConvertDocumentContext`, which stops a conversion at asciidoctorg's next
@@ -617,14 +621,12 @@ Known gaps (from the test review, November 2026):
   quoted (`SI::'m³⋅s⁻¹'`), arithmetic is done in SI base units
   (`10 [km/h] * 2` → `50/9 m/s`), composite attribute values come back as
   `InstanceID`.
-- View rendering to DOT/Mermaid exists only in `internal/ir/view` and the
-  `sysml` CLI (TBD-9), so `sysml-view` runs the CLI (`views.CLI`): `sysml
-  <files> -render <qn> -render-form dot`, then `dot -Tsvg`; a table view
-  refuses DOT, and is written with `-render-form csv` instead. The CLI
-  prints `✓ package …` and its errors (`sysml: <message>`) on stderr,
-  exits 2 when it refuses; it needs `private import Views::*` and
-  `StandardViewDefinitions::*` in the model for `render as…`. Its version
-  is whatever is installed, not the one `go.mod` pins.
+- `RenderView` writes a view in process with `WithForm` (TBD-9, §13 9):
+  `dot` for a diagram, `csv` or `text` for a table. `views.InProcess` asks
+  for DOT, lays it out with `dot -Tsvg`, and asks for the data when the
+  view has no diagram form — a table's `Columns` and `Rows`. There is no
+  SVG form, so Graphviz stays. A view needs `private import Views::*` and
+  `StandardViewDefinitions::*` in the model for `render as…`.
 - `Query` supports a closed set of properties (on develop: `body`,
   `language`, `textualRepresentation` added) and one value each (§13, 1).
 
@@ -739,9 +741,6 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
 4. **Make `Write` atomic**: render into a sibling temp folder, then swap.
 5. **Tag asciidoctorg releases** whenever this project needs its newer code
    (and push its local commits), then bump `go.mod`.
-6. **Render views in process** once OpenSysML's `RenderView` returns a
-   picture (or DOT): a second `macros.Views` replaces `views.CLI`, and the
-   installed `sysml` stops mattering (TBD-9, §13 9).
 
 ## 11. Open decisions
 
@@ -799,11 +798,12 @@ re-checked since; the workarounds still pass the tests.
    detect cancellation with `ctx.Err()` (§5.5).
 8. **The unit `m^3/h` is rejected** with "Must be a valid feature" (v0.12.1;
    cause not investigated).
-9. **View rendering is not public API** (v0.12.1; still so on develop
-   `d2136035d7`, 2026-11-10): the DOT and Mermaid writers are in
-   `internal/ir/view`; `RenderView` gives only the view's data, and
-   `RenderViewRequest` has no form. Workaround: `views.CLI` runs the `sysml`
-   command and Graphviz (TBD-9, MC-21).
+9. **View rendering is not public API** (v0.12.1; **fixed in develop**
+   `56febd38bcad`, 2026-11-11): the DOT and Mermaid writers are in
+   `internal/ir/view`; `RenderView` gave only the view's data, and
+   `RenderViewRequest` had no form. `WithForm` now writes the view (DOT,
+   CSV, Mermaid, …), and `views.InProcess` uses it; there is no SVG form,
+   so Graphviz still lays a diagram out (TBD-9, MC-21).
 10. **Export changes between v0.12.1 and develop** (not bugs, but they
     changed this tool's output): every usage owns an unnamed `Multiplicity`
     member, its implicit `[1..1]` included (left out of the members `sysml-members-list` lists); a

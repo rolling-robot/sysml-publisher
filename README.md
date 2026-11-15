@@ -293,7 +293,7 @@ the element that owns the representation.
 | `sysml-iface-ends::[<interface>][depth=<n>\|all][name=short\|long]` | block | the ends of an interface or connection, source first: `engine.air`; `depth` shows the last n segments of the port's qualified path (`engine::air`), `all` all of it; `name=long` names each segment by its name (short names are the default) |
 | `sysml-ifaces::[<element>][name=short\|long]` | block | the interfaces and connections the element's ports are on: `i1 -> y`, or `i3 -> y, z` for the other parts |
 | `sysml-metadata-table::<metadata def>[]` | block | a table of that metadata's attributes on the element |
-| `sysml-view::[<view>][]` | block | the view as OpenSysML renders it: a diagram as an SVG picture, a table view as a table; needs OpenSysML's `sysml` command and Graphviz |
+| `sysml-view::[<view>][]` | block | the view as OpenSysML renders it: a diagram as an SVG picture, a table view as a table; a diagram needs Graphviz's `dot` |
 
 Inline macros go anywhere in text; block macros go on a line of their own.
 Without a target, `sysml-name`, `sysml-qualified-name`, `sysml-short-name`,
@@ -380,7 +380,7 @@ Names starting with `sysml-` are reserved for this tool's macros. See
 ## Command line
 
 ```
-sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-sysml CMD] [-dot CMD]
+sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
 ```
 
 | Flag | Default | Meaning |
@@ -389,8 +389,7 @@ sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-sysml CMD] 
 | `-out DIR` | `./site` | folder to write the site to; replaced on every run |
 | `-v` | off | also report how long each stage and each page took |
 | `-log-format` | `text` | `text` for people, `json` for one JSON object per line, for CI and log tools |
-| `-sysml CMD` | `sysml` from `PATH` | OpenSysML's `sysml` command, which renders the views `sysml-view` shows |
-| `-dot CMD` | `dot` from `PATH` | Graphviz's `dot` command, which lays out their diagrams |
+| `-dot CMD` | `dot` from `PATH` | Graphviz's `dot` command, which lays out the diagrams `sysml-view` shows; a diagram needs it, a table view needs no program |
 
 Everything the tool reports goes to stderr as log records (here for
 `model/aircraft.sysml`, with a warning as it would appear for a composite
@@ -446,8 +445,8 @@ This is a first version.
 
 - Models are read from files only; reading from a SysML v2 API server is
   planned.
-- Views (`sysml-view`) are rendered by OpenSysML's `sysml` command and
-  Graphviz, which must be installed where the site is built.
+- Views (`sysml-view`) are rendered by OpenSysML in process; a diagram is
+  laid out by Graphviz, which must be installed where the site is built.
 - A failing macro stops the whole run; whether it should instead leave a
   placeholder and warn is undecided.
 - The tool reads models through OpenSysML's SysML v2 API queries and element
