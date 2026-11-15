@@ -176,6 +176,9 @@ func TestUsageErrors(t *testing.T) {
 		{"-log-format", "xml"},
 		{"extra-argument"},
 		{"-no-such-flag"},
+		// Views are rendered in process: the sysml command's flag is gone,
+		// not accepted and ignored (MC-21).
+		{"-sysml", "/usr/bin/sysml"},
 	} {
 		var log bytes.Buffer
 		if code := run(context.Background(), args, &log); code != exitUsage {
