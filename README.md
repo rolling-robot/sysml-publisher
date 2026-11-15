@@ -290,7 +290,7 @@ the element that owns the representation.
 | `sysml-members-list::[]` | block | a list of its members with their types |
 | `sysml-members-list::<element>[]` | block | its members typed by, subclassing or subsetting `<element>` |
 | `sysml-members-list::<kind>[]` | block | its members of one kind: `partUsage`, `interfaceUsage`, ... |
-| `sysml-iface-ends::[<interface>][depth=<n>\|all]` | block | the ends of an interface or connection, source first: `source: engine.air`; `depth` shows the last n segments of the port's qualified path (`engine::air`), `all` all of it |
+| `sysml-iface-ends::[<interface>][depth=<n>\|all][name=short\|long]` | block | the ends of an interface or connection, source first: `engine.air`; `depth` shows the last n segments of the port's qualified path (`engine::air`), `all` all of it; `name=long` names each segment by its name (short names are the default) |
 | `sysml-metadata-table::<metadata def>[]` | block | a table of that metadata's attributes on the element |
 | `sysml-view::[<view>][]` | block | the view as OpenSysML renders it: a diagram as an SVG picture, a table view as a table; needs OpenSysML's `sysml` command and Graphviz |
 

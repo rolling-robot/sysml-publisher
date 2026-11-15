@@ -313,12 +313,13 @@ interface, or of any connection: the page's element with
 `sysml-iface-ends::[]`, or the element a target names
 (`sysml-iface-ends::airDuct[]`), named as described in <<naming>>.
 
-Each item is the end's name and the feature it connects, the segments of the
-feature linked to their pages when they have one: `source: engine.air`.
+Each item is the feature an end connects, the segments of the feature linked
+to their pages when they have one: `engine.air`.
 
 * `connect a to b` and `connect (a, b)` give ends named `source` and
-  `target`.
-* Ends named by an interface def keep its names: `supplier: x.p`.
+  `target`, listed without their names.
+* Ends named by an interface def keep their names internally, but the list
+  shows only the features they connect.
 * The unnamed ends of an n-ary `connect (a, b, c)` show the feature only.
 * The ends of an interface def connect nothing, so they show their names
   only.
@@ -329,29 +330,35 @@ declared. An element without ends fails the macro (<<failures>>). The list has t
 The attribute `depth` chooses how much of the connected feature's path is
 shown. Its path is the qualified name of the part it is on followed by the
 feature: `Model::aircraft::engine::air`. `depth` keeps that many segments
-from the end, joined by `::`; `all` keeps the whole path. Every segment
+from the end, joined by ` :: `; `all` keeps the whole path. Every segment
 whose element has a page is a link.
 
 [cols="1,2"]
 |===
 |Written |Item
 
-|`sysml-iface-ends::airDuct[]` |`source: engine.air` (the chain as written)
-|`sysml-iface-ends::airDuct[depth=1]` |`source: air`
-|`sysml-iface-ends::airDuct[depth=2]` |`source: engine::air`
-|`sysml-iface-ends::airDuct[depth=3]` |`source: aircraft::engine::air`
-|`sysml-iface-ends::airDuct[depth=all]` |`source: Model::aircraft::engine::air`
+|`sysml-iface-ends::airDuct[]` |`engine.air` (the chain as written)
+|`sysml-iface-ends::airDuct[depth=1]` |`air`
+|`sysml-iface-ends::airDuct[depth=2]` |`engine :: air`
+|`sysml-iface-ends::airDuct[depth=3]` |`aircraft :: engine :: air`
+|`sysml-iface-ends::airDuct[depth=all]` |`Model :: aircraft :: engine :: air`
 |===
 
 `[2]` is the same as `[depth=2]`. A depth longer than the path shows the
-whole path. Names that need quotes are quoted, as in a qualified name:
-`wing::'de-icing fluid'`. A depth that is neither a positive number nor
+whole path. Names are shown without the single quotes that a qualified name
+uses to quote them: `wing :: de-icing fluid`, not `wing :: 'de-icing fluid'`.
+A depth that is neither a positive number nor
 `all` fails the macro (<<failures>>).
 
+The attribute `name` says how each segment is named: `short` (the default)
+uses the segment's short name when it has one, else its name; `long` always
+uses the name.
+
 Syntax:: `sysml-iface-ends::[]`, `sysml-iface-ends::<element>[]`,
-`sysml-iface-ends::<element>[depth=<n>|all]`
+`sysml-iface-ends::<element>[depth=<n>|all]`,
+`sysml-iface-ends::<element>[name=short|long]`
 Attributes:: `depth` (also the first positional attribute): a positive
-number or `all`
+number or `all`; `name`: `short` or `long`
 
 Example:
 
@@ -370,8 +377,7 @@ part aircraft {
 }
 ----
 
-The page of `aircraft` lists source: engine.air and target:
-airConditioner.air.
+The page of `aircraft` lists engine.air and airConditioner.air.
 
 == sysml-metadata-table
 

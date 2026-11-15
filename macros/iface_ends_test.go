@@ -20,14 +20,14 @@ func TestIfaceEnds(t *testing.T) {
 		name, page, target string
 		want               []string
 	}{
-		{"connect (a, b): source and target", "I/sys", "i1", []string{"source: x.p", "target: y.p"}},
-		{"connect a to b", "I/sys", "i2", []string{"source: x.q", "target: y.q"}},
-		{"ends named by an interface def", "I/sys", "i4", []string{"a: x.p", "b: y.p", "c: z.p"}},
-		{"n-ary, unnamed ends", "I/sys", "i5", []string{"x.p", "y.p", "z.p"}},
-		{"source declared second, listed first", "I/sys", "i8", []string{"source: x.r", "target: z.r"}},
-		{"a connection", "I/sys", "c1", []string{"source: x.p", "target: z.p"}},
-		{"qualified target", "I/sys", "I::sys::i2", []string{"source: x.q", "target: y.q"}},
-		{"no target: the page's interface", "I/sys/i6", "", []string{"supplier: x.p", "consumer: y.p"}},
+		{"connect (a, b): source and target", "I/sys", "i1", []string{"ex.p", "y.p"}},
+		{"connect a to b", "I/sys", "i2", []string{"ex.q", "y.q"}},
+		{"ends named by an interface def", "I/sys", "i4", []string{"ex.p", "y.p", "z.p"}},
+		{"n-ary, unnamed ends", "I/sys", "i5", []string{"ex.p", "y.p", "z.p"}},
+		{"source declared second, listed first", "I/sys", "i8", []string{"ex.r", "z.r"}},
+		{"a connection", "I/sys", "c1", []string{"ex.p", "z.p"}},
+		{"qualified target", "I/sys", "I::sys::i2", []string{"ex.q", "y.q"}},
+		{"no target: the page's interface", "I/sys/i6", "", []string{"ex.p", "y.p"}},
 		{"no target: an interface def, ends connect nothing", "I/D", "", []string{"supplier", "consumer"}},
 	}
 	for _, c := range cases {
@@ -44,6 +44,53 @@ func TestIfaceEnds(t *testing.T) {
 				t.Errorf("items = %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+// The name attribute says how each path segment is named: short (the
+// default) uses the segment's short name when it has one (x's is ex),
+// long always the name.
+func TestIfaceEndsSegmentName(t *testing.T) {
+	tr, ad := setupFixture(t, "iface-ends")
+	page := Attributes(pageAt(t, tr, "I/sys").ID)
+	cases := []struct {
+		name, src string
+		want      []string
+	}{
+		{"default: the short name when it has one", "sysml-iface-ends::i1[]", []string{"ex.p", "y.p"}},
+		{"short: the short name when it has one", "sysml-iface-ends::i1[name=short]", []string{"ex.p", "y.p"}},
+		{"long: the names", "sysml-iface-ends::i1[name=long]", []string{"x.p", "y.p"}},
+		{"LONG spelled in capitals", "sysml-iface-ends::i1[name=LONG]", []string{"x.p", "y.p"}},
+		{"default with depth", "sysml-iface-ends::i1[depth=2]", []string{"ex :: p", "y :: p"}},
+		{"short with depth", "sysml-iface-ends::i1[name=short,depth=2]", []string{"ex :: p", "y :: p"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := ad.Convert(c.src, &asciidoctor.Options{Attributes: page})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, m := range listItemRx.FindAllStringSubmatch(out, -1) {
+				got = append(got, html.UnescapeString(regexp.MustCompile(`<[^>]*>`).ReplaceAllString(m[1], "")))
+			}
+			if !slices.Equal(got, c.want) {
+				t.Errorf("items = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+// A short-named segment that has a page is still linked, its link text the
+// short name (short is the default).
+func TestIfaceEndsShortNameLink(t *testing.T) {
+	tr, ad := setupFixture(t, "iface-ends")
+	out, err := ad.Convert("sysml-iface-ends::i1[]", &asciidoctor.Options{Attributes: Attributes(pageAt(t, tr, "I/sys").ID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `<a href="x/index.html">ex</a>.p`; !strings.Contains(out, want) {
+		t.Errorf("output %q does not contain %q", out, want)
 	}
 }
 
@@ -67,8 +114,8 @@ func TestIfaceEndsLinks(t *testing.T) {
 	}
 	x := pageAt(t, tr, "I/sys/x").ID
 	cases := []struct{ backend, want string }{
-		{"html5", `source: <a href="x/index.html">x</a>.p`},
-		{"other", "source: [" + x + ": x].p"},
+		{"html5", `<a href="x/index.html">ex</a>.p`},
+		{"other", "[" + x + ": ex].p"},
 	}
 	for _, c := range cases {
 		t.Run(c.backend, func(t *testing.T) {
@@ -93,16 +140,16 @@ func TestIfaceEndsDepth(t *testing.T) {
 		name, src string
 		want      []string
 	}{
-		{"no depth: as written", "sysml-iface-ends::i1[]", []string{"source: x.p", "target: y.p"}},
-		{"depth 1: the port", "sysml-iface-ends::i1[depth=1]", []string{"source: p", "target: p"}},
-		{"depth as the positional attribute", "sysml-iface-ends::i1[1]", []string{"source: p", "target: p"}},
-		{"depth 2: part and port", "sysml-iface-ends::i1[depth=2]", []string{"source: x::p", "target: y::p"}},
-		{"depth 3: the owner of the part too", "sysml-iface-ends::i1[depth=3]", []string{"source: sys::x::p", "target: sys::y::p"}},
-		{"all: the qualified path", "sysml-iface-ends::i1[depth=all]", []string{"source: I::sys::x::p", "target: I::sys::y::p"}},
-		{"all in capitals", "sysml-iface-ends::i1[depth=ALL]", []string{"source: I::sys::x::p", "target: I::sys::y::p"}},
-		{"deeper than the path: the whole path", "sysml-iface-ends::i1[depth=9]", []string{"source: I::sys::x::p", "target: I::sys::y::p"}},
-		{"quoted name with depth", "sysml-iface-ends::i9[depth=2]", []string{"source: x::'de-icing fluid'", "target: y::'de-icing fluid'"}},
-		{"quoted name as written", "sysml-iface-ends::i9[]", []string{"source: x.de-icing fluid", "target: y.de-icing fluid"}},
+		{"no depth: as written", "sysml-iface-ends::i1[]", []string{"ex.p", "y.p"}},
+		{"depth 1: the port", "sysml-iface-ends::i1[depth=1]", []string{"p", "p"}},
+		{"depth as the positional attribute", "sysml-iface-ends::i1[1]", []string{"p", "p"}},
+		{"depth 2: part and port", "sysml-iface-ends::i1[depth=2]", []string{"ex :: p", "y :: p"}},
+		{"depth 3: the owner of the part too", "sysml-iface-ends::i1[depth=3]", []string{"sys :: ex :: p", "sys :: y :: p"}},
+		{"all: the qualified path", "sysml-iface-ends::i1[depth=all]", []string{"I :: sys :: ex :: p", "I :: sys :: y :: p"}},
+		{"all in capitals", "sysml-iface-ends::i1[depth=ALL]", []string{"I :: sys :: ex :: p", "I :: sys :: y :: p"}},
+		{"deeper than the path: the whole path", "sysml-iface-ends::i1[depth=9]", []string{"I :: sys :: ex :: p", "I :: sys :: y :: p"}},
+		{"quoted name with depth", "sysml-iface-ends::i9[depth=2]", []string{"ex :: de-icing fluid", "y :: de-icing fluid"}},
+		{"quoted name as written", "sysml-iface-ends::i9[]", []string{"ex.de-icing fluid", "y.de-icing fluid"}},
 		{"interface def ends: names only", "sysml-iface-ends::D[depth=all]", []string{"supplier", "consumer"}},
 	}
 	for _, c := range cases {
@@ -129,7 +176,7 @@ func TestIfaceEndsDepthLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := `source: <a href="../index.html">I</a>::<a href="index.html">sys</a>::<a href="x/index.html">x</a>::p`; !strings.Contains(out, want) {
+	if want := `<a href="../index.html">I</a> :: <a href="index.html">sys</a> :: <a href="x/index.html">ex</a> :: p`; !strings.Contains(out, want) {
 		t.Errorf("output %q does not contain %q", out, want)
 	}
 }
@@ -142,6 +189,7 @@ func TestIfaceEndsErrors(t *testing.T) {
 		{"no ends: a target", "sysml-iface-ends::x[]", "I::sys: sysml-iface-ends::x[]: I::sys::x has no ends; name an interface or connection"},
 		{"depth zero", "sysml-iface-ends::i1[depth=0]", `I::sys: sysml-iface-ends::i1[depth=0]: depth "0" is not a positive number or all`},
 		{"depth not a number", "sysml-iface-ends::i1[depth=two]", `I::sys: sysml-iface-ends::i1[depth=two]: depth "two" is not a positive number or all`},
+		{"name not short or long", "sysml-iface-ends::i1[name=tall]", `I::sys: sysml-iface-ends::i1[name=tall]: name "tall" is not short or long`},
 		{"unknown target", "sysml-iface-ends::nope[]", `I::sys: sysml-iface-ends::nope[]: the model has no element named "nope"`},
 	}
 	for _, c := range cases {

@@ -12,13 +12,15 @@ import (
 
 // IfaceEnds is the block macro sysml-iface-ends::[<element>][], replaced by
 // a bullet list of the ends of an interface (or any connection): each end's
-// name and the feature it connects, engine.air, its segments linked to their
-// pages (MC-17). The source end comes first when there is one. Without a
-// target the page's element is used; a target is read as sysml-name reads
-// it (MC-8, MC-15). The attribute depth (named, or the first positional
-// one) shows the last depth segments of the feature's qualified path,
-// joined by :: (1: air, 2: engine::air), all the whole path
-// (Model::aircraft::engine::air).
+// feature, engine.air, its segments linked to their pages (MC-17). The
+// source end comes first when there is one. Without a target the page's
+// element is used; a target is read as sysml-name reads it (MC-8, MC-15).
+// The attribute depth (named, or the first positional one) shows the last
+// depth segments of the feature's qualified path, joined by " :: " (1: air,
+// 2: engine :: air), all the whole path (Model :: aircraft :: engine :: air).
+// The attribute name says how each segment is named: short (the default)
+// uses the element's short name when it has one, falling back to its name;
+// long always uses the name. Names are shown without single quotes.
 const IfaceEnds = "sysml-iface-ends"
 
 // IfaceEndsRole is the role of the list, for styling.
@@ -27,13 +29,23 @@ const IfaceEndsRole = "sysml-iface-ends"
 func registerIfaceEnds(g *asciidoctor.ExtensionGroup, e *env) {
 	block(g, e, IfaceEnds, &asciidoctor.MacroOptions{PositionalAttributes: []string{"depth"}},
 		func(name, sep, target string, attrs map[string]any) string {
+			attrsText := ""
 			if depth := ifaceDepth(attrs); depth != "" {
-				return name + sep + target + "[depth=" + depth + "]"
+				attrsText = "[depth=" + depth + "]"
+			} else if nm, _ := attrs["name"].(string); nm != "" {
+				attrsText = "[name=" + strings.TrimSpace(nm) + "]"
 			}
-			return name + sep + target + "[]"
+			if attrsText == "" {
+				attrsText = "[]"
+			}
+			return name + sep + target + attrsText
 		},
 		func(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNode, error) {
 			depth, err := parseDepth(ifaceDepth(c.attrs))
+			if err != nil {
+				return nil, err
+			}
+			segName, err := parseSegmentName(ifaceAttrs(c.attrs, "name"))
 			if err != nil {
 				return nil, err
 			}
@@ -58,7 +70,7 @@ func registerIfaceEnds(g *asciidoctor.ExtensionGroup, e *env) {
 				return nil, err
 			}
 			for _, end := range ends {
-				text, err := endText(c.parent, c.page, end, e, depth)
+				text, err := endText(c.parent, c.page, end, e, depth, segName)
 				if err != nil {
 					return nil, err
 				}
@@ -74,8 +86,13 @@ func registerIfaceEnds(g *asciidoctor.ExtensionGroup, e *env) {
 
 // ifaceDepth is the depth attribute of a sysml-iface-ends macro, trimmed.
 func ifaceDepth(attrs map[string]any) string {
-	depth, _ := attrs["depth"].(string)
-	return strings.TrimSpace(depth)
+	return ifaceAttrs(attrs, "depth")
+}
+
+// ifaceAttrs is a named attribute of a sysml-iface-ends macro, trimmed.
+func ifaceAttrs(attrs map[string]any, key string) string {
+	v, _ := attrs[key].(string)
+	return strings.TrimSpace(v)
 }
 
 // Depths of sysml-iface-ends: depthAsWritten without the attribute, the
@@ -99,6 +116,48 @@ func parseDepth(s string) (int, error) {
 		return 0, fmt.Errorf("depth %q is not a positive number or all", s)
 	}
 	return d, nil
+}
+
+// setSegment's name mode: segmentShort uses each element's short name when
+// it has one, else its name; segmentLong always uses the name. The default,
+// without the name attribute, is segmentShort.
+type segmentName int
+
+const (
+	segmentShort segmentName = iota
+	segmentLong
+)
+
+// parseSegmentName reads the name attribute: empty or short, else long.
+func parseSegmentName(s string) (segmentName, error) {
+	switch strings.ToLower(s) {
+	case "", "short":
+		return segmentShort, nil
+	case "long":
+		return segmentLong, nil
+	}
+	return 0, fmt.Errorf("name %q is not short or long", s)
+}
+
+// segmentText is the text of one path segment, an element's name (or short
+// name), single quotes stripped, and linked to its page when it has one.
+func segmentText(parent asciidoctor.Node, page element, e *env, seg segmentName, id string) (string, error) {
+	name, err := e.names.name(id)
+	if err != nil {
+		return "", err
+	}
+	if seg == segmentShort {
+		if short, err := e.m.ShortName(e.ctx, id); err != nil {
+			return "", err
+		} else if short != "" {
+			name = short
+		}
+	}
+	text := html.EscapeString(strings.ReplaceAll(name, "'", ""))
+	if href, ok := e.href(page.id, id); ok {
+		return link(parent, id, href, text)
+	}
+	return text, nil
 }
 
 // connectorEnd is one end of a connection.
@@ -156,14 +215,15 @@ func connectorEnds(e *env, id string) ([]connectorEnd, error) {
 	return ends, nil
 }
 
-// endText is a list item's AsciiDoc: the end's name and the feature it
-// connects, each segment linked to its page when it has one. With
-// depthAsWritten the feature is the chain as written (source: engine.air);
-// otherwise it is the feature's qualified path, the owners of the chain's
-// first element followed by the chain, cut to its last depth segments and
-// joined by :: (source: aircraft::engine::air). An end that connects nothing
-// (an interface def's) shows its name only.
-func endText(parent asciidoctor.Node, page element, end connectorEnd, e *env, depth int) (string, error) {
+// endText is a list item's AsciiDoc: the feature the end connects, each
+// segment linked to its page when it has one. With depthAsWritten the
+// feature is the chain as written (engine.air); otherwise it is the
+// feature's qualified path, the owners of the chain's first element followed
+// by the chain, cut to its last depth segments and joined by " :: "
+// (aircraft :: engine :: air). seg names each segment by short name when
+// available (segmentShort) or always by name (segmentLong). An end that
+// connects nothing (an interface def's) shows its name only.
+func endText(parent asciidoctor.Node, page element, end connectorEnd, e *env, depth int, seg segmentName) (string, error) {
 	ids, sep := end.path, "."
 	if depth != depthAsWritten && len(end.path) > 0 {
 		outer, err := owners(e, end.path[0])
@@ -174,32 +234,21 @@ func endText(parent asciidoctor.Node, page element, end connectorEnd, e *env, de
 		if depth != depthAll && depth < len(ids) {
 			ids = ids[len(ids)-depth:]
 		}
-		sep = "::"
+		sep = " :: "
 	}
 	segs := make([]string, len(ids))
 	for i, id := range ids {
-		name, err := e.names.name(id)
+		segText, err := segmentText(parent, page, e, seg, id)
 		if err != nil {
 			return "", err
 		}
-		if sep == "::" {
-			name = quoteName(name)
-		}
-		segs[i] = html.EscapeString(name)
-		if href, ok := e.href(page.id, id); ok {
-			if segs[i], err = link(parent, id, href, segs[i]); err != nil {
-				return "", err
-			}
-		}
+		segs[i] = segText
 	}
 	path := strings.Join(segs, sep)
-	switch {
-	case end.name == "":
-		return passthrough(path), nil
-	case path == "":
+	if path == "" {
 		return passthrough(html.EscapeString(end.name)), nil
 	}
-	return passthrough(html.EscapeString(end.name) + ": " + path), nil
+	return passthrough(path), nil
 }
 
 // owners are the elements that own id, outermost first, up to a top-level

@@ -256,11 +256,10 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
 - MC-17 :: The block macro =sysml-iface-ends::[<element>][]= shall be
   replaced by a bullet list of the ends of an interface or connection: the
   page's element without a target, else the element the target names, read
-  as for =sysml-name= (MC-8, MC-15). Each item shall be the end's name and
-  the feature it connects (=source: engine.air=), each segment of the
-  feature linked to its page when it has one; an end without a name shows
-  the feature only, an end that connects nothing (an interface def's) its
-  name only. The source end (the end named =source=, as in =connect a to b=
+  as for =sysml-name= (MC-8, MC-15). Each item shall be the feature an end
+  connects (=engine.air=), each segment of the feature linked to its page
+  when it has one; an end that connects nothing (an interface def's) shows
+  its name only. The source end (the end named =source=, as in =connect a to b=
   and =connect (a, b)=) shall come first, the other ends in declaration
   order. An element without ends shall fail the macro (MC-19).
   The attribute =depth= (=[depth=2]= or =[2]=) shall choose how much of the
@@ -271,6 +270,10 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   qualified name. A depth longer than the path shows the whole path.
   Without =depth= the chain is shown as written (=engine.air=). A depth that
   is neither a positive number nor =all= shall fail the macro (MC-19).
+  The attribute =name= shall say how each segment is named: =short= (the
+  default) its short name when it has one, else its name; =long= always the
+  name. A value other than =short= or =long= shall fail the macro
+  (MC-19).
 - MC-18 :: The text of =sysml-name=, =sysml-short-name= and
   =sysml-qualified-name= (MC-8, MC-9, MC-11) shall link to the page of the
   element it describes when that element has a page (PG-1, PG-6), with a
