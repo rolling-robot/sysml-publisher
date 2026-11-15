@@ -282,7 +282,8 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   or when the text is empty (an element without a short name). In a
   document title, the link is kept in the page heading and dropped from the
   browser tab and the sidebar (PG-8). Every link a macro makes to a page
-  (these, =sysml-members-list=, =sysml-iface-ends=, custom macros' links,
+  (these, =sysml-members-list=, =sysml-iface-ends=, =sysml-ifaces=, custom
+  macros' links,
   MC-20) shall be an Asciidoctor link written by the output's converter,
   marked with the element it leads to, so that an output whose links are
   not =<a href>= (Confluence's =<ac:link>=) writes its own.
@@ -316,6 +317,23 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   A target that names no view, a page's element that is not a view, a
   program that cannot be run and a view =sysml= cannot render shall fail
   the macro (MC-19), with the message the program gives.
+- MC-23 :: The block macro =sysml-ifaces::[<element>][]= shall be replaced by
+  a bullet list of the interfaces and connections the target is on: every
+  =ConnectionUsage= and =InterfaceUsage= of the whole model whose ends
+  reference one of the target's owned ports (=PortUsage= members). Without a
+  target the page's element is used, named as MC-15 says. Each item is one
+  connection: its name, linked to its page (MC-18) when it has one, then
+  = -> = and the distinct part(s) on the other ends — the ends that do not
+  reference the target's ports — each the owner of the end's leaf feature,
+  linked and joined with =, =. A connection all of whose ends reference the
+  target's ports shows the connection alone (an empty right side). A part
+  with no owned ports, or with none that any connection references, drops the
+  macro line (MC-12). The =name= attribute says how each part is named,
+  =short= (the default) using its short name when it has one, =long= always
+  its name; a value other than the two fails the macro (MC-19). The model is
+  searched once, a reverse index of ports to connections built on first use
+  and shared by every page (MC-3). A target naming no element, or that is
+  not part-like, fails the macro (MC-19).
 * Open questions
 - TBD-9 :: (Decided: 1, behind an interface, macros.Views, so an in-process
   renderer can replace it once OpenSysML's API gives a picture; MC-21.)

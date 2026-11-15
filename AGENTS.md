@@ -321,7 +321,9 @@ view: it parses a model, `sysml.Open`s it, registers with a map as
   id the model lacks is a renderer bug and returns an error.
 - `env` (`macros.go`): what the macros of one rendering share — the
   rendering's context, the model, the host's `Pages`, `nameIndex`,
-  `metadataIndex` and the lazily built `kindIndex`. `Register` makes one
+  `metadataIndex` and the lazily built `kindIndex` and `connIndex` (the
+  whole-model reverse index of ports to connections, `sysml-ifaces`,
+  MC-23). `Register` makes one
   and passes it to every `register<Name>(g, e)`. Macros read the model only
   through `sysml.Model` (`Props`, `Query`, the element facts, `Specializes`,
   `Evaluate`), never a raw element map, and never through the page tree.
@@ -336,8 +338,10 @@ view: it parses a model, `sysml.Open`s it, registers with a map as
   (Confluence's `<ac:link>`). Converting at once, rather than returning the
   node, lets the same path serve list items and table cells, whose text is
   AsciiDoc embedding finished markup (`passthrough`). `sysml-name` & co.,
-  `sysml-members-list` and `Call.Link` use `linkTo`; `sysml-iface-ends`
-  calls `e.href` and `link` itself, so it also links a segment that is the
+  `sysml-members-list` and `Call.Link` use `linkTo`; `sysml-iface-ends` and
+  `sysml-ifaces`
+  call `e.href` and `link` themselves, so they also link a segment (or the
+  connection and partner parts) that is the
   page's own element. Never write `<a href>` in a macro
   (`TestLinksAreWrittenByTheConverter`, `TestIfaceEndsLinks`).
   `sysml-view` follows the same rule for pictures (MC-21): an image block
@@ -410,6 +414,7 @@ view: it parses a model, `sysml.Open`s it, registers with a map as
 | `sysml-doc::[<element>][]` | block | `Model.Docs` | each doc parsed as AsciiDoc (`ParseContent`) into an open block; target as `sysml-name`; macros in the docs still see the page's element |
 | `sysml-members-list::[<element or kind>][]` | block | `members` (`Model.Members`, `Model.Types`), `Model.Specializes` | ulist; owned members minus annotations and multiplicities (`notMembers`); links to members that have pages; no target: all members with `(types)`; element: members typed by, subclassing or subsetting it; else kind: members of exactly that metaclass (`kindIndex`, case-insensitive) |
 | `sysml-iface-ends::[<element>][]` | block | `Props` (`connectorEnds`: `ownedFeature`, `isEnd`, `ownedReferenceSubsetting`, `chainingFeature`), `nameTarget` | ulist of owned ends (`isEnd`): the connected feature from its `ReferenceSubsetting` (a `chainingFeature` path), segments linked; the end named `source` first; no ends → failure; `depth` (named or positional): last n segments of owners(chain[0]) + chain, ` :: `-joined, single quotes stripped, `all` the whole path; none: chain as written with `.`; `name` (default `short`): each segment by short name when it has one, else by name; `long` always by name; an end that connects nothing shows its name |
+| `sysml-ifaces::[<element>][]` | block | `connIndex` (query `ConnectionUsage`/`InterfaceUsage`, then `connectorEnds`), `nameTarget`, `Model.Members` | ulist of the connections the target's owned `PortUsage` members are on: one item per connection, its name linked, ` -> `, then the distinct other ends' parts (owners of the leaf feature), linked, joined `, `; self-loop: connection alone (`i -> `); no ports or none referenced: line dropped; a target that is not a part (`PartUsage`/`PartDefinition`) fails; `name` (default `short`): each by short name when it has one, else by name; `long` always by name |
 | `sysml-metadata-table::<def>[]` | block | `metadataIndex` (`Props`) | table per MetadataUsage; bound value, else def value, else "(no value)"; supertypes' attributes after own |
 | `sysml-view::[<view>][]` | block | `nameIndex` (`ViewUsage`), `Views` | the host's `Views` renders the view by qualified name (`Registry.SetViews`; none: failure); diagram → image block (`CreateImageBlock`), target the SVG as a `data:image/svg+xml;base64,` URI, alt the view's name; table → table, header row first; both with role and `AttrView` (the qualified name), written by the output's converter as links are (MC-18; `ViewSVG` gives another converter the SVG) and the `.Title` written above set on the block itself, since the parser drops a block macro's attributes; no target: the page's element, must be a view; a name that is no view → "X is a PartUsage, not a view" |
 | `sysml-value:<feature>[]` | inline | `Model.Evaluate` | target must be a feature reference (`featureRefRx`: names, `::`, `.`), not an expression, or `[<element>::]@<metadata>::<attribute>` (`parseMetadataRef`, value read as `sysml-metadata-table` does, not evaluated); OpenSysML evaluates it with the page element as subject; units formatted; composite → `[composite]` + warning |

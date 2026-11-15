@@ -108,6 +108,7 @@ func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, m *sysml.Model, 
 	registerShortName(g, e)
 	registerMembersList(g, e)
 	registerIfaceEnds(g, e)
+	registerIfaces(g, e)
 	registerDoc(g, e)
 	registerMetadataTable(g, e)
 	registerValue(g, e)
@@ -133,6 +134,9 @@ type env struct {
 	views Views
 	// kindIndex is made on first use, by kinds.
 	kindIndex kindIndex
+	// connIndex is the whole-model reverse index of ports to connections,
+	// made on first use, by conns (MC-23); nil until then.
+	connIndex *connIndex
 }
 
 func newEnv(ctx context.Context, m *sysml.Model, pages Pages, warn Warn) *env {

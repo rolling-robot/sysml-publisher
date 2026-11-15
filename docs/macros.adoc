@@ -379,6 +379,66 @@ part aircraft {
 
 The page of `aircraft` lists engine.air and airConditioner.air.
 
+== sysml-ifaces
+
+Block macro, on a line of its own. Replaced by a bullet list of the
+interfaces and connections the target's owned ports are on: the page's
+element with `sysml-ifaces::[]`, or the element a target names
+(`sysml-ifaces::airConditioner[]`), named as described in <<naming>>.
+
+A connection is on the target when any of its ends references one of the
+target's owned ports. Each item is one such connection: its name, linked to
+its page when it has one, then ` -> `, and the distinct part(s) on the
+other ends (the ends that do not reference the target's ports), each linked
+to its page and joined with `, `:
+
+* `i1 connect (x.p, y.p)` on the page of `x` gives `i1 -> y`.
+* An n-ary `i3 connect (x.p, y.p, z.p)` gives `i3 -> y, z`.
+* A `connection` (not an `interface`) is listed the same way.
+* A self-loop `connect (x.p, x.q)` gives the connection alone, `i -> `.
+
+The parts are the owners of the connected features on the other ends. A
+part with no owned ports, or with ports that no connection references, shows
+nothing: the macro line is dropped. The search is over the whole model; the
+ports are found once per run, not per page.
+
+The attribute `name` says how the connection and each partner part are
+named: `short` (the default) uses an element's short name when it has one,
+else its name; `long` always uses the name.
+
+Syntax:: `sysml-ifaces::[]`, `sysml-ifaces::<element>[]`,
+`sysml-ifaces::<element>[name=short|long]`
+Attributes:: `name`: `short` or `long`
+
+Example:
+
+[source,sysml]
+----
+package Example {
+    port def P;
+    part aircraft {
+        rep language "asciidoc"
+            /*
+            Ducts:
+
+            sysml-ifaces::[]
+            */
+        port air : P;
+    }
+    part airConditioner {
+        rep language "asciidoc"
+            /* = airConditioner */
+        port air : P;
+    }
+    interface airDuct connect (aircraft.air, airConditioner.air) {
+        rep language "asciidoc"
+            /* = airDuct */
+    }
+}
+----
+
+The page of `aircraft` lists `airDuct -> airConditioner`.
+
 == sysml-metadata-table
 
 Block macro, on a line of its own. Replaced by a table of the attributes of
