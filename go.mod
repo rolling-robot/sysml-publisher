@@ -3,7 +3,7 @@ module github.com/rolling-robot/sysml-publisher
 go 1.27.2
 
 require (
-	github.com/Open-MBEE/OpenSysML v0.12.2-0.20261110074652-6f9622b8a9d5
+	github.com/Open-MBEE/OpenSysML v0.12.2-0.20261111062923-56febd38bcad
 	github.com/rolling-robot/asciidoctorg v0.2.1
 )
 

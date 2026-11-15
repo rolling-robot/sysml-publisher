@@ -36,9 +36,11 @@ go vet ./...
 ```
 
 - **Dependencies are versions anyone can download** in `go.mod`: OpenSysML
-  at a `develop` commit (`v0.12.2-0.20261110074652-6f9622b8a9d5`, for the
-  query properties `body`, `language` and `textualRepresentation` and for
-  `Client.ElementProperties`, which no tag has yet; move to the next tag when it is released) and asciidoctorg
+  at a `develop` commit (`v0.12.2-0.20261111062923-56febd38bcad`, for the
+  query properties `body`, `language` and `textualRepresentation`, for
+  `Client.ElementProperties`, and for `Client.RenderView`'s written forms
+  (`WithForm`: DOT, CSV, …), which no tag has yet; move to the next tag when
+  it is released) and asciidoctorg
   `v0.2.1`; `go install …/cmd/sysml-publish@latest` must work, so `go.mod`
   never carries `replace` directives. OpenSysML pseudo-versions work: it
   has no submodules.

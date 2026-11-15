@@ -15,8 +15,8 @@ github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/Open-MBEE/OpenSysML v0.12.2-0.20261110074652-6f9622b8a9d5 h1:E8GB27h7uEoRAgmxcU1yW7m+j4lF4+3UKPObdmL90/4=
-github.com/Open-MBEE/OpenSysML v0.12.2-0.20261110074652-6f9622b8a9d5/go.mod h1:pP+I1tvUcaM77lEwd2cxua/052bu5LODjftsJ5gXejg=
+github.com/Open-MBEE/OpenSysML v0.12.2-0.20261111062923-56febd38bcad h1:SkFcNoKKExcZxoBGLFMpegiD9G17yCcaUX1JocJaimA=
+github.com/Open-MBEE/OpenSysML v0.12.2-0.20261111062923-56febd38bcad/go.mod h1:M29NNn9HhUK2BLV7SaPiB3yg1PUa4JBbfpEwIZOQXvM=
 github.com/RoaringBitmap/roaring/v2 v2.14.5 h1:ckd0o545JqDPeVJDgeFoaM21eBixUnlWfYgjE5VnyWw=
 github.com/RoaringBitmap/roaring/v2 v2.14.5/go.mod h1:eq4wdNXxtJIS/oikeCzdX1rBzek7ANzbth041hrU8Q4=
 github.com/abtreece/confd v0.41.2 h1:XN+ozNZmah6gIjJG2mN0iCr2JkE/KB5yEf2MDfLM2D8=
