@@ -70,6 +70,18 @@ func (m *Model) Evaluate(ctx context.Context, subject, expression string) (opens
 	return m.client.Evaluate(ctx, m.parsed, expression, opensysml.WithSubject(subject))
 }
 
+// RenderView renders the view with that qualified name as the view's data
+// (nodes, edges, a table's columns and rows), shaped by the options; with
+// opensysml.WithForm it also writes the view in that form — DOT for a
+// diagram, CSV or text for a table (MC-21). Without a form, Columns and Rows
+// say whether the view is tabular.
+func (m *Model) RenderView(ctx context.Context, qualifiedName string, opts ...opensysml.RenderViewOption) (*opensysml.RenderedView, error) {
+	if m.client == nil {
+		return nil, errors.New("sysml: the model is closed")
+	}
+	return m.client.RenderView(ctx, m.parsed, qualifiedName, opts...)
+}
+
 // Close releases the engine. What was read stays cached, but nothing more
 // can be read.
 func (m *Model) Close() error {
