@@ -1,0 +1,20 @@
+# Example configuration for sysml-publish.
+#
+# Copy this file as sysml-publish.toml in the working directory to have the
+# tool read it on every run, or pass it explicitly:
+#
+#     sysml-publish -config docs/sysml-publish.toml
+#
+# Paths are relative to the working directory, like the flags' values are.
+# A flag given on the command line wins over the file; the file wins over
+# the built-in defaults (CFG-3). These five keys are the only ones; any
+# other key is a usage error.
+
+[source]
+dir = "model"                # the model folder (the -model default)
+
+[site]
+dir = "site"                 # the output folder (the -out default)
+title = "Aircraft documentation"          # landing page, sidebar, browser tabs
+baseURL = "https://example.com/aircraft/"  # the URL the site is published under;
+                                           # every page then carries a canonical link

@@ -395,6 +395,8 @@ title = "Aircraft docs"      # the site's title: landing page, sidebar, browser 
 baseURL = "https://example.com/aircraft/"  # the URL the site is published under
 ```
 
+A commented example to copy is [`docs/sysml-publish.toml`](docs/sysml-publish.toml).
+
 - Paths are relative to the working directory, like the flags' values are.
 - Without the file (or without a key in it), the flags and defaults apply:
   `./model`, `./site`, the title "Model documentation".
