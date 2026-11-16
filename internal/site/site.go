@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,8 +27,19 @@ import (
 // may replace the folder (CLI-4) without risking a folder the user made.
 const Marker = ".sysml-publish"
 
-// LandingTitle is the title of the landing page (PT-5).
+// LandingTitle is the site title when none is configured (CFG-4), shown on
+// the landing page, in the sidebar and after the page title in the tab.
 const LandingTitle = "Model documentation"
+
+// Options are the site's settings from the config file: the title (CFG-4)
+// and the URL the site is published under (CFG-5), both optional.
+type Options struct {
+	// Title replaces LandingTitle when not empty.
+	Title string
+	// BaseURL makes every page carry a canonical link when set. Absolute
+	// (CFG-5); the pages' links to each other stay relative (PT-1).
+	BaseURL string
+}
 
 //go:embed assets/*.css
 var assets embed.FS
@@ -49,25 +61,29 @@ type Site struct {
 
 // Render renders t (render.Tree) and lays it out as a site (New). logger
 // and views are render.Options.Logger and render.Options.Views.
-func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger, views macros.Views) (*Site, error) {
+func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger, views macros.Views, o Options) (*Site, error) {
 	res, err := render.Tree(ctx, t, render.Options{Logger: logger, Views: views})
 	if err != nil {
 		return nil, err
 	}
-	return New(res)
+	return New(res, o)
 }
 
 // New lays out res as a site: a page per page of the tree in its folder
 // (PT-1), with the tree as a sidebar on every page (SB-1..3), the landing
 // page (PT-5), the stylesheets and Marker. Links between pages are the
 // tree's relative ones, so res must be rendered with render.Options.Pages
-// nil.
-func New(res *render.Result) (*Site, error) {
+// nil. o gives the site's title (CFG-4) and base URL (CFG-5).
+func New(res *render.Result, o Options) (*Site, error) {
+	title := o.Title
+	if title == "" {
+		title = LandingTitle
+	}
 	s := &Site{Files: map[string][]byte{}}
 	for _, w := range res.Warnings {
 		s.Warnings = append(s.Warnings, w.String())
 	}
-	l := &layout{t: res.Tree, pages: res.Pages}
+	l := &layout{t: res.Tree, pages: res.Pages, title: title, baseURL: o.BaseURL}
 	if err := l.page(s, res.Tree.Root); err != nil {
 		return nil, err
 	}
@@ -89,8 +105,10 @@ func New(res *render.Result) (*Site, error) {
 
 // layout writes the pages of a rendered tree.
 type layout struct {
-	t     *tree.Tree
-	pages map[*tree.Node]*render.Page
+	t       *tree.Tree
+	pages   map[*tree.Node]*render.Page
+	title   string
+	baseURL string
 }
 
 // file is where node n's page is written.
@@ -99,6 +117,23 @@ func file(n *tree.Node) string {
 		return "index.html"
 	}
 	return n.Dir + "/index.html"
+}
+
+// canonical is a page's absolute URL under baseURL (CFG-5): the base URL
+// with the page's folder appended. Its segments are escaped the way the
+// pages' links escape theirs, so the URL is the one a web server serves the
+// page at.
+func canonical(baseURL, dir string) string {
+	if baseURL == "" {
+		return ""
+	}
+	u := strings.TrimSuffix(baseURL, "/")
+	if dir != "" {
+		for _, seg := range strings.Split(dir, "/") {
+			u += "/" + url.PathEscape(seg)
+		}
+	}
+	return u + "/"
 }
 
 type navItem struct {
@@ -114,6 +149,7 @@ type pageView struct {
 	QualifiedName        string
 	AssetsHref, HomeHref string
 	SiteTitle            string
+	Canonical            string
 	Landing, Empty       bool
 	Own, Inherited       []template.HTML
 	Nav                  []navItem
@@ -122,15 +158,16 @@ type pageView struct {
 func (l *layout) page(s *Site, n *tree.Node) error {
 	root := l.t.Root
 	v := pageView{
-		SiteTitle:  LandingTitle,
+		SiteTitle:  l.title,
 		AssetsHref: strings.TrimSuffix(tree.Href(n, root), "index.html") + "assets/",
 		HomeHref:   tree.Href(n, root),
+		Canonical:  canonical(l.baseURL, n.Dir),
 		Landing:    n == root,
 		Empty:      n != root && !n.Documented(),
 		Nav:        l.nav(n, root.Children),
 	}
 	if n == root {
-		t := render.PlainTitle(LandingTitle)
+		t := render.PlainTitle(l.title)
 		v.TitleHTML, v.TitleText = t.HTML, t.Text
 	} else {
 		p := l.pages[n]

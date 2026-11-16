@@ -13,6 +13,10 @@ import (
 )
 
 func renderSite(t *testing.T, fixture string) *Site {
+	return renderSiteOptions(t, fixture, Options{})
+}
+
+func renderSiteOptions(t *testing.T, fixture string, o Options) *Site {
 	t.Helper()
 	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", fixture)}.Load(t.Context())
 	if err != nil {
@@ -23,7 +27,7 @@ func renderSite(t *testing.T, fixture string) *Site {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Render(t.Context(), tr, nil, nil)
+	s, err := Render(t.Context(), tr, nil, nil, o)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,6 +87,46 @@ func TestHrefEscapesSegments(t *testing.T) {
 	to := &tree.Node{Dir: "A/x#y"}
 	if got, want := tree.Href(from, to), "../x%23y/index.html"; got != want {
 		t.Errorf("href = %q, want %q", got, want)
+	}
+}
+
+// canonical joins the base URL and a page's folder (CFG-5); no base URL, no
+// canonical link.
+func TestCanonical(t *testing.T) {
+	cases := []struct{ base, dir, want string }{
+		{"https://example.com", "", "https://example.com/"},
+		{"https://example.com/", "", "https://example.com/"},
+		{"https://example.com/docs", "Model/pd", "https://example.com/docs/Model/pd/"},
+		{"https://example.com/docs/", "Model/pd", "https://example.com/docs/Model/pd/"},
+		{"https://example.com", "A/b c", "https://example.com/A/b%20c/"},
+	}
+	for _, c := range cases {
+		if got := canonical(c.base, c.dir); got != c.want {
+			t.Errorf("canonical(%q, %q) = %q, want %q", c.base, c.dir, got, c.want)
+		}
+	}
+	if got := canonical("", "A"); got != "" {
+		t.Errorf("canonical(\"\") = %q, want \"\"", got)
+	}
+}
+
+// Options' title (CFG-4) is the landing page's and the tabs' suffix; the
+// base URL (CFG-5) puts a canonical link on every page.
+func TestOptionsTitleAndCanonical(t *testing.T) {
+	s := renderSiteOptions(t, "smoke", Options{Title: "Model docs", BaseURL: "https://example.com/docs/"})
+	mustContain(t, s, "index.html",
+		"<h1>Model docs</h1>",
+		`<a class="home" href="index.html" aria-current="page">Model docs</a>`,
+		`<link rel="canonical" href="https://example.com/docs/">`)
+	mustContain(t, s, "Model/pd/index.html",
+		"<title>Element: pd — Model docs</title>",
+		`<link rel="canonical" href="https://example.com/docs/Model/pd/">`)
+	// Without a base URL no page carries a canonical link.
+	s = renderSite(t, "smoke")
+	for _, f := range s.Pages() {
+		if strings.Contains(string(s.Files[f]), "canonical") {
+			t.Errorf("%s has a canonical link without a base URL", f)
+		}
 	}
 }
 

@@ -3,6 +3,7 @@ module github.com/rolling-robot/sysml-publisher
 go 1.27.2
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/Open-MBEE/OpenSysML v0.12.2-0.20261111062923-56febd38bcad
 	github.com/rolling-robot/asciidoctorg v0.2.1
 )
@@ -13,7 +14,6 @@ require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/Azure/go-ntlmssp v0.1.1 // indirect
-	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.14.5 // indirect
 	github.com/abtreece/confd v0.41.2 // indirect
 	github.com/ajroetker/go-highway v0.0.4 // indirect

@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{if .Landing}}{{.SiteTitle}}{{else}}{{.TitleText}} — {{.SiteTitle}}{{end}}</title>
+{{if .Canonical}}<link rel="canonical" href="{{.Canonical}}">
+{{end -}}<title>{{if .Landing}}{{.SiteTitle}}{{else}}{{.TitleText}} — {{.SiteTitle}}{{end}}</title>
 <link rel="stylesheet" href="{{.AssetsHref}}asciidoctor.css">
 <link rel="stylesheet" href="{{.AssetsHref}}layout.css">
 </head>

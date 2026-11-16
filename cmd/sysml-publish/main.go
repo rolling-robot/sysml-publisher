@@ -1,7 +1,10 @@
 // Command sysml-publish builds a static HTML page tree from the AsciiDoc
 // textual representations of a SysML v2 model.
 //
-//	sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json]
+//	sysml-publish [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
+//
+// An optional TOML config file (CFG-1..CFG-5) names the model and site
+// folders and the site's title and base URL; command-line flags win over it.
 //
 // Everything it reports goes to stderr as structured log records (log/slog):
 // human-readable text by default, JSON with -log-format json.
@@ -47,11 +50,12 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	modelDir := fs.String("model", "./model", "folder holding the SysML model files (*.sysml, *.kerml), searched recursively")
 	outDir := fs.String("out", "./site", "folder to write the pages to; replaced on every run")
+	configPath := fs.String("config", "", "configuration file (TOML); "+DefaultConfigFile+" in the working directory when unset (CFG-1)")
 	verbose := fs.Bool("v", false, "also log debug records: the duration of every stage and page")
 	logFormat := fs.String("log-format", "text", "format of the log on stderr: text or json")
 	dotCmd := fs.String("dot", "dot", "Graphviz's dot command, which lays out the diagrams sysml-view shows")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]")
+		fmt.Fprintln(stderr, "Usage: sysml-publish [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]")
 		fmt.Fprintln(stderr, "\nBuilds a static HTML page tree from the AsciiDoc textual representations of a SysML v2 model.")
 		fmt.Fprintln(stderr)
 		fs.PrintDefaults()
@@ -76,7 +80,29 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	// Libraries that log through the default logger use the same one.
 	slog.SetDefault(logger)
 
-	err = publish(ctx, logger, *modelDir, *outDir, *dotCmd)
+	// The config file (CFG-1..CFG-3): an explicit -config must exist; the
+	// default name may not. A flag the user gave wins over the file, the
+	// file over the flag's default.
+	given := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { given[f.Name] = true })
+	path := *configPath
+	if path == "" {
+		path = DefaultConfigFile
+	}
+	cfg, err := loadConfig(path, given["config"])
+	if err != nil {
+		fmt.Fprintln(stderr, "sysml-publish:", err)
+		return exitUsage
+	}
+	modelPath, sitePath := *modelDir, *outDir
+	if !given["model"] && cfg.Source.Dir != "" {
+		modelPath = cfg.Source.Dir
+	}
+	if !given["out"] && cfg.Site.Dir != "" {
+		sitePath = cfg.Site.Dir
+	}
+
+	err = publish(ctx, logger, modelPath, sitePath, *dotCmd, site.Options{Title: cfg.Site.Title, BaseURL: cfg.Site.BaseURL})
 	switch {
 	case err == nil:
 		return exitOK
@@ -124,8 +150,9 @@ func newLogger(w io.Writer, format string, verbose bool) (*slog.Logger, error) {
 }
 
 // publish builds the site of the model in modelDir into outDir; dotCmd lays
-// out the diagrams sysml-view shows (views.InProcess).
-func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir, dotCmd string) error {
+// out the diagrams sysml-view shows (views.InProcess), and siteOpts carry
+// the config file's site title and base URL (CFG-4, CFG-5).
+func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir, dotCmd string, siteOpts site.Options) error {
 	start := time.Now()
 
 	stage := time.Now()
@@ -163,7 +190,7 @@ func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir, dotCmd 
 	}
 
 	stage = time.Now()
-	s, err := site.Render(ctx, t, logger, &views.InProcess{Model: m.Model, Dot: dotCmd})
+	s, err := site.Render(ctx, t, logger, &views.InProcess{Model: m.Model, Dot: dotCmd}, siteOpts)
 	if err != nil {
 		return err
 	}

@@ -22,8 +22,8 @@ from the model (names, docs, members, metadata tables, evaluated attribute
 values).
 
 ```
-sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
-# defaults: ./model, ./site, dot from PATH
+sysml-publish [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
+# defaults: ./model, ./site, dot from PATH; config file sysml-publish.toml (CFG-1..CFG-5)
 ```
 
 ## 2. Building, running, testing
@@ -80,6 +80,7 @@ go vet ./...
 
 ```
 cmd/sysml-publish/main.go   CLI: flags, wiring, messages, exit codes
+cmd/sysml-publish/config.go the config file: TOML, strict keys, flag precedence (CFG-1..CFG-5)
 internal/model/             find + parse the files (OpenSysML in-process), diagnostics; embeds *sysml.Model
 internal/tree/              which elements get pages, inheritance, names, paths (reads the model, writes nothing)
 internal/render/            convert representations per page (asciidoctorg), titles;
@@ -241,13 +242,15 @@ take the same converted pages: `internal/render` converts and titles,
   Inherited}` (HTML fragments) for every page of `Tree.Pages`, none for
   the root; `Warnings` as `macros.Warning`s, location filled.
 
-`site.New(result)` lays the result out: `page.html.tmpl` for every page
-and the landing page, with the sidebar built from the tree, the
-stylesheets and the marker. Asciidoctor output is trusted as
+`site.New(result, Options{Title, BaseURL})` lays the result out: `page.html.tmpl`
+for every page and the landing page, with the sidebar built from the tree, the
+stylesheets and the marker. `Options.Title` is the site's title (CFG-4;
+default `LandingTitle`), `Options.BaseURL` gives every page a canonical link
+(CFG-5; the pages' links stay relative). Asciidoctor output is trusted as
 `template.HTML` (secure safe mode); everything else is escaped by
 `html/template`. Its links are the tree's, so the result must be rendered
-with `Pages` nil. `site.Render(ctx, t, logger)` is `render.Tree` then
-`New`, and is what the CLI calls.
+with `Pages` nil. `site.Render(ctx, t, logger, views, o)` is `render.Tree`
+then `New`, and is what the CLI calls.
 
 - `Site.Write` refuses to replace a non-empty folder without the
   `.sysml-publish` marker, then `RemoveAll`s and writes (CLI-4). Not atomic:
@@ -438,6 +441,18 @@ message.
 
 `run(ctx, args, stderr) int`, tested in `main_test.go` against fixtures into
 `t.TempDir()`.
+
+- **Config file (CFG-1..CFG-5, `config.go`)**: an optional TOML file,
+  `sysml-publish.toml` in the working directory or the `-config` path (which
+  must exist). Keys are strict: `[source] dir` (the model folder, CLI-2) and
+  `[site] dir` (the site folder, CLI-3), `title` (CFG-4) and `baseURL`
+  (CFG-5); anything else is a usage error naming the key, so the decoder
+  runs twice — into a map for the exact key check (the decoder also matches
+  keys ignoring case) and into the struct for the values. `baseURL` must be
+  absolute; set to `""` it is still set, and still an error. A flag the user
+  gave (`fs.Visit`) wins over the file, the file over the flag defaults.
+  A config problem is a usage error (exit 2), logged once, before anything
+  loads.
 
 - **Logging (CLI-6)**: every message is a `log/slog` record on stderr: text
   without timestamps by default, JSON with `-log-format json`; `-v` enables

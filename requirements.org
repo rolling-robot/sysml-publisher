@@ -55,6 +55,26 @@
   It is needed only when a representation uses a =sysml-view= that is a
   diagram: a table view is written from the rendering's rows.
 
+* Configuration
+- CFG-1 :: The tool shall read an optional configuration file in TOML
+  format: =sysml-publish.toml= in the working directory, or the file
+  =-config= names, which shall exist. When the default file does not exist,
+  the tool shall run without it.
+- CFG-2 :: The configuration file shall name, in a =source= section, the
+  model folder (=dir=, CLI-2), and, in a =site= section, the site folder
+  (=dir=, CLI-3), the site's title (=title=) and the URL the site is
+  published under (=baseURL=). A key that is none of these shall be a usage
+  error naming it.
+- CFG-3 :: A value given on the command line shall win over the
+  configuration file, and the file over the built-in defaults (CLI-2,
+  CLI-3).
+- CFG-4 :: =site.title= shall be the site's title, shown on the landing
+  page, in the sidebar and after the page title in the browser tab. If
+  unset, =Model documentation= shall be used.
+- CFG-5 :: =site.baseURL= shall be absolute, else a usage error. When it is
+  set, every page shall carry =<link rel="canonical" href=…>= naming the
+  page's URL under it. Links between pages stay relative (PT-1).
+
 * Pages
 - PG-1 :: The tool shall generate exactly one page per documented element,
   and one page per ancestor of a documented element (PG-6).

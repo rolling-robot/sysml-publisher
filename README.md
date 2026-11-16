@@ -266,6 +266,8 @@ site/
   page marked.
 - All links are relative, so the site works from `file://`, from any web
   server, and from any sub-path.
+- With `baseURL` configured, every page also carries a canonical link naming
+  its absolute URL under it (see [Configuration file](#configuration-file)).
 - **The output folder is replaced on every run**, so pages of removed elements
   disappear. To protect your files, the tool only replaces a folder that is
   empty, does not exist, or carries the `.sysml-publish` marker from an earlier
@@ -377,14 +379,42 @@ r.Inline("my-mass", func(c *macros.Call) (string, error) {
 Names starting with `sysml-` are reserved for this tool's macros. See
 `ExampleRegistry_Inline` in the same file.
 
+## Configuration file
+
+A `sysml-publish.toml` in the working directory (or the file `-config` names)
+names the folders and the site's metadata. A flag you give wins over the file,
+and the file over the built-in defaults:
+
+```toml
+[source]
+dir = "model"                # the model folder (the -model default)
+
+[site]
+dir = "site"                 # the output folder (the -out default)
+title = "Aircraft docs"      # the site's title: landing page, sidebar, browser tabs
+baseURL = "https://example.com/aircraft/"  # the URL the site is published under
+```
+
+- Paths are relative to the working directory, like the flags' values are.
+- Without the file (or without a key in it), the flags and defaults apply:
+  `./model`, `./site`, the title "Model documentation".
+- `baseURL` must be an absolute URL. When it is set, every page carries
+  `<link rel="canonical" href="…">` naming that page's URL under it; the
+  links between pages stay relative, so the site still opens from disk.
+- These five keys are the only ones; any other key is a usage error, so a
+  misspelled one is reported instead of silently ignored.
+- `sysml-publish.toml` found by name may be absent; a file named with
+  `-config` must exist.
+
 ## Command line
 
 ```
-sysml-publish [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
+sysml-publish [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
 ```
 
 | Flag | Default | Meaning |
 |---|---|---|
+| `-config FILE` | `sysml-publish.toml` in the working directory, if present | the [configuration file](#configuration-file) |
 | `-model DIR` | `./model` | folder with the model; every `*.sysml` and `*.kerml` file in it, searched recursively, is read as one model, so references across files work; hidden files and folders (`.git`, editor lock files) are skipped |
 | `-out DIR` | `./site` | folder to write the site to; replaced on every run |
 | `-v` | off | also report how long each stage and each page took |
@@ -408,7 +438,7 @@ Exit status:
 |---|---|
 | 0 | the site was written (possibly with warnings) |
 | 1 | the run failed; nothing was written |
-| 2 | wrong command-line usage |
+| 2 | wrong command-line usage, a problem in the config file (an unknown key, a `baseURL` that is not an absolute URL, a missing `-config` file) |
 | 130 | interrupted with Ctrl-C or SIGTERM; nothing was written |
 
 ## Errors and warnings

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +15,17 @@ import (
 )
 
 func fixture(name string) string { return filepath.Join("..", "..", "testdata", name) }
+
+// fixtureAbs is a fixture path that stays right when the test changes the
+// working directory.
+func fixtureAbs(t *testing.T, name string) string {
+	t.Helper()
+	p, err := filepath.Abs(fixture(name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
 
 func TestPublishSmoke(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "site")
@@ -168,6 +180,90 @@ func TestMacroFailuresAreWarnings(t *testing.T) {
 	}
 	if !strings.Contains(string(page), `<div class="sysml-failed">`) {
 		t.Errorf("M/b/index.html has no placeholder:\n%s", page)
+	}
+}
+
+// The config file names the folders, the title and the base URL (CFG-1,
+// CFG-2, CFG-4, CFG-5): the run takes them all from -config, and every page
+// shows the configured title and its canonical URL.
+func TestConfigFile(t *testing.T) {
+	model, out := fixtureAbs(t, "smoke"), filepath.Join(t.TempDir(), "site")
+	cfg := writeConfig(t, t.TempDir(), fmt.Sprintf(
+		"[source]\ndir = %q\n[site]\ndir = %q\ntitle = \"Model docs\"\nbaseURL = \"https://example.com/docs/\"\n", model, out))
+	var log bytes.Buffer
+	if code := run(t.Context(), []string{"-config", cfg}, &log); code != exitOK {
+		t.Fatalf("exit %d, want %d; log:\n%s", code, exitOK, log.String())
+	}
+	landing, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := os.ReadFile(filepath.Join(out, "Model", "pd", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ file, html string }{
+		{"index.html", "<title>Model docs</title>"},
+		{"index.html", `<a class="home" href="index.html" aria-current="page">Model docs</a>`},
+		{"index.html", `<link rel="canonical" href="https://example.com/docs/">`},
+		{"Model/pd/index.html", "<title>Element: pd — Model docs</title>"},
+		{"Model/pd/index.html", `<link rel="canonical" href="https://example.com/docs/Model/pd/">`},
+	} {
+		if c.file == "index.html" && !bytes.Contains(landing, []byte(c.html)) {
+			t.Errorf("landing lacks %q:\n%s", c.html, landing)
+		}
+		if c.file != "index.html" && !bytes.Contains(page, []byte(c.html)) {
+			t.Errorf("pd's page lacks %q:\n%s", c.html, page)
+		}
+	}
+}
+
+// The sysml-publish.toml of the working directory is read without -config
+// (CFG-1), and a flag the user gave wins over the file (CFG-3).
+func TestConfigDefaultNameAndFlagsWin(t *testing.T) {
+	model := fixtureAbs(t, "smoke")
+	dir := t.TempDir()
+	cfgOut := filepath.Join(dir, "fromconfig")
+	flagOut := filepath.Join(dir, "fromflag")
+	// Both folders in the file are wrong: the run only works when the
+	// flags won.
+	writeConfig(t, dir, fmt.Sprintf(
+		"[source]\ndir = %q\n[site]\ndir = %q\n", "no-such-model", cfgOut))
+	t.Chdir(dir)
+	var log bytes.Buffer
+	args := []string{"-model", model, "-out", flagOut}
+	if code := run(t.Context(), args, &log); code != exitOK {
+		t.Fatalf("exit %d, want %d; log:\n%s", code, exitOK, log.String())
+	}
+	if _, err := os.Stat(filepath.Join(flagOut, "index.html")); err != nil {
+		t.Errorf("the -out folder was not used: %v", err)
+	}
+	if _, err := os.Stat(cfgOut); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the config's site folder was written despite -out: %v", err)
+	}
+}
+
+// A -config file that does not exist is a usage error (CFG-1); with no
+// -config and no default file, the run goes on.
+func TestConfigMissing(t *testing.T) {
+	absent := filepath.Join(t.TempDir(), "absent.toml")
+	var log bytes.Buffer
+	if code := run(context.Background(), []string{"-config", absent}, &log); code != exitUsage {
+		t.Errorf("exit %d, want %d; log:\n%s", code, exitUsage, log.String())
+	}
+	if !strings.Contains(log.String(), "reading the config file") {
+		t.Errorf("log lacks the missing file:\n%s", log.String())
+	}
+	// A broken default file is an error too, named as a config problem.
+	dir := t.TempDir()
+	writeConfig(t, dir, "[site]\nbogus = 1\n")
+	t.Chdir(dir)
+	log.Reset()
+	if code := run(context.Background(), nil, &log); code != exitUsage {
+		t.Errorf("exit %d, want %d; log:\n%s", code, exitUsage, log.String())
+	}
+	if !strings.Contains(log.String(), DefaultConfigFile) {
+		t.Errorf("log does not name %s:\n%s", DefaultConfigFile, log.String())
 	}
 }
 
