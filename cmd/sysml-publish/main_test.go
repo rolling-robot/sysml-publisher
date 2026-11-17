@@ -141,7 +141,7 @@ func TestModelWithoutRepresentationsWritesLandingPageOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{".sysml-publish", "assets/asciidoctor.css", "assets/layout.css", "assets/sort.js", "index.html"}
+	want := []string{".sysml-publish", "assets/asciidoctor.css", "assets/layout.css", "assets/sidebar.js", "assets/sort.js", "index.html"}
 	if !slices.Equal(got, want) {
 		t.Errorf("files written = %v, want %v", got, want)
 	}

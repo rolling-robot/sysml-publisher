@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- A resizable sidebar (SB-5): a strip at the sidebar's right edge widens and
+  narrows the page tree by dragging; the chosen width is remembered in the
+  browser and applied on every page. Double-click, or the arrow keys with the
+  strip focused, restores the default width. A page without JavaScript keeps
+  the default width, as before.
+
 ## 0.4.0 — 2026-11-18
 
 ### Added

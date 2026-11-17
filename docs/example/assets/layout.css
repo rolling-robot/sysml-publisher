@@ -1,8 +1,9 @@
 /* Copyright 2026 Petr Mukhachev | SPDX-License-Identifier: MIT */
 /* sysml-publisher page layout: page tree on the left, content on the right (SB-1). */
 .layout {
+  position: relative;
   display: grid;
-  grid-template-columns: 18rem minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 18rem) minmax(0, 1fr);
   gap: 2rem;
   max-width: 82rem;
   margin: 0 auto;
@@ -42,7 +43,35 @@
 @media (max-width: 48rem) {
   .layout { grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: static; max-height: none; border-right: 0; border-bottom: 1px solid #e7e7e9; padding-right: 0; }
+  .sidebar-resize { display: none; }
 }
+/* Resizing the sidebar (SB-5): sidebar.js drags .sidebar-resize, a strip
+   over the sidebar's right border, and remembers the width in the browser;
+   without the script the strip is inert and the sidebar keeps its default
+   width. During the drag the whole page keeps the strip's cursor. */
+.sidebar-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(1rem + var(--sidebar-width, 18rem) - .75rem);
+  width: 1.5rem;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidebar-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: .65rem;
+  border-right: 2px solid transparent;
+}
+.sidebar-resize:hover::after,
+.sidebar-resize:focus-visible::after { border-color: #b9b9bf; }
+.sidebar-resize:focus { outline: none; }
+html.sidebar-resizing,
+html.sidebar-resizing body { cursor: col-resize; }
+html.sidebar-resizing body { user-select: none; -webkit-user-select: none; }
 .sysml-metadata-table .no-value { color: rgba(0, 0, 0, .45); font-style: italic; }
 /* The placeholder a failing macro leaves (MC-19): visible, but not mistaken for content. */
 .sysml-failed {

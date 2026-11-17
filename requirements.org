@@ -135,6 +135,13 @@
   and reads exactly as before. A column's values are compared as numbers when
   every value in the column is one, and as text (case-insensitive) otherwise;
   a cell with no text sorts after every other value, in either direction.
+- SB-5 :: The user may adjust the sidebar's width by dragging a strip at its
+  right edge, and the chosen width shall be remembered in the browser and
+  applied on every page of the site. A double-click on the strip shall
+  restore the default width. The strip is also keyboard-adjustable. The
+  adjustment happens in the browser over a small script the site ships with
+  the stylesheets; a page without it renders and reads exactly as before,
+  with the default width.
 
 * Errors
 - ER-1 :: (Post-MVP) If the external service is unreachable, the tool shall

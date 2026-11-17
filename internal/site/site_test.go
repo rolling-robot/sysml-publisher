@@ -78,14 +78,17 @@ func TestRenderSmoke(t *testing.T) {
 		`<a href="../bbb/index.html">Element: bbb</a>`)
 	mustContain(t, s, "Model/index.html", `<p class="empty-page">`)
 	mustContain(t, s, "index.html", "<h1>"+LandingTitle+"</h1>", `<a href="Model/pd/index.html">Element: pd</a>`)
-	for _, f := range []string{"assets/asciidoctor.css", "assets/layout.css", "assets/sort.js", Marker} {
+	for _, f := range []string{"assets/asciidoctor.css", "assets/layout.css", "assets/sort.js", "assets/sidebar.js", Marker} {
 		if len(s.Files[f]) == 0 {
 			t.Errorf("%s missing", f)
 		}
 	}
-	// Every page loads the table-sorting script (SB-4), from the same
-	// assets folder as the stylesheets.
-	mustContain(t, s, "Model/pd/index.html", `<script src="../../assets/sort.js" defer></script>`)
+	// Every page loads the table-sorting (SB-4) and sidebar-resizing (SB-5)
+	// scripts, from the same assets folder as the stylesheets.
+	mustContain(t, s, "Model/pd/index.html",
+		`<script src="../../assets/sort.js" defer></script>`,
+		`<script src="../../assets/sidebar.js" defer></script>`,
+		`<div class="sidebar-resize" role="separator" aria-orientation="vertical"`)
 }
 
 func TestHrefEscapesSegments(t *testing.T) {

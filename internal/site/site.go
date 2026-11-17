@@ -96,7 +96,7 @@ func New(res *render.Result, o Options) (*Site, error) {
 			return nil, err
 		}
 	}
-	for _, name := range []string{"asciidoctor.css", "layout.css", "sort.js"} {
+	for _, name := range []string{"asciidoctor.css", "layout.css", "sort.js", "sidebar.js"} {
 		data, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			return nil, err

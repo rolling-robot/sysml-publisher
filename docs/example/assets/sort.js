@@ -35,13 +35,11 @@
       var body = table.tBodies[b];
       var rows = [].slice.call(body.rows);
       var num = numeric(rows, col);
-      // null last whichever direction the rest sort in.
-      var none = dir < 0 ? -1 : 1;
       rows.sort(function (r, s) {
         var a = key(r, col), c = key(s, col);
         if (a === null && c === null) return 0;
-        if (a === null) return none;
-        if (c === null) return -none;
+        if (a === null) return 1; // no value sorts last, either direction
+        if (c === null) return -1;
         if (num) {
           var x = parseFloat(a), y = parseFloat(c);
           return x === y ? 0 : (x < y ? -1 : 1) * dir;

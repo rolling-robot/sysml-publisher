@@ -88,7 +88,8 @@ internal/render/            convert representations per page (asciidoctorg), tit
                             source.go (where a macro is written, for warnings)
 internal/site/              lay a render result out as HTML files (html/template), write
 internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT), layout.css,
-                            sort.js (table sorting in the browser, SB-4)
+                            sort.js (table sorting in the browser, SB-4),
+                            sidebar.js (sidebar resizing, SB-5)
 internal/site/page.html.tmpl
 sysml/                      public: reads a parsed model (Query, Props, element facts, Evaluate,
                             RenderView)
