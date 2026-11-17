@@ -81,6 +81,7 @@ go vet ./...
 ```
 cmd/sysml-publish/main.go   CLI: flags, wiring, messages, exit codes
 cmd/sysml-publish/config.go the config file: TOML, strict keys, flag precedence (CFG-1..CFG-5)
+CHANGELOG.md                changes per release
 internal/model/             find + parse the files (OpenSysML in-process), diagnostics; embeds *sysml.Model
 internal/tree/              which elements get pages, inheritance, names, paths (reads the model, writes nothing)
 internal/render/            convert representations per page (asciidoctorg), titles;
