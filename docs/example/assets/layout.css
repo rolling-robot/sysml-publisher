@@ -1,3 +1,4 @@
+/* Copyright 2026 Petr Mukhachev | SPDX-License-Identifier: MIT */
 /* sysml-publisher page layout: page tree on the left, content on the right (SB-1). */
 .layout {
   display: grid;
@@ -55,3 +56,10 @@
 }
 div.sysml-failed { margin-bottom: 1.25em; padding: .5em .75em; }
 div.sysml-failed > p { margin: 0; }
+
+/* Sortable tables (SB-4): sort.js marks every sortable table and the column
+   sorted last with aria-sort; the styles follow the marker, so a page whose
+   script does not run shows plain headers. */
+table.sortable thead th { cursor: pointer; user-select: none; }
+table.sortable thead th[aria-sort]::after { content: " ▲"; }
+table.sortable thead th[aria-sort="descending"]::after { content: " ▼"; }

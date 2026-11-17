@@ -86,7 +86,8 @@ internal/tree/              which elements get pages, inheritance, names, paths 
 internal/render/            convert representations per page (asciidoctorg), titles;
                             source.go (where a macro is written, for warnings)
 internal/site/              lay a render result out as HTML files (html/template), write
-internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT) + layout.css
+internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT), layout.css,
+                            sort.js (table sorting in the browser, SB-4)
 internal/site/page.html.tmpl
 sysml/                      public: reads a parsed model (Query, Props, element facts, Evaluate,
                             RenderView)

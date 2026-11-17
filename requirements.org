@@ -127,6 +127,14 @@
   page tree.
 - SB-2 :: Every element in the sidebar shall link to its page.
 - SB-3 :: The sidebar shall mark the current page.
+- SB-4 :: Every table with a header row shall be sortable: clicking a header
+  cell sorts the table's rows by that column, ascending on the first click,
+  descending on the second, and marks the sorted column (=aria-sort= and a
+  triangle after the header's text). Sorting happens in the browser over a
+  small script the site ships with the stylesheets; a page without it renders
+  and reads exactly as before. A column's values are compared as numbers when
+  every value in the column is one, and as text (case-insensitive) otherwise;
+  a cell with no text sorts after every other value, in either direction.
 
 * Errors
 - ER-1 :: (Post-MVP) If the external service is unreachable, the tool shall

@@ -3,7 +3,7 @@
 
 // Package site lays a rendered page tree (package render) out as a static
 // HTML site and writes it to the site folder (requirements PT-1, PT-5,
-// SB-1..3, CLI-4).
+// SB-1..4, CLI-4).
 package site
 
 import (
@@ -44,7 +44,7 @@ type Options struct {
 	BaseURL string
 }
 
-//go:embed assets/*.css
+//go:embed assets/*.css assets/*.js
 var assets embed.FS
 
 //go:embed page.html.tmpl
@@ -74,9 +74,10 @@ func Render(ctx context.Context, t *tree.Tree, logger *slog.Logger, views macros
 
 // New lays out res as a site: a page per page of the tree in its folder
 // (PT-1), with the tree as a sidebar on every page (SB-1..3), the landing
-// page (PT-5), the stylesheets and Marker. Links between pages are the
-// tree's relative ones, so res must be rendered with render.Options.Pages
-// nil. o gives the site's title (CFG-4) and base URL (CFG-5).
+// page (PT-5), the stylesheets, the table-sorting script (SB-4) and Marker.
+// Links between pages are the tree's relative ones, so res must be rendered
+// with render.Options.Pages nil. o gives the site's title (CFG-4) and base
+// URL (CFG-5).
 func New(res *render.Result, o Options) (*Site, error) {
 	title := o.Title
 	if title == "" {
@@ -95,7 +96,7 @@ func New(res *render.Result, o Options) (*Site, error) {
 			return nil, err
 		}
 	}
-	for _, name := range []string{"asciidoctor.css", "layout.css"} {
+	for _, name := range []string{"asciidoctor.css", "layout.css", "sort.js"} {
 		data, err := assets.ReadFile("assets/" + name)
 		if err != nil {
 			return nil, err
