@@ -113,6 +113,7 @@ func Register(ctx context.Context, ad *asciidoctor.Asciidoctor, m *sysml.Model, 
 	registerMetadataTable(g, e)
 	registerValue(g, e)
 	registerView(g, e)
+	registerCatalog(g, e)
 	if err := g.Register(); err != nil {
 		return nil, fmt.Errorf("registering the sysml macros: %w", err)
 	}

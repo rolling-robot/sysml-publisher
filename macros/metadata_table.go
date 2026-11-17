@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"slices"
+	"strconv"
 	"strings"
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
@@ -142,6 +144,52 @@ func (md *metadataIndex) attributes(def string) ([]sysml.Ref, error) {
 		queue = append(queue, supers...)
 	}
 	return out, nil
+}
+
+// label is the presentation label of a metadata def attribute: the body of
+// its first representation, trimmed; "" when it has none, in which case the
+// attribute is named by its own name (the metadata-table and catalog columns).
+func (md *metadataIndex) label(attr string) (string, error) {
+	reps, err := md.m.Representations(md.ctx, attr)
+	if err != nil {
+		return "", err
+	}
+	for _, r := range reps {
+		if l := strings.TrimSpace(r.Body); l != "" {
+			return l, nil
+		}
+	}
+	return "", nil
+}
+
+// order is the value of a def attribute's nested "order" literal, 0 when it
+// has none: the column order a catalog sorts its columns by.
+func (md *metadataIndex) order(attr string) (int, error) {
+	members, err := md.m.Members(md.ctx, attr)
+	if err != nil {
+		return 0, err
+	}
+	for _, f := range members {
+		names, err := md.names.names(f.ID)
+		if err != nil {
+			return 0, err
+		}
+		if !slices.Contains(names, "order") {
+			continue
+		}
+		expr, err := md.valueOf(f.ID)
+		if err != nil || expr == "" {
+			continue
+		}
+		p, err := md.m.Props(md.ctx, expr, "value")
+		if err != nil {
+			return 0, err
+		}
+		if n, err := strconv.Atoi(p.Str("value")); err == nil {
+			return n, nil
+		}
+	}
+	return 0, nil
 }
 
 // value is the expression giving attr's value in usage u: the one u binds,

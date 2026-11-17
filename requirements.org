@@ -355,6 +355,24 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   searched once, a reverse index of ports to connections built on first use
   and shared by every page (MC-3). A target naming no element, or that is
   not part-like, fails the macro (MC-19).
+- MC-24 :: The block macro =sysml-catalog::[]= shall be replaced, on a
+  view's page, by a table of that view's exposed elements: one row per
+  element of the view's exposed tree that carries the view's filter
+  metadata. The exposed root and the filter shall come solely from the
+  page's view element (its =expose … / filter …=), never from a root or
+  filter attribute of the macro. A =*+= expose names the root's direct
+  members, a =**= expose its whole subtree (recursively, cycle-safe,
+  skipping library elements). A row is an exposed element that owns a
+  metadata usage of the filter def; its Name cell is the element's name,
+  linked to its page (MC-18) when it has one, and the remaining cells are
+  the values (MC-13: bound, else the def's default/fixed, else absent) of
+  the metadata def's attributes. The columns are the first row's metadata
+  def attributes, each labelled by the (redefined) attribute's representation
+  body, else its name, ordered by the attribute's =order= literal
+  (ascending, the Name column first). A page's element that is not a view,
+  a view with no expose or no filter, or an unresolvable exposed root or
+  filter def fails the macro (MC-19). An exposed tree with no element
+  carrying the filter metadata drops the macro line (MC-12).
 * Open questions
 - TBD-9 :: (Decided: 3, behind the interface macros.Views, with =dot
   -Tsvg= for the layout as in 1; MC-21.)

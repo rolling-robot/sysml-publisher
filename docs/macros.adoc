@@ -591,6 +591,73 @@ On the page of `wing` this gives the rows Owner = Petr, Reviewed = false and
 Status = approved. An element without that metadata, an attribute the
 metadata def does not have, or a target without an attribute (`@m`) fails the macro (<<failures>>).
 
+== sysml-catalog
+
+Block macro, on a line of its own, written on a view's page. Replaced by a
+table of that view's exposed elements: one row per element of the exposed
+tree that carries the view's filter metadata, with a Name column and one
+column per metadata def attribute.
+
+The macro takes no target and no attributes: the exposed root and the filter
+come solely from the page's view element and its `expose` / `filter`
+statements, so the user never re-states them.
+
+* The root and the filter are read from the view itself: `expose
+  Protocols::*` names the root, `filter @LogicalProtocolMetadata` the filter
+  type a row must carry.
+* A `*` expose lists the root's direct members; a `**` expose lists the whole
+  exposed subtree.
+* A row is an exposed element that owns a metadata usage of the filter type.
+  Its Name cell is the element's name, linked to its page when it has one.
+* The columns are the filter type's attributes, each labelled by the
+  (redefined) attribute's representation body, else its name, ordered by the
+  attribute's `order` literal (ascending), the Name column always first.
+* A cell's value is the element's bound value, else the filter type's default
+  or fixed value, else `(no value)`.
+
+A page's element that is not a view, a view with no `expose` or no `filter`,
+and an exposed root or filter type the model cannot resolve fail the macro
+(<<failures>>). An exposed tree with no element carrying the filter metadata
+gives nothing: the macro line is dropped.
+
+The table has the role `sysml-catalog`, for styling.
+
+Syntax:: `sysml-catalog::[]`
+Attributes:: none
+
+Example:
+
+[source,sysml]
+----
+import Views::*;
+import StandardViewDefinitions::*;
+
+metadata def InterfaceMetadata {
+    attribute description : String default "none" {
+        rep language "rus"
+        /* Описание */
+        attribute order default 10;
+    }
+}
+package Protocols {
+    part tcp { @InterfaceMetadata { description = "reliable"; } }
+    part udp { @InterfaceMetadata; }
+}
+view protocolCatalog : GridView {
+    rep language "asciidoc"
+        /*
+        = sysml-name:[]
+
+        sysml-catalog::[]
+        */
+    expose Protocols::*;
+    filter @InterfaceMetadata;
+}
+----
+
+The page of `protocolCatalog` shows a table with the columns Name,
+Описание and the rows tcp = reliable, udp = none.
+
 == sysml-view
 
 Block macro, on a line of its own. Replaced by a view of the model as
