@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // Package macros_test uses only public packages, as another module would.
 package macros_test
 

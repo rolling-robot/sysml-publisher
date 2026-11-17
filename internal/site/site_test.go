@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 package site
 
 import (

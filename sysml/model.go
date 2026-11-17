@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // Package sysml reads a SysML v2 model the way the SysML v2 API serves it
 // (requirement DS-4): element queries (Query), reads of one element's
 // metamodel properties (Props, cached), facts built on them (names, docs,

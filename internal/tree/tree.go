@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // Package tree decides which elements of a model get pages, what each page
 // shows, and where it is written (requirements PG-1..7, PT-1..6). It finds
 // them by querying the model for its textual representations, then grows

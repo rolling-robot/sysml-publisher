@@ -1,3 +1,4 @@
+/* Copyright 2026 Petr Mukhachev | SPDX-License-Identifier: MIT */
 /* sysml-publisher page layout: page tree on the left, content on the right (SB-1). */
 .layout {
   display: grid;

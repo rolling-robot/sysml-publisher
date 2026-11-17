@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // Package site lays a rendered page tree (package render) out as a static
 // HTML site and writes it to the site folder (requirements PT-1, PT-5,
 // SB-1..3, CLI-4).

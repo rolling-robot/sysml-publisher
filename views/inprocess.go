@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // Package views renders SysML v2 views, for the sysml-view macro
 // (requirement MC-21): OpenSysML writes a view in process with
 // sysml.Model.RenderView — DOT for a diagram, columns and rows for a table —

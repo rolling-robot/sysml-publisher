@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // Command sysml-publish builds a static HTML page tree from the AsciiDoc
 // textual representations of a SysML v2 model.
 //

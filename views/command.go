@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // This file runs the one program a rendering needs: Graphviz's dot, which
 // lays a diagram out. A table is written from the rendering's rows, with no
 // program at all.

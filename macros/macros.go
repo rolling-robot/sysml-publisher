@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // Package macros holds the sysml-* AsciiDoc macros (requirements MC-1..21),
 // which put facts from a SysML v2 model into AsciiDoc text: names, docs,
 // members, metadata, evaluated values. Each macro lives in its own file;

@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // Package model loads a SysML v2 model from a folder of files: it parses
 // them in-process as one model, reports the parser's diagnostics, and opens
 // the result for reading through package sysml (DS-2, DS-4).

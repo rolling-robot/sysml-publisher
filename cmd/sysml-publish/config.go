@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // The config file (CFG-1..CFG-5): an optional TOML file naming the model and
 // site folders and the site's title and base URL. A value the user gave on
 // the command line wins over the file; the file wins over the defaults

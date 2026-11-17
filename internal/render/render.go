@@ -1,3 +1,6 @@
+// Copyright 2026 Petr Mukhachev
+// SPDX-License-Identifier: MIT
+
 // Package render converts the representations of a page tree with
 // asciidoctorg and titles its pages (PG-3, PG-8..10, MC-3): what every
 // output needs, whatever it writes the pages to. The HTML site (package
