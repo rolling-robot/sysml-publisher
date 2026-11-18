@@ -7,11 +7,16 @@
 #
 # Paths are relative to the working directory, like the flags' values are.
 # A flag given on the command line wins over the file; the file wins over
-# the built-in defaults (CFG-3). These five keys are the only ones; any
+# the built-in defaults (CFG-3). These six keys are the only ones; any
 # other key is a usage error.
 
 [source]
 dir = "model"                # the model folder (the -model default)
+api = "localhost:50051"      # the SysML service's address (the -api flag,
+                             # CLI-9); a sysml-grpc serves this port by
+                             # default. There is no default address: the
+                             # tool refuses to run without one. The service's
+                             # bearer token is read from $OPENSYSML_GRPC_TOKEN.
 
 [site]
 dir = "site"                 # the output folder (the -out default)

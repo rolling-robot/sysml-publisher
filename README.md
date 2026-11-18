@@ -8,10 +8,13 @@ sidebar on every page. Small `sysml-*` macros pull live data from the model into
 the text: names, `doc` comments, member lists, metadata tables and evaluated
 attribute values with their units.
 
-The model is parsed in-process by [OpenSysML](https://github.com/Open-MBEE/OpenSysML)
-and the AsciiDoc is rendered by [asciidoctorg](https://github.com/rolling-robot/asciidoctorg).
-No server and no Ruby installation are needed; the output is plain HTML and CSS
-that opens straight from disk.
+The tool does not parse the model itself and does not hold one in memory: it
+sends the files' text to a [sysml-grpc](https://github.com/Open-MBEE/OpenSysML)
+service, which parses the model, holds it, and answers the tool's reads over
+the SysML v2 API surface it serves. The AsciiDoc is rendered by
+[asciidoctorg](https://github.com/rolling-robot/asciidoctorg). No Ruby
+installation is needed; the output is plain HTML and CSS that opens straight
+from disk.
 
 ## Quick start
 
@@ -19,6 +22,13 @@ Install the tool (see [Requirements and building](#requirements-and-building)):
 
 ```sh
 go install github.com/rolling-robot/sysml-publisher/cmd/sysml-publish@latest
+```
+
+Start a sysml-grpc service, from the OpenSysML repository:
+
+```sh
+git clone https://github.com/Open-MBEE/OpenSysML && cd OpenSysML
+go run ./cmd/sysml-grpc        # serves localhost:50051 until you stop it
 ```
 
 Put a model in `./model`. This one is a shortened `model/aircraft.sysml`, the
@@ -98,8 +108,8 @@ package Model {
 Run it and open the result:
 
 ```sh
-sysml-publish                # reads ./model, writes ./site
-xdg-open site/index.html     # or open it in any browser
+sysml-publish -api localhost:50051    # reads ./model, writes ./site
+xdg-open site/index.html              # or open it in any browser
 ```
 
 You get six pages, one per documented element plus the package that holds
@@ -154,8 +164,9 @@ go run ./cmd/sysml-publish -model model -out docs/example   # in a clone
 
 ## Requirements and building
 
-You need Go 1.27.2 or newer. Everything else, including OpenSysML and
-asciidoctorg, is fetched by Go.
+You need Go 1.27.2 or newer and a running sysml-grpc service (see
+[Quick start](#quick-start)). Everything else, including the OpenSysML client
+and asciidoctorg, is fetched by Go.
 
 Install the command:
 
@@ -172,11 +183,12 @@ Or build it from a clone:
 git clone https://github.com/rolling-robot/sysml-publisher.git
 cd sysml-publisher
 go build -o bin/sysml-publish ./cmd/sysml-publish
-go test ./...        # optional: runs the test suite on the fixture models
+go test ./...        # optional: starts a sysml-grpc and runs the fixtures through it
 ```
 
 The binary is large (about 250 MB): it embeds a Ruby interpreter with
-Asciidoctor and the SysML engine, so it needs nothing else at run time.
+Asciidoctor, so rendering needs nothing else at run time; the model is the
+service's to parse and hold.
 
 ## Documenting the model
 
@@ -388,6 +400,7 @@ and the file over the built-in defaults:
 ```toml
 [source]
 dir = "model"                # the model folder (the -model default)
+api = "localhost:50051"      # the SysML service's address (the -api flag)
 
 [site]
 dir = "site"                 # the output folder (the -out default)
@@ -399,11 +412,12 @@ A commented example to copy is [`docs/sysml-publish.toml`](docs/sysml-publish.to
 
 - Paths are relative to the working directory, like the flags' values are.
 - Without the file (or without a key in it), the flags and defaults apply:
-  `./model`, `./site`, the title "Model documentation".
+  `./model`, `./site`, the title "Model documentation". The service's
+  address has no default: `-api` or `[source] api` must name one.
 - `baseURL` must be an absolute URL. When it is set, every page carries
   `<link rel="canonical" href="…">` naming that page's URL under it; the
   links between pages stay relative, so the site still opens from disk.
-- These five keys are the only ones; any other key is a usage error, so a
+- These six keys are the only ones; any other key is a usage error, so a
   misspelled one is reported instead of silently ignored.
 - `sysml-publish.toml` found by name may be absent; a file named with
   `-config` must exist.
@@ -411,11 +425,12 @@ A commented example to copy is [`docs/sysml-publish.toml`](docs/sysml-publish.to
 ## Command line
 
 ```
-sysml-publish [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
+sysml-publish -api ADDR [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
 ```
 
 | Flag | Default | Meaning |
 |---|---|---|
+| `-api ADDR` | none — required | address of the sysml-grpc service that parses the model and answers the reads, spelled as `localhost:50051` or `https://sysml.example.com`; the service's bearer token is read from `$OPENSYSML_GRPC_TOKEN` |
 | `-config FILE` | `sysml-publish.toml` in the working directory, if present | the [configuration file](#configuration-file) |
 | `-model DIR` | `./model` | folder with the model; every `*.sysml` and `*.kerml` file in it, searched recursively, is read as one model, so references across files work; hidden files and folders (`.git`, editor lock files) are skipped |
 | `-out DIR` | `./site` | folder to write the site to; replaced on every run |
