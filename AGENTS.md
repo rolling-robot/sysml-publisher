@@ -36,18 +36,22 @@ sysml-publish [-api ADDR] [-config FILE] [-model DIR] [-out DIR] [-v] [-log-form
 ```sh
 go build -o bin/sysml-publish ./cmd/sysml-publish
 bin/sysml-publish -api localhost:50051   # ./model -> ./site, parsed by the service
+bin/sysml-publish -api local             # or: the tool starts and stops its own
 go test ./...                            # spawns a sysml-grpc, runs the fixtures through it
 go vet ./...
 ```
 
-- **A sysml-grpc service is needed to run and to test.** Start one from the
-  OpenSysML checkout (`../sysmlv2/OpenSysML`): `go run ./cmd/sysml-grpc`
-  (serves gRPC, gRPC-Web and Connect on `localhost:50051`), or
-  `sysml-grpc -port 0 -report-address -health-port 0` to let the kernel
-  choose a port and print it. The tests get theirs from
-  `internal/servicetest` and skip when it cannot be obtained (§8). A
-  service that cannot be reached, or lacks a capability the tool needs, is
-  a runtime failure (ER-1), never a usage error.
+- **A sysml-grpc service is needed to run and to test.** `-api local`
+  starts one of the run's own — from `PATH` or built from the OpenSysML
+  checkout (`../sysmlv2/OpenSysML`) — and stops it after; `internal/service`
+  is that logic, shared with the tests. Or start one yourself
+  (`go run ./cmd/sysml-grpc` serves gRPC, gRPC-Web and Connect on
+  `localhost:50051`, or `sysml-grpc -port 0 -report-address -health-port 0`
+  to let the kernel choose a port and print it) and name it with `-api`.
+  The tests get theirs from `internal/servicetest` and skip when it cannot
+  be obtained (§8). A service that cannot be reached, started, or lacks a
+  capability the tool needs, is a runtime failure (ER-1), never a usage
+  error.
 - **Dependencies are versions anyone can download** in `go.mod`: OpenSysML
   at a `develop` commit (`v0.12.2-0.20261111062923-56febd38bcad`, for
   `Client.Dial` to sysml-grpc, `ParseSources` documents as inline content,
@@ -98,7 +102,8 @@ cmd/sysml-publish/main.go   CLI: flags, wiring, messages, exit codes
 cmd/sysml-publish/config.go the config file: TOML, strict keys, flag precedence (CFG-1..CFG-6)
 CHANGELOG.md                changes per release
 internal/model/             reads the files' text, dials the Service, splits diagnostics; embeds *sysml.Model
-internal/servicetest/       starts a sysml-grpc for the tests to dial; skips when it cannot
+internal/service/           starts a local sysml-grpc (the CLI's -api local; the tests via servicetest)
+internal/servicetest/       the tests' address of a SysML service; skips when it cannot get one
 internal/tree/              which elements get pages, inheritance, names, paths (reads the model, writes nothing)
 internal/render/            convert representations per page (asciidoctorg), titles;
                             source.go (where a macro is written, for warnings)
@@ -492,7 +497,11 @@ message.
 
 - **Service address (CLI-9)**: `-api ADDR`, config `[source] api`; the flag
   wins over the file (CFG-3). Neither given → usage error (exit 2) that
-  says to start a `sysml-grpc` and name it. `publish` passes the address to
+  says to start a `sysml-grpc` and name it. The address `local` names no
+  service: the run starts one of its own (`internal/service.Start`, from
+  `PATH` or built from the checkout), uses it and stops it after; starting
+  one that cannot be started is a failure (ER-1) saying why.
+  `publish` passes the address to
   `model.Folder.API`. A service that cannot be reached, that answers
   nothing, or that lacks a needed capability fails the run (ER-1) like any
   error, logged once in `run`; nothing is written.
@@ -589,10 +598,11 @@ What the suite is:
   the `Pages` of the examples is one.
 - **`internal/servicetest.API(t)` gives a test the address of a SysML
   service**: `$SYSML_PUBLISH_TEST_API` when set (a service someone else
-  started), else a `sysml-grpc` found on `PATH`, else one built from the
-  OpenSysML checkout (`$OPENSYSML_DIR`, default `../sysmlv2/OpenSysML`
-  relative to this module) and run with `-port 0 -report-address
-  -health-port 0`. One service per test process, shared by its tests; every
+  started), else `internal/service.Start` — a `sysml-grpc` found on `PATH`,
+  or one built from the OpenSysML checkout (`$OPENSYSML_DIR`, default
+  `../sysmlv2/OpenSysML` relative to this module) and run with `-port 0
+  -report-address -health-port 0` — the logic the CLI's `-api local`
+  runs. One service per test process, shared by its tests; every
   load and every `run(...)` takes its
   `-api` from it. Nothing to obtain → the test **skips**, and the skip
   names the reason, so a CI run without a service is visible, not silent.

@@ -17,6 +17,10 @@
   `part both : Wheel, Sport` shows `(Sport)`, not `(Wheel, Sport)`).
 
 ### Added
+- Running without a service of your own: `-api local` (or
+  `[source] api = "local"`) starts a sysml-grpc for the run — found on
+  `PATH` or built from the OpenSysML checkout — uses it, and stops it
+  after. A service that cannot be started fails the run saying why (ER-1).
 - A resizable sidebar (SB-5): a strip at the sidebar's right edge widens and
   narrows the page tree by dragging; the chosen width is remembered in the
   browser and applied on every page. Double-click, or the arrow keys with the

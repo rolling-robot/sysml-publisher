@@ -3,11 +3,11 @@
 
 //go:build !linux
 
-package servicetest
+package service
 
 import "os/exec"
 
 // setPDeathsig is Linux's service reaping; elsewhere the service outlives
-// the test process unless Service's stop ran, which is acceptable for a
-// development machine and reaped at reboot.
+// this process unless its stop ran, which is acceptable for a development
+// machine and reaped at reboot.
 func setPDeathsig(cmd *exec.Cmd) error { return nil }

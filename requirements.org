@@ -67,9 +67,11 @@
   diagram: a table view is written from the rendering's rows.
 - CLI-9 :: The user shall give the Service's address on the command line:
   =-api ADDR=, spelled as the SysML client dials it (=localhost:50051=,
-  =https://sysml.example.com=). When neither =-api= nor the configuration
-  file (CFG-6) gives an address, the tool shall refuse with a usage error
-  that says to start a =sysml-grpc= service and name it.
+  =https://sysml.example.com=). The address =local= names no service: it
+  says the tool shall start a =sysml-grpc= of its own for the run, use it,
+  and stop it after. When neither =-api= nor the configuration file (CFG-6)
+  gives an address, the tool shall refuse with a usage error that says to
+  start a =sysml-grpc= service and name it.
 
 * Configuration
 - CFG-1 :: The tool shall read an optional configuration file in TOML
@@ -91,8 +93,9 @@
   set, every page shall carry =<link rel="canonical" href=…>= naming the
   page's URL under it. Links between pages stay relative (PT-1).
 - CFG-6 :: =source.api= shall be the Service's address (CLI-9), read as the
-  SysML client dials it. A flag the user gave wins over it (CFG-3). The
-  Service's bearer token is not configured here: the SysML client reads
+  SysML client dials it; =local= starts one of the run's own, as CLI-9
+  says. A flag the user gave wins over it (CFG-3). The Service's bearer
+  token is not configured here: the SysML client reads
   =$OPENSYSML_GRPC_TOKEN=.
 
 * Pages

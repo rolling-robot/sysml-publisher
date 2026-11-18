@@ -326,6 +326,39 @@ func TestUnreachableServiceFailsWithItsAddress(t *testing.T) {
 	}
 }
 
+// -api local starts a sysml-grpc of the run's own, uses it and stops it
+// (CLI-9): the site is written and the log names the address it dialed.
+func TestLocalServiceRunsTheTool(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "site")
+	var log bytes.Buffer
+	if code := run(t.Context(), []string{"-api", "local", "-model", fixture("smoke"), "-out", out}, &log); code != exitOK {
+		t.Fatalf("exit %d, log:\n%s", code, log.String())
+	}
+	text := log.String()
+	if !strings.Contains(text, `msg="started a local SysML service"`) || !strings.Contains(text, "address=127.0.0.1:") {
+		t.Errorf("log does not name the local service:\n%s", text)
+	}
+	if _, err := os.Stat(filepath.Join(out, "index.html")); err != nil {
+		t.Errorf("site not written: %v", err)
+	}
+}
+
+// A local service that cannot be started — no sysml-grpc on PATH, no Go to
+// build one with — fails the run, saying why (ER-1).
+func TestLocalServiceStartFailure(t *testing.T) {
+	// An empty PATH hides sysml-grpc; a bogus OPENSYSML_DIR breaks the
+	// build. Restore both after the test.
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("OPENSYSML_DIR", filepath.Join(t.TempDir(), "no-such-checkout"))
+	var log bytes.Buffer
+	if code := run(t.Context(), []string{"-api", "local", "-model", fixture("smoke"), "-out", filepath.Join(t.TempDir(), "site")}, &log); code != exitFailure {
+		t.Fatalf("exit %d, want %d; log:\n%s", code, exitFailure, log.String())
+	}
+	if !strings.Contains(log.String(), "no sysml-grpc on PATH") {
+		t.Errorf("log does not say why no service could start:\n%s", log.String())
+	}
+}
+
 func TestInterruptedRunWritesNothing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
