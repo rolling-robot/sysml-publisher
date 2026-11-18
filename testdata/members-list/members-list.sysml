@@ -1,10 +1,12 @@
-// sysml-members-list (MC-12). Expected lists, as "name (types)" items:
+// sysml-members-list (MC-12). Expected lists, as "name (types)" items; the
+// types are the API's type of the member, which folds a written type
+// specialized by another written one (Sport :> Wheel):
 //
 // On M::pd's page:
 //   sysml-members-list::[]   every owned member, in declaration order, with
 //                            its types; no docs, representations, metadata:
 //     mass (Real), a*b*+++c, sub (linked), Unnamed (other), wheels (Wheel),
-//     front (Wheel, from wheels), spare (Sport), Racing, both (Wheel, Sport),
+//     front (Wheel, from wheels), spare (Sport), Racing, both (Sport),
 //     link
 //   ::Wheel[]   members typed by, subclassing or subsetting Wheel, at any
 //               depth, without types: wheels (: Wheel), front (:> wheels,

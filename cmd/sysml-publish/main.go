@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 // Command sysml-publish builds a static HTML page tree from the AsciiDoc
-// textual representations of a SysML v2 model.
+// textual representations of a SysML v2 model, which a sysml-grpc service
+// parses and holds (DS-1).
 //
-//	sysml-publish [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
+//	sysml-publish -api ADDR [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
 //
-// An optional TOML config file (CFG-1..CFG-5) names the model and site
-// folders and the site's title and base URL; command-line flags win over it.
+// An optional TOML config file (CFG-1..CFG-6) names the model folder, the
+// service's address and the site's folder, title and base URL; command-line
+// flags win over it.
 //
 // Everything it reports goes to stderr as structured log records (log/slog):
 // human-readable text by default, JSON with -log-format json.
@@ -51,6 +53,7 @@ func main() {
 func run(ctx context.Context, args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("sysml-publish", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	apiAddr := fs.String("api", "", "address of the SysML v2 service (sysml-grpc) that parses the model and answers the reads (CLI-9); for example localhost:50051")
 	modelDir := fs.String("model", "./model", "folder holding the SysML model files (*.sysml, *.kerml), searched recursively")
 	outDir := fs.String("out", "./site", "folder to write the pages to; replaced on every run")
 	configPath := fs.String("config", "", "configuration file (TOML); "+DefaultConfigFile+" in the working directory when unset (CFG-1)")
@@ -58,8 +61,8 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	logFormat := fs.String("log-format", "text", "format of the log on stderr: text or json")
 	dotCmd := fs.String("dot", "dot", "Graphviz's dot command, which lays out the diagrams sysml-view shows")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: sysml-publish [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]")
-		fmt.Fprintln(stderr, "\nBuilds a static HTML page tree from the AsciiDoc textual representations of a SysML v2 model.")
+		fmt.Fprintln(stderr, "Usage: sysml-publish -api ADDR [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]")
+		fmt.Fprintln(stderr, "\nBuilds a static HTML page tree from the AsciiDoc textual representations of a SysML v2 model, parsed by a sysml-grpc service.")
 		fmt.Fprintln(stderr)
 		fs.PrintDefaults()
 	}
@@ -104,13 +107,21 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	if !given["out"] && cfg.Site.Dir != "" {
 		sitePath = cfg.Site.Dir
 	}
+	api := *apiAddr
+	if !given["api"] && cfg.Source.API != "" {
+		api = cfg.Source.API
+	}
+	if api == "" {
+		fmt.Fprintln(stderr, "sysml-publish: no SysML service address (CLI-9): start a sysml-grpc service and name it with -api ADDR, or [source] api in "+DefaultConfigFile)
+		return exitUsage
+	}
 
-	err = publish(ctx, logger, modelPath, sitePath, *dotCmd, site.Options{Title: cfg.Site.Title, BaseURL: cfg.Site.BaseURL})
+	err = publish(ctx, logger, modelPath, api, sitePath, *dotCmd, site.Options{Title: cfg.Site.Title, BaseURL: cfg.Site.BaseURL})
 	switch {
 	case err == nil:
 		return exitOK
 	case ctx.Err() != nil:
-		// The engine reports a cancelled call with its own error, which
+		// The Service reports a cancelled call with its own error, which
 		// does not wrap context.Canceled, so ask the context.
 		logger.Error("interrupted; nothing written")
 		return exitInterrupted
@@ -152,14 +163,15 @@ func newLogger(w io.Writer, format string, verbose bool) (*slog.Logger, error) {
 	return nil, fmt.Errorf("unknown -log-format %q: want text or json", format)
 }
 
-// publish builds the site of the model in modelDir into outDir; dotCmd lays
+// publish builds the site of the model in modelDir into outDir; the model is
+// parsed by the SysML service at api (DS-1, CLI-9), dotCmd lays
 // out the diagrams sysml-view shows (views.InProcess), and siteOpts carry
 // the config file's site title and base URL (CFG-4, CFG-5).
-func publish(ctx context.Context, logger *slog.Logger, modelDir, outDir, dotCmd string, siteOpts site.Options) error {
+func publish(ctx context.Context, logger *slog.Logger, modelDir, api, outDir, dotCmd string, siteOpts site.Options) error {
 	start := time.Now()
 
 	stage := time.Now()
-	m, err := model.Folder{Dir: modelDir, Logger: logger}.Load(ctx)
+	m, err := model.Folder{Dir: modelDir, API: api, Logger: logger}.Load(ctx)
 	if err != nil {
 		return err
 	}

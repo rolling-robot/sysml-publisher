@@ -13,32 +13,46 @@ requirement it implements, and every macro change updates the reference.
 
 ## 1. What the program does
 
-`sysml-publish` reads a folder of SysML v2 textual models and writes a static
-HTML site: one page per element that has an AsciiDoc textual representation
+`sysml-publish` turns a folder of SysML v2 textual models into a static HTML
+site: one page per element that has an AsciiDoc textual representation
 (`rep language "asciidoc" /* ... */`), arranged as the model's containment
-tree, with the tree as a sidebar on every page. Representation bodies are
+tree, with the tree as a sidebar on every page. **It does not parse the model
+and does not hold one in memory** (DS-1): it reads the files' text and sends
+it to a **sysml-grpc** service (OpenSysML), which parses the model, holds it,
+and answers the tool's reads over the SysML v2 API surface it serves — Query,
+ElementProperties, Evaluate, RenderView. Representation bodies are
 AsciiDoc, rendered by asciidoctorg, and may use `sysml-*` macros that pull data
 from the model (names, docs, members, metadata tables, evaluated attribute
 values).
 
 ```
-sysml-publish [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
-# defaults: ./model, ./site, dot from PATH; config file sysml-publish.toml (CFG-1..CFG-5)
+sysml-publish [-api ADDR] [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format text|json] [-dot CMD]
+# -api is required: the address of a sysml-grpc service (CLI-9); defaults:
+# ./model, ./site, dot from PATH; config file sysml-publish.toml (CFG-1..CFG-6)
 ```
 
 ## 2. Building, running, testing
 
 ```sh
 go build -o bin/sysml-publish ./cmd/sysml-publish
-bin/sysml-publish                       # ./model -> ./site
-go test ./...                           # parses and renders the fixture models
+bin/sysml-publish -api localhost:50051   # ./model -> ./site, parsed by the service
+go test ./...                            # spawns a sysml-grpc, runs the fixtures through it
 go vet ./...
 ```
 
+- **A sysml-grpc service is needed to run and to test.** Start one from the
+  OpenSysML checkout (`../sysmlv2/OpenSysML`): `go run ./cmd/sysml-grpc`
+  (serves gRPC, gRPC-Web and Connect on `localhost:50051`), or
+  `sysml-grpc -port 0 -report-address -health-port 0` to let the kernel
+  choose a port and print it. The tests get theirs from
+  `internal/servicetest` and skip when it cannot be obtained (§8). A
+  service that cannot be reached, or lacks a capability the tool needs, is
+  a runtime failure (ER-1), never a usage error.
 - **Dependencies are versions anyone can download** in `go.mod`: OpenSysML
-  at a `develop` commit (`v0.12.2-0.20261111062923-56febd38bcad`, for the
-  query properties `body`, `language` and `textualRepresentation`, for
-  `Client.ElementProperties`, and for `Client.RenderView`'s written forms
+  at a `develop` commit (`v0.12.2-0.20261111062923-56febd38bcad`, for
+  `Client.Dial` to sysml-grpc, `ParseSources` documents as inline content,
+  the query properties `body`, `language` and `textualRepresentation`,
+  `Client.ElementProperties`, and `Client.RenderView`'s written forms
   (`WithForm`: DOT, CSV, …), which no tag has yet; move to the next tag when
   it is released) and asciidoctorg
   `v0.2.1`; `go install …/cmd/sysml-publish@latest` must work, so `go.mod`
@@ -59,7 +73,7 @@ go vet ./...
 
   use .
 
-  replace github.com/Open-MBEE/OpenSysML => ../OpenSysML
+  replace github.com/Open-MBEE/OpenSysML => ../sysmlv2/OpenSysML
   replace github.com/rolling-robot/asciidoctorg => ../asciidoctorg
   ```
 
@@ -71,7 +85,8 @@ go vet ./...
 - **Offline builds** work once the module cache is filled (`go mod download`
   with network, once). In a sandbox without DNS, run Go with `GOPROXY=off`;
   the Go tool resolves names itself, so a sandbox that lets `git` and `curl`
-  through can still block it.
+  through can still block it. Building is offline, but running and testing
+  additionally need a sysml-grpc to dial.
 - **Toolchain**: Go 1.27.2+ (asciidoctorg's minimum).
 - `bin/`, `site/`, the root `sysml-publish` binary, `*.api.json` dumps and
   `*~` backups are build output or scratch, ignored by `.gitignore`.
@@ -80,9 +95,10 @@ go vet ./...
 
 ```
 cmd/sysml-publish/main.go   CLI: flags, wiring, messages, exit codes
-cmd/sysml-publish/config.go the config file: TOML, strict keys, flag precedence (CFG-1..CFG-5)
+cmd/sysml-publish/config.go the config file: TOML, strict keys, flag precedence (CFG-1..CFG-6)
 CHANGELOG.md                changes per release
-internal/model/             find + parse the files (OpenSysML in-process), diagnostics; embeds *sysml.Model
+internal/model/             reads the files' text, dials the Service, splits diagnostics; embeds *sysml.Model
+internal/servicetest/       starts a sysml-grpc for the tests to dial; skips when it cannot
 internal/tree/              which elements get pages, inheritance, names, paths (reads the model, writes nothing)
 internal/render/            convert representations per page (asciidoctorg), titles;
                             source.go (where a macro is written, for warnings)
@@ -91,12 +107,12 @@ internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT), layout.c
                             sort.js (table sorting in the browser, SB-4),
                             sidebar.js (sidebar resizing, SB-5)
 internal/site/page.html.tmpl
-sysml/                      public: reads a parsed model (Query, Props, element facts, Evaluate,
+sysml/                      public: reads the model the Service parsed (Query, Props, element facts, Evaluate,
                             RenderView)
 macros/                     public: the sysml-* AsciiDoc macros, one file per macro;
                             names.go (element lookup), kinds.go (metaclass names);
                             example_test.go (use from another module)
-views/                      public: renders views for sysml-view in process, with Graphviz's dot
+views/                      public: renders views for sysml-view through the Service, with Graphviz's dot
 model/                      the user's model (default input)
 testdata/<case>/            fixture models, one folder per test case
 docs/macros.adoc            user reference for the macros
@@ -107,11 +123,14 @@ requirements.org            requirements, decisions, open questions
 ## 4. Pipeline
 
 ```
- model/*.sysml, *.kerml
-        │  model.Folder.Load
-        ▼
- opensysml.New() ─ ParseFiles (one model, all files) ─ diagnostics: errors stop the run (ER-2)
-        │  Query(all elements) -> ElementCount, Tops, own ids  (engine kept open)
+ model/*.sysml, *.kerml ── read as text ──▶ sysml-grpc  (the Service, DS-1)
+        │  model.Folder.Load: Dial + ParseSources (documents named by path;
+        │                                     .kerml documents carry LanguageKerML)
+        ▼                            the model is parsed and held by the service
+        │  capabilities checked once: parse_sources, query, element_properties,
+        │  render_view, render_view_form, evaluate_subject (ER-1 when missing)
+        │  diagnostics: errors stop the run (ER-2); Query(all elements)
+        │  -> ElementCount, Tops, own ids              (the client kept open)
         ▼
  model.Model { Files, Warnings, Tops; Query, Props, Evaluate }      (DS-4)
         │  tree.Build(ctx, m)
@@ -143,17 +162,27 @@ Everything is in memory until `Site.Write`; a failing run writes nothing.
 
 ### 5.1 `internal/model` and `sysml`
 
-`internal/model` finds and parses the files and splits the diagnostics; the
-public package `sysml` reads the parsed model (`sysml.Open(ctx, client,
-parsed)`), for this tool and for other modules. `model.Model` embeds
-`*sysml.Model`, so its read methods are the model's.
+`internal/model` reads the files' text, hands the model to the Service, and
+splits the diagnostics; the public package `sysml` reads the parsed model
+(`sysml.Open(ctx, client, parsed)`), for this tool and for other modules.
+`model.Model` embeds `*sysml.Model`, so its read methods are the model's.
 
-- `Folder{Dir}.Load` walks the folder for `*.sysml`/`*.kerml` (sorted, so runs
-  are deterministic; hidden files and folders skipped, DS-2), parses them **as one model** (`ParseFiles`, so
-  cross-file references resolve — DS-2), splits diagnostics into errors
-  (returned as `*DiagnosticsError`) and warnings, and queries every element
-  once (`readIndex`): `ElementCount`, `Tops` (top-level elements, file
-  order) and the model's own ids (`Contains`).
+- `Folder{Dir, API}.Load` walks the folder for `*.sysml`/`*.kerml` (sorted, so
+  runs are deterministic; hidden files and folders skipped, DS-2), reads
+  them, and sends them to the service at `API` as the documents of one
+  `ParseSources`, each named by its path (`.kerml` documents carry
+  `LanguageKerML`), so cross-file references resolve (DS-2). It checks the
+  service's capabilities once before parsing (`parse_sources`, `query`,
+  `element_properties`, `render_view`, `render_view_form`,
+  `evaluate_subject` — a service without the last two would silently change
+  `sysml-value`'s and `sysml-view`'s answers), fails ER-1 with the address
+  when it cannot reach the service or a capability is missing, splits
+  diagnostics into errors (returned as `*DiagnosticsError`) and warnings,
+  and queries every element once (`readIndex`): `ElementCount`, `Tops`
+  (top-level elements, file order) and the model's own ids (`Contains`).
+  The tool holds no parsed model: the service does (DS-1); what the tool
+  keeps is the hash, the diagnostics, and, later, each rendering's working
+  set (representations, read properties, the macros' indexes).
 - **Reading (DS-4)**: no whole-model export. `Query` selects elements
   (OpenSysML's SysML v2 API query; one value per property, so never read a
   multi-valued property through it — §13). `Props(ctx, id, names...)` reads
@@ -172,12 +201,15 @@ parsed)`), for this tool and for other modules. `model.Model` embeds
   13).
 - `Stats()` counts queries, element reads and cache hits; the CLI logs them
   with the page tree record.
-- The OpenSysML client stays open after a successful load for `Props`,
-  `Query` and `Model.Evaluate(ctx, subjectQualifiedName, expression)`; the
-  caller must `Close()` it. Not safe for concurrent use (the cache).
-- `Source` is an interface so a post-MVP SysML v2 API service source (DS-1,
-  DS-3) can be added; today `Folder` is its only implementation, and
-  `Evaluate` is not part of the interface.
+- The SysML client stays open after a successful load for `Props`,
+  `Query`, `Model.Evaluate(ctx, subjectQualifiedName, expression)` and
+  `Model.RenderView`; the caller must `Close()` it (a dialed service keeps
+  running: it was not the client's to stop). Not safe for concurrent use
+  (the cache).
+- `Source` is the seam between the tool and a service kind (DS-3): `Folder`
+  speaks sysml-grpc through `opensysml.Dial` today; a Flexo/REST Source is
+  to be added later without touching the rest of the tool. `Evaluate` is
+  not part of the interface.
 
 ### 5.2 `internal/tree`
 
@@ -445,10 +477,11 @@ message.
 `run(ctx, args, stderr) int`, tested in `main_test.go` against fixtures into
 `t.TempDir()`.
 
-- **Config file (CFG-1..CFG-5, `config.go`)**: an optional TOML file,
+- **Config file (CFG-1..CFG-6, `config.go`)**: an optional TOML file,
   `sysml-publish.toml` in the working directory or the `-config` path (which
   must exist). Keys are strict: `[source] dir` (the model folder, CLI-2) and
-  `[site] dir` (the site folder, CLI-3), `title` (CFG-4) and `baseURL`
+  `[source] api` (the Service's address, CLI-9), and `[site] dir` (the site
+  folder, CLI-3), `title` (CFG-4) and `baseURL`
   (CFG-5); anything else is a usage error naming the key, so the decoder
   runs twice — into a map for the exact key check (the decoder also matches
   keys ignoring case) and into the struct for the values. `baseURL` must be
@@ -456,6 +489,13 @@ message.
   gave (`fs.Visit`) wins over the file, the file over the flag defaults.
   A config problem is a usage error (exit 2), logged once, before anything
   loads.
+
+- **Service address (CLI-9)**: `-api ADDR`, config `[source] api`; the flag
+  wins over the file (CFG-3). Neither given → usage error (exit 2) that
+  says to start a `sysml-grpc` and name it. `publish` passes the address to
+  `model.Folder.API`. A service that cannot be reached, that answers
+  nothing, or that lacks a needed capability fails the run (ER-1) like any
+  error, logged once in `run`; nothing is written.
 
 - **Logging (CLI-6)**: every message is a `log/slog` record on stderr: text
   without timestamps by default, JSON with `-log-format json`; `-v` enables
@@ -541,13 +581,29 @@ message.
 
 What the suite is:
 
-- Tests go through the real stack: fixtures are parsed by OpenSysML in
-  process, rendered by asciidoctorg. No mocks, no build tags: nothing leaves
-  the process, except where the code itself runs programs: the `views` tests
-  run `dot` and skip when it is not on `PATH`, and the
-  `sysml-view` tests in `macros` render with a map (`fakeViews`), as the
-  `Pages` of the examples is one. The whole suite runs in a few seconds (about 0.2 s of each
-  macro or site test is parsing and starting asciidoctorg).
+- Tests go through the real stack: fixtures are parsed by a real
+  sysml-grpc, rendered by asciidoctorg. No mocks, no build tags. The model
+  leaves the test process — to the Service (DS-1) — and `dot` still runs as
+  a program: the `views` tests run `dot` and skip when it is not on `PATH`,
+  and the `sysml-view` tests in `macros` render with a map (`fakeViews`), as
+  the `Pages` of the examples is one.
+- **`internal/servicetest.API(t)` gives a test the address of a SysML
+  service**: `$SYSML_PUBLISH_TEST_API` when set (a service someone else
+  started), else a `sysml-grpc` found on `PATH`, else one built from the
+  OpenSysML checkout (`$OPENSYSML_DIR`, default `../sysmlv2/OpenSysML`
+  relative to this module) and run with `-port 0 -report-address
+  -health-port 0`. One service per test process, shared by its tests; every
+  load and every `run(...)` takes its
+  `-api` from it. Nothing to obtain → the test **skips**, and the skip
+  names the reason, so a CI run without a service is visible, not silent.
+  The service lives until the test process does (Linux kills it with the
+  process); a runnable Example, which cannot skip, calls `Service()`
+  instead and fails when nothing can be obtained.
+- The suite is slower over the wire: each test package starts its own
+  service (a cache-hot spawn is well under a second), every model read is a
+  round trip, and each package process builds the service once. `go test
+  ./...` is on the order of a minute, `-race` a few; keep an eye on it
+  rather than assuming the old seconds.
 - One folder per fixture under `testdata/`; expected results live as `//`
   notes in the fixture or as tables in the test. Fixtures must be committed
   with the tests that use them.
@@ -568,6 +624,8 @@ Rules for new tests:
 
 - Use `t.Context()`, not `context.Background()`, and close what you open
   (`t.Cleanup(func() { m.Close() })` for a loaded model).
+- Every load takes its service from `servicetest.API(t)` (a fixture load or
+  a `run(...)` `-api`); never hard-code an address.
 - Table-driven tests use a slice of named cases and `t.Run(name, ...)`, never
   a map (random order) or a bare loop (the first `Fatal` hides the rest).
 - Assert exact values where they are known (`reflect.DeepEqual` /
@@ -606,7 +664,7 @@ Known gaps (from the test review, November 2026):
 5. **Duplicated setup**: fixture loading is written about seven times
    (`build`, `load`, `render`, `setup`, `setupFixture`, inline in
    `TestMembers`/`TestValue`/`TestValueErrors`; `page` and `pageAt` are the
-   same function), and most loads never close the engine. A shared helper
+   same function), and most loads never close the client. A shared helper
    package (`internal/testfixture`: `Load(t, name)` with cleanup) fixes both.
 6. **Not yet written**: a golden-file test of the rendered smoke site
    (`-update` flag), fuzz targets for `segment`/`unique`, `formatUnit`,
@@ -614,9 +672,26 @@ Known gaps (from the test review, November 2026):
 
 ## 9. Dependencies and their quirks
 
-**OpenSysML** (`client/opensysml`, in-process):
-- Pin the OpenSysML version: `Query` and `ElementProperties` are on
+**OpenSysML** (`client/opensysml`, dialing sysml-grpc over Connect):
+- Pin the OpenSysML version: `Dial`, `ParseSources` with inline documents,
+  `Query` and `ElementProperties` are on
   `develop`, not in a tag yet.
+- **`Dial` connects lazily.** An unreachable service shows on the first
+  call as a `CodeUnavailable` `*StatusError`, not at dial time; ER-1's
+  message names the address around it. The capability preflight in
+  `Folder.Load` makes that first call, so a dead service fails the run
+  before any model is sent.
+- **`ParseSources` reads `file_path` documents itself**, so a remote tool
+  sends every document as inline `content`, named by its path, `.kerml`
+  with `Language: LanguageKerML` (inline content has no extension to infer
+  from). Diagnostics then name documents by those paths, which keeps
+  `file:line:col` diagnostics and the macro-warning locations working
+  unchanged.
+- **A service that lacks `evaluate_subject` drops `WithSubject` silently**
+  (the client does not gate it), and one without `render_view_form` drops
+  `WithForm` (it refuses that call) — either quietly changes what
+  `sysml-value` or `sysml-view` show. The preflight requires both, with
+  `parse_sources`, `query`, `element_properties` and `render_view`.
 - Comment bodies keep a trailing space before `*/` (trimmed for docs, not for
   representations — harmless for AsciiDoc).
 - **Ids**: `ElementProperties` returns the element form's ids (`M__pd`,
@@ -639,7 +714,7 @@ Known gaps (from the test review, November 2026):
   quoted (`SI::'m³⋅s⁻¹'`), arithmetic is done in SI base units
   (`10 [km/h] * 2` → `50/9 m/s`), composite attribute values come back as
   `InstanceID`.
-- `RenderView` writes a view in process with `WithForm` (TBD-9, §13 9):
+- `RenderView` writes a view on the service with `WithForm` (TBD-9, §13 9):
   `dot` for a diagram, `csv` or `text` for a table. `views.InProcess` asks
   for DOT, lays it out with `dot -Tsvg`, and asks for the data when the
   view has no diagram form — a table's `Columns` and `Rows`. There is no
@@ -686,9 +761,10 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
   I/O and decides every page, path and inheritance question, which made the
   requirements testable one by one.
 - **One way to read the model** (DS-4): tree and macros read it through
-  SysML v2 API operations — Query, element reads, evaluation — on one
-  parse, with one cache; the same operations a SysML v2 API service offers
-  (DS-1, DS-3).
+  SysML v2 API operations — Query, element reads, evaluation — and the tool
+  now delegates those operations to the Service (DS-1): the model is parsed
+  and held there, and these reads are its API. Nothing above the read
+  layer changed for the transport swap.
 - **The macro mechanism is small and uniform**: page context via a document
   attribute, one registration point, shared helpers for text, links and
   passthrough. Adding the seven macros needed no change to the renderer
@@ -702,12 +778,16 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
 
 ### Weaknesses and risks
 
-1. **Reliance on an untagged OpenSysML API.** `ElementProperties` and the
-   query properties used are on `develop` only; element ids are
-   OpenSysML's element-form ids, and several behaviours (trailing spaces,
-   unit spellings, derived `type`, implicit multiplicities) are observed,
-   not specified. An OpenSysML upgrade can change pages silently (§13
-   lists what has already).
+1. **Reliance on an untagged OpenSysML API, now on both ends.**
+   `ElementProperties` and the query properties used are on `develop` only;
+   element ids are OpenSysML's element-form ids, and several behaviours
+   (trailing spaces, unit spellings, derived `type`, implicit
+   multiplicities) are observed, not specified. The client and the service
+   it dials are two builds of that develop tree that must agree; the
+   capability preflight catches a service missing what the client assumes,
+   but wire semantics (diagnostic naming, capability gating inside the
+   client) are observed, not specified. An OpenSysML upgrade can change
+   pages silently (§13 lists what has already).
 2. **Rendering cost scales with pages × inherited representations ×
    macros.** Every page re-converts every representation it shows (MC-3),
    and `sysml-value` calls the evaluator per macro per page. Model reads are
@@ -715,10 +795,13 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    usage's and definition's specializations once (`-v` logs the counts).
    Fine for small models; a definition shared by hundreds of usages
    multiplies the conversions.
-3. **Rendering needs the open engine.** Macros read the model through
-   `sysml.Model`; reads and evaluation need the OpenSysML engine open until
-   rendering ends, so rendering is tied to the parser's lifetime, for this
-   tool and for any module using the macros.
+3. **Rendering needs the live service.** Macros read the model through
+   `sysml.Model`; reads, evaluation and view rendering are RPCs to
+   sysml-grpc now, and every uncached read is a round trip. The caches
+   (the per-element property cache, the name, metadata, kind and
+   connection indexes) carry the repeats, and a slow service slows
+   rendering proportionally. Rendering stays tied to the client's
+   lifetime, for this tool and for any module using the macros.
 4. **Source locations are found by text.** The model gives no source
    positions (§13, 15), so a failing macro's file and line come from
    matching the representation's body against the model files (§5.3): two
@@ -737,9 +820,11 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    with spaces or for values beyond float precision.
 7. **`Site.Write` is not atomic** (remove, then write).
 8. **Pinned to an untagged OpenSysML**: `go.mod` uses an OpenSysML
-   `develop` commit, whose behaviour can still change before it is tagged.
-   asciidoctorg is at its latest tag, `v0.2.1`; later fixes on its `master`
-   reach users only with a new asciidoctorg tag.
+   `develop` commit, whose behaviour can still change before it is tagged,
+   and the sysml-grpc a user runs is a build of that tree of their own; the
+   preflight catches only capability gaps the client knows about, not
+   behavioural drift. asciidoctorg is at its latest tag, `v0.2.1`; later
+   fixes on its `master` reach users only with a new asciidoctorg tag.
 9. **Repository hygiene**: commits have missed files (a commit referenced
    `registerMetadata` without `metadata.go`; tests were committed for a
    while before their `testdata/` fixtures). Before committing, check
@@ -752,7 +837,10 @@ cannot be redefined (use `default`); degrees Celsius is a scale, not a unit.
    assertions, then a shared fixture helper, then the untested rules.
 2. **Move model reading behind the tree**: precompute what macros need
    (metadata defs by name, metadata usages per element) in `tree.Build` or a
-   small index built once, so macros never scan the model.
+   small index built once, so macros never scan the model. Over the network
+   this matters more: a cached read saves a round trip, so the fewer reads
+   the tree leaves to per-macro per-page scanning, the better the wire
+   behaves.
 3. **Cache by (page, representation) only where it matters**, or skip
    per-page conversion for representations that contain no `sysml-` macro
    (a cheap substring check), which restores sharing for the common case.
@@ -862,3 +950,14 @@ re-checked since; the workarounds still pass the tests.
     `"At sysml-value:position[], …\n"`. Workaround: `render.sources` matches
     the body's lines, whitespace aside, between `/*` and `*/` in the model
     files to place macro warnings (MC-19, §5.3).
+16. **`Feature::type` is the derived feature type** (seen on the service at
+    `34f6f6ce49`, 2026-11-15; OpenSysML #2198, between the pinned develop
+    and that build). `type` now answers a feature's written typings and the
+    types it inherits through subsetting and redefinition, with a written
+    type another written one specializes folded away — KerML 1.1
+    §8.3.3.3.4 `deriveFeatureType`: `Sport :> Wheel` with
+    `part both : Wheel, Sport` answers `[Sport]`, where the pinned develop
+    answered `[Wheel, Sport]`. `sysml-members-list` follows the API's
+    answer (DS-4); the written typings are in api-json's
+    `sysx:mappingValues` only, which `GetElementProperties` does not
+    expose. Updated the fixture notes, the test and MC-12's example.

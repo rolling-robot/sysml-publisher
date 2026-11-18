@@ -13,12 +13,13 @@ import (
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
 	"github.com/rolling-robot/sysml-publisher/internal/model"
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
 func setupFixture(t *testing.T, fixture string) (*tree.Tree, *asciidoctor.Asciidoctor) {
 	t.Helper()
-	m, err := model.Folder{Dir: filepath.Join("..", "testdata", fixture)}.Load(t.Context())
+	m, err := model.Folder{Dir: filepath.Join("..", "testdata", fixture), API: servicetest.API(t)}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

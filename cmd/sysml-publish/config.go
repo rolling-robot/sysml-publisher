@@ -1,10 +1,10 @@
 // Copyright 2026 Petr Mukhachev
 // SPDX-License-Identifier: MIT
 
-// The config file (CFG-1..CFG-5): an optional TOML file naming the model and
-// site folders and the site's title and base URL. A value the user gave on
-// the command line wins over the file; the file wins over the defaults
-// (CFG-3, CLI-2, CLI-3).
+// The config file (CFG-1..CFG-6): an optional TOML file naming the model
+// folder and the Service's address, and the site's folder, title and base
+// URL. A value the user gave on the command line wins over the file; the
+// file wins over the defaults (CFG-3, CLI-2, CLI-3, CLI-9).
 package main
 
 import (
@@ -32,6 +32,7 @@ type config struct {
 
 type sourceConfig struct {
 	Dir string // the model folder (CLI-2)
+	API string // the SysML service's address (CLI-9)
 }
 
 type siteConfig struct {
@@ -42,7 +43,7 @@ type siteConfig struct {
 
 // allowed keys of the config file, by section (CFG-2).
 var allowedKeys = map[string][]string{
-	"source": {"dir"},
+	"source": {"dir", "api"},
 	"site":   {"dir", "title", "baseURL"},
 }
 

@@ -1,7 +1,9 @@
 // Copyright 2026 Petr Mukhachev
 // SPDX-License-Identifier: MIT
 
-// Package macros_test uses only public packages, as another module would.
+// Package macros_test uses only public packages, as another module would;
+// the service address comes from internal/servicetest, which is this
+// module's own test wiring, not part of the macros API.
 package macros_test
 
 import (
@@ -10,11 +12,13 @@ import (
 	"go/build"
 	"html"
 	"log"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/Open-MBEE/OpenSysML/client/opensysml"
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 	"github.com/rolling-robot/sysml-publisher/macros"
 	"github.com/rolling-robot/sysml-publisher/sysml"
 )
@@ -27,17 +31,28 @@ func (p pages) Href(from, to string) (string, bool) {
 	return href, ok
 }
 
-// Using the macros from another module: parse a model with OpenSysML, open
-// it with sysml.Open, register the macros with the host's pages, and
+// Using the macros from another module: send a model to a SysML service,
+// open it with sysml.Open, register the macros with the host's pages, and
 // convert AsciiDoc for an element. A failing macro leaves a placeholder and
 // a warning.
 func Example() {
 	ctx := context.Background()
-	client, err := opensysml.New()
+	addr, stop, err := servicetest.Service()
 	if err != nil {
 		log.Fatal(err)
 	}
-	parsed, err := client.ParseFiles(ctx, []string{"../testdata/external/vehicles.sysml"})
+	defer stop()
+	client, err := opensysml.Dial(addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	content, err := os.ReadFile("../testdata/external/vehicles.sysml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	parsed, err := client.ParseDocuments(ctx, []opensysml.Document{
+		opensysml.Source("../testdata/external/vehicles.sysml", string(content)),
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -102,11 +117,22 @@ func Example() {
 // a placeholder and a warning instead of stopping the conversion.
 func ExampleRegistry_Inline() {
 	ctx := context.Background()
-	client, err := opensysml.New()
+	addr, stop, err := servicetest.Service()
 	if err != nil {
 		log.Fatal(err)
 	}
-	parsed, err := client.ParseFiles(ctx, []string{"../testdata/external/vehicles.sysml"})
+	defer stop()
+	client, err := opensysml.Dial(addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	content, err := os.ReadFile("../testdata/external/vehicles.sysml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	parsed, err := client.ParseDocuments(ctx, []opensysml.Document{
+		opensysml.Source("../testdata/external/vehicles.sysml", string(content)),
+	})
 	if err != nil {
 		log.Fatal(err)
 	}

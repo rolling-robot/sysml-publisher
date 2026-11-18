@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/rolling-robot/sysml-publisher/internal/model"
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
@@ -21,7 +22,7 @@ func renderSite(t *testing.T, fixture string) *Site {
 
 func renderSiteOptions(t *testing.T, fixture string, o Options) *Site {
 	t.Helper()
-	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", fixture)}.Load(t.Context())
+	m, err := model.Folder{Dir: filepath.Join("..", "..", "testdata", fixture), API: servicetest.API(t)}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

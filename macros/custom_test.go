@@ -6,12 +6,14 @@ package macros_test
 import (
 	"context"
 	"html"
+	"os"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/Open-MBEE/OpenSysML/client/opensysml"
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 	"github.com/rolling-robot/sysml-publisher/macros"
 	"github.com/rolling-robot/sysml-publisher/sysml"
 )
@@ -29,11 +31,18 @@ type host struct {
 
 func newHost(t *testing.T, ctx context.Context) *host {
 	t.Helper()
-	client, err := opensysml.New()
+	client, err := opensysml.Dial(servicetest.API(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed, err := client.ParseFiles(ctx, []string{"../testdata/external/vehicles.sysml"})
+	content, err := os.ReadFile("../testdata/external/vehicles.sysml")
+	if err != nil {
+		client.Close()
+		t.Fatal(err)
+	}
+	parsed, err := client.ParseDocuments(ctx, []opensysml.Document{
+		opensysml.Source("../testdata/external/vehicles.sysml", string(content)),
+	})
 	if err != nil {
 		client.Close()
 		t.Fatal(err)

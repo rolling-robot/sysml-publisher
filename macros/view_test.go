@@ -14,6 +14,7 @@ import (
 
 	asciidoctor "github.com/rolling-robot/asciidoctorg"
 	"github.com/rolling-robot/sysml-publisher/internal/model"
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 )
 
@@ -45,7 +46,7 @@ const testSVG = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 // rendering them; nil registers no renderer.
 func setupViews(t *testing.T, views Views) (*tree.Tree, *asciidoctor.Asciidoctor) {
 	t.Helper()
-	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "views")}.Load(t.Context())
+	m, err := model.Folder{Dir: filepath.Join("..", "testdata", "views"), API: servicetest.API(t)}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

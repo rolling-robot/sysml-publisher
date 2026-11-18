@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Changed
+- The tool no longer parses the model itself, and holds no model in memory
+  (DS-1): it sends the model files' text to a sysml-grpc service (OpenSysML),
+  which parses the model, holds it, and answers the tool's reads. Every run
+  names the service with `-api ADDR` or `[source] api` in the config file
+  (CLI-9, CFG-6); there is no default address, and a service that cannot be
+  reached, or lacks a capability the tool needs, fails the run (ER-1) with a
+  message naming the address. The tests start their own sysml-grpc
+  (`internal/servicetest`) and skip when they cannot get one.
+- `sysml-members-list` shows the types the API's `type` answers, which since
+  OpenSysML #2198 is the KerML derived feature type: a written type another
+  written one specializes is folded away (`Sport :> Wheel` with
+  `part both : Wheel, Sport` shows `(Sport)`, not `(Wheel, Sport)`).
+
 ### Added
 - A resizable sidebar (SB-5): a strip at the sidebar's right edge widens and
   narrows the page tree by dragging; the chosen width is remembered in the

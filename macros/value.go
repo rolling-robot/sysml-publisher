@@ -188,7 +188,7 @@ func formatNumber(n opensysml.Number) string {
 // unitQualifier is a package prefix in a unit name: the SI:: of SI::kg.
 var unitQualifier = regexp.MustCompile(`(?:[A-Za-z_][A-Za-z0-9_]*::)+`)
 
-// formatUnit writes a unit as its symbol. The engine names a unit it
+// formatUnit writes a unit as its symbol. The Service names a unit it
 // composed by its qualified, quoted name (SI::'m³⋅s⁻¹'); a reader wants
 // m³⋅s⁻¹.
 func formatUnit(unit string) string {

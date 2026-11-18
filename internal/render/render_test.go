@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/rolling-robot/sysml-publisher/internal/model"
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 	"github.com/rolling-robot/sysml-publisher/internal/tree"
 	"github.com/rolling-robot/sysml-publisher/macros"
 )
@@ -23,7 +24,7 @@ func fixture(name string) string { return filepath.Join("..", "..", "testdata", 
 // build loads a fixture and builds its page tree.
 func build(t *testing.T, name string) (*model.Model, *tree.Tree) {
 	t.Helper()
-	m, err := model.Folder{Dir: fixture(name)}.Load(t.Context())
+	m, err := model.Folder{Dir: fixture(name), API: servicetest.API(t)}.Load(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

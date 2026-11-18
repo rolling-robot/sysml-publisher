@@ -5,16 +5,18 @@ package sysml
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"sort"
 	"testing"
 
 	"github.com/Open-MBEE/OpenSysML/client/opensysml"
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 )
 
-// loadOpen parses the files of a testdata fixture as one model and opens
-// it; the model is closed when the test ends.
+// loadOpen sends the files of a testdata fixture to a sysml-grpc service as
+// one model and opens it; the model is closed when the test ends.
 func loadOpen(t *testing.T, fixture string) *Model {
 	t.Helper()
 	files, err := filepath.Glob(filepath.Join("..", "testdata", fixture, "*.sysml"))
@@ -22,11 +24,20 @@ func loadOpen(t *testing.T, fixture string) *Model {
 		t.Fatalf("fixture %s: %v", fixture, err)
 	}
 	sort.Strings(files)
-	client, err := opensysml.New()
+	client, err := opensysml.Dial(servicetest.API(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed, err := client.ParseFiles(t.Context(), files)
+	docs := make([]opensysml.Document, 0, len(files))
+	for _, path := range files {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			client.Close()
+			t.Fatal(err)
+		}
+		docs = append(docs, opensysml.Source(path, string(content)))
+	}
+	parsed, err := client.ParseDocuments(t.Context(), docs)
 	if err != nil {
 		client.Close()
 		t.Fatal(err)

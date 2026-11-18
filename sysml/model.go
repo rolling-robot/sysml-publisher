@@ -5,8 +5,9 @@
 // (requirement DS-4): element queries (Query), reads of one element's
 // metamodel properties (Props, cached), facts built on them (names, docs,
 // representations, specializations) and expression evaluation (Evaluate).
-// Nothing exports the whole model. It works on a model parsed by
-// OpenSysML's in-process engine (github.com/Open-MBEE/OpenSysML).
+// Nothing exports the whole model. It works on a model the SysML service
+// parsed and holds (github.com/Open-MBEE/OpenSysML's client, dialed to
+// sysml-grpc).
 package sysml
 
 import (
@@ -29,7 +30,7 @@ type Model struct {
 	// file's root namespace.
 	Tops []Ref
 
-	// The engine the model was parsed by, open until Close.
+	// The client the Service answers through, open until Close.
 	client opensysml.Client
 	parsed *opensysml.Model
 	// cache holds the properties Props has read, by element id and by every
@@ -85,8 +86,8 @@ func (m *Model) RenderView(ctx context.Context, qualifiedName string, opts ...op
 	return m.client.RenderView(ctx, m.parsed, qualifiedName, opts...)
 }
 
-// Close releases the engine. What was read stays cached, but nothing more
-// can be read.
+// Close releases the client. What was read stays cached, but nothing more
+// can be read; the service keeps running.
 func (m *Model) Close() error {
 	if m.client == nil {
 		return nil

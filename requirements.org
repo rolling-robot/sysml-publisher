@@ -1,6 +1,9 @@
 * Definitions
 - Model folder :: a directory containing SysML v2 textual notation files
   (=*.sysml=, =*.kerml=), searched recursively.
+- Service :: the external SysML v2 service the model is delegated to
+  (DS-1): =sysml-grpc= from OpenSysML today, named by its address (DS-3);
+  another SysML v2 service, such as Flexo, later as another Source.
 - AsciiDoc representation :: a =TextualRepresentation= element whose
   =language= is "adoc" or "asciidoc", compared case-insensitively.
 - Inherited representation :: an AsciiDoc representation of a usage or
@@ -13,15 +16,23 @@
 - Site folder :: the output directory that receives the generated pages.
 
 * Data source
-- DS-1 :: The tool shall obtain model data in one of two ways: by parsing
-  the SysML files itself, or from an external service that serves the
-  SysML v2 API. For the MVP, the tool shall parse files internally only.
-- DS-2 :: The tool shall load every file in the model folder as one model,
-  so references across files resolve. Hidden files and folders (names
+- DS-1 :: The tool shall not parse SysML and shall not hold a parsed model
+  in memory: parsing and model storage shall be delegated to the Service.
+  The tool shall read the model files only to send their text to the
+  service and to locate what it reports. Macro processors and the renderer
+  shall hold the elements the information they render is drawn from —
+  representations, read properties, the indexes the macros build — never
+  the whole model.
+- DS-2 :: The tool shall send every file in the model folder to the service
+  as the documents of one model, so references across files resolve, each
+  document named by its file path. Hidden files and folders (names
   starting with =.=, such as editor lock files and =.git=) shall be
   ignored.
-- DS-3 :: (Post-MVP) When an external service is used, the user shall give
-  its SysML v2 API base URL and the project to read on the command line.
+- DS-3 :: The user shall name the Service by its address, on the command
+  line (CLI-9) or in the configuration file (CFG-6). The tool shall speak
+  one service kind through one Source implementation: =sysml-grpc= today;
+  another kind, such as Flexo's REST API, shall be addable as another
+  Source without changing the rest of the tool.
 - DS-4 :: The tool shall read model data the way the SysML v2 API serves
   it: by element queries, reads of one element's properties, and
   expression evaluation, not by exporting the whole model. It shall find
@@ -54,6 +65,11 @@
   =-dot= for Graphviz's =dot=; if omitted, =dot= shall be found on =PATH=.
   It is needed only when a representation uses a =sysml-view= that is a
   diagram: a table view is written from the rendering's rows.
+- CLI-9 :: The user shall give the Service's address on the command line:
+  =-api ADDR=, spelled as the SysML client dials it (=localhost:50051=,
+  =https://sysml.example.com=). When neither =-api= nor the configuration
+  file (CFG-6) gives an address, the tool shall refuse with a usage error
+  that says to start a =sysml-grpc= service and name it.
 
 * Configuration
 - CFG-1 :: The tool shall read an optional configuration file in TOML
@@ -61,10 +77,10 @@
   =-config= names, which shall exist. When the default file does not exist,
   the tool shall run without it.
 - CFG-2 :: The configuration file shall name, in a =source= section, the
-  model folder (=dir=, CLI-2), and, in a =site= section, the site folder
-  (=dir=, CLI-3), the site's title (=title=) and the URL the site is
-  published under (=baseURL=). A key that is none of these shall be a usage
-  error naming it.
+  model folder (=dir=, CLI-2) and the Service's address (=api=, CLI-9),
+  and, in a =site= section, the site folder (=dir=, CLI-3), the site's
+  title (=title=) and the URL the site is published under (=baseURL=). A
+  key that is none of these shall be a usage error naming it.
 - CFG-3 :: A value given on the command line shall win over the
   configuration file, and the file over the built-in defaults (CLI-2,
   CLI-3).
@@ -74,6 +90,10 @@
 - CFG-5 :: =site.baseURL= shall be absolute, else a usage error. When it is
   set, every page shall carry =<link rel="canonical" href=…>= naming the
   page's URL under it. Links between pages stay relative (PT-1).
+- CFG-6 :: =source.api= shall be the Service's address (CLI-9), read as the
+  SysML client dials it. A flag the user gave wins over it (CFG-3). The
+  Service's bearer token is not configured here: the SysML client reads
+  =$OPENSYSML_GRPC_TOKEN=.
 
 * Pages
 - PG-1 :: The tool shall generate exactly one page per documented element,
@@ -144,8 +164,10 @@
   with the default width.
 
 * Errors
-- ER-1 :: (Post-MVP) If the external service is unreachable, the tool shall
-  exit with a nonzero status and a message naming the URL it tried.
+- ER-1 :: If the Service cannot be reached, does not answer, or does not
+  serve a capability the tool needs, the tool shall exit with a nonzero
+  status and a message naming the address and, when that is the problem,
+  the missing capability. Nothing shall be written.
 - ER-2 :: If the model has errors, the tool shall print each as
   =file:line:col message=, exit with a nonzero status, and write no pages.
 - ER-3 :: If the model folder contains no model files, the tool shall exit
@@ -225,7 +247,11 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   representations, metadata usages) and multiplicities shall be left out.
   - Without =<element>=, every such member shall be listed, followed by its
     types in parentheses when it has any: =mass (Real)=,
-    =both (Wheel, Sport)=.
+    =both (Sport)=. The types are the ones the API's =type= answers for the
+    member: its written typings and the types it gets through subsetting
+    and redefinition, with a written type that another written one
+    specializes (=Sport :> Wheel=, =part both : Wheel, Sport=) folded away
+    as KerML's derived feature type answers it.
   - With =<element>=, only the members that are typed by it, subclass it
     or subset it shall be listed, without types: through typing,
     subclassification or subsetting (redefinition and reference subsetting

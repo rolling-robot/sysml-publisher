@@ -15,9 +15,18 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 )
 
 func fixture(name string) string { return filepath.Join("..", "..", "testdata", name) }
+
+// apiArgs puts the shared test service's address in front of the flags:
+// every run of the suite delegates to it (CLI-9).
+func apiArgs(t *testing.T, args ...string) []string {
+	t.Helper()
+	return append([]string{"-api", servicetest.API(t)}, args...)
+}
 
 // fixtureAbs is a fixture path that stays right when the test changes the
 // working directory.
@@ -33,7 +42,7 @@ func fixtureAbs(t *testing.T, name string) string {
 func TestPublishSmoke(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "site")
 	var log bytes.Buffer
-	if code := run(context.Background(), []string{"-model", fixture("smoke"), "-out", out}, &log); code != exitOK {
+	if code := run(context.Background(), apiArgs(t, "-model", fixture("smoke"), "-out", out), &log); code != exitOK {
 		t.Fatalf("exit %d, log:\n%s", code, log.String())
 	}
 	for _, f := range []string{"index.html", "Model/pd/index.html", "Model/aaaa/index.html", ".sysml-publish"} {
@@ -60,7 +69,7 @@ func TestPublishSmoke(t *testing.T) {
 func TestJSONLogWithTimings(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "site")
 	var log bytes.Buffer
-	args := []string{"-model", fixture("smoke"), "-out", out, "-v", "-log-format", "json"}
+	args := apiArgs(t, "-model", fixture("smoke"), "-out", out, "-v", "-log-format", "json")
 	if code := run(context.Background(), args, &log); code != exitOK {
 		t.Fatalf("exit %d, log:\n%s", code, log.String())
 	}
@@ -98,7 +107,7 @@ func TestJSONLogWithTimings(t *testing.T) {
 func TestModelErrorsAreLoggedEachAndNothingWritten(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "site")
 	var log bytes.Buffer
-	if code := run(context.Background(), []string{"-model", fixture("syntaxerror"), "-out", out}, &log); code != exitFailure {
+	if code := run(context.Background(), apiArgs(t, "-model", fixture("syntaxerror"), "-out", out), &log); code != exitFailure {
 		t.Fatalf("exit %d, want %d; log:\n%s", code, exitFailure, log.String())
 	}
 	text := log.String()
@@ -115,7 +124,7 @@ func TestModelErrorsAreLoggedEachAndNothingWritten(t *testing.T) {
 func TestModelWithoutRepresentationsWritesLandingPageOnly(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "site")
 	var log bytes.Buffer
-	if code := run(t.Context(), []string{"-model", fixture("undocumented"), "-out", out}, &log); code != exitOK {
+	if code := run(t.Context(), apiArgs(t, "-model", fixture("undocumented"), "-out", out), &log); code != exitOK {
 		t.Fatalf("exit %d, want %d; log:\n%s", code, exitOK, log.String())
 	}
 	text := log.String()
@@ -154,7 +163,7 @@ func TestModelWithoutRepresentationsWritesLandingPageOnly(t *testing.T) {
 func TestMacroFailuresAreWarnings(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "site")
 	var log bytes.Buffer
-	if code := run(t.Context(), []string{"-model", fixture("macroerror"), "-out", out}, &log); code != exitOK {
+	if code := run(t.Context(), apiArgs(t, "-model", fixture("macroerror"), "-out", out), &log); code != exitOK {
 		t.Fatalf("exit %d, want %d; log:\n%s", code, exitOK, log.String())
 	}
 	file := filepath.Join(fixture("macroerror"), "macroerror.sysml")
@@ -192,7 +201,8 @@ func TestMacroFailuresAreWarnings(t *testing.T) {
 func TestConfigFile(t *testing.T) {
 	model, out := fixtureAbs(t, "smoke"), filepath.Join(t.TempDir(), "site")
 	cfg := writeConfig(t, t.TempDir(), fmt.Sprintf(
-		"[source]\ndir = %q\n[site]\ndir = %q\ntitle = \"Model docs\"\nbaseURL = \"https://example.com/docs/\"\n", model, out))
+		"[source]\ndir = %q\napi = %q\n[site]\ndir = %q\ntitle = \"Model docs\"\nbaseURL = \"https://example.com/docs/\"\n",
+		model, servicetest.API(t), out))
 	var log bytes.Buffer
 	if code := run(t.Context(), []string{"-config", cfg}, &log); code != exitOK {
 		t.Fatalf("exit %d, want %d; log:\n%s", code, exitOK, log.String())
@@ -229,9 +239,10 @@ func TestConfigDefaultNameAndFlagsWin(t *testing.T) {
 	cfgOut := filepath.Join(dir, "fromconfig")
 	flagOut := filepath.Join(dir, "fromflag")
 	// Both folders in the file are wrong: the run only works when the
-	// flags won.
+	// flags won. The address comes from the file (CFG-6), nothing overriding
+	// it here.
 	writeConfig(t, dir, fmt.Sprintf(
-		"[source]\ndir = %q\n[site]\ndir = %q\n", "no-such-model", cfgOut))
+		"[source]\ndir = %q\napi = %q\n[site]\ndir = %q\n", "no-such-model", servicetest.API(t), cfgOut))
 	t.Chdir(dir)
 	var log bytes.Buffer
 	args := []string{"-model", model, "-out", flagOut}
@@ -286,12 +297,41 @@ func TestUsageErrors(t *testing.T) {
 	}
 }
 
+// Without -api and without [source] api there is no Service to parse the
+// model, which is a usage error that says how to run one (CLI-9).
+func TestMissingServiceAddressIsAUsageError(t *testing.T) {
+	var log bytes.Buffer
+	if code := run(t.Context(), []string{"-model", fixture("smoke")}, &log); code != exitUsage {
+		t.Fatalf("exit %d, want %d; log:\n%s", code, exitUsage, log.String())
+	}
+	text := log.String()
+	for _, want := range []string{"no SysML service address", "sysml-grpc", "-api"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("log lacks %q:\n%s", want, text)
+		}
+	}
+}
+
+// ER-1: a service that answers nothing fails the run with a message naming
+// the address, and nothing is written.
+func TestUnreachableServiceFailsWithItsAddress(t *testing.T) {
+	// Port 1 on the loopback: nothing listens there, and no service of the
+	// suite is ever told to.
+	var log bytes.Buffer
+	if code := run(t.Context(), []string{"-api", "localhost:1", "-model", fixture("smoke"), "-out", filepath.Join(t.TempDir(), "site")}, &log); code != exitFailure {
+		t.Fatalf("exit %d, want %d; log:\n%s", code, exitFailure, log.String())
+	}
+	if !strings.Contains(log.String(), "reaching the SysML service at localhost:1") {
+		t.Errorf("log does not name the service at its address:\n%s", log.String())
+	}
+}
+
 func TestInterruptedRunWritesNothing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	out := filepath.Join(t.TempDir(), "site")
 	var log bytes.Buffer
-	if code := run(ctx, []string{"-model", fixture("smoke"), "-out", out}, &log); code != exitInterrupted {
+	if code := run(ctx, apiArgs(t, "-model", fixture("smoke"), "-out", out), &log); code != exitInterrupted {
 		t.Fatalf("exit %d, want %d; log:\n%s", code, exitInterrupted, log.String())
 	}
 	if !strings.Contains(log.String(), "interrupted; nothing written") {
@@ -309,7 +349,7 @@ func TestInterruptedRunWritesNothing(t *testing.T) {
 func TestViewPrograms(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "site")
 	var log bytes.Buffer
-	args := []string{"-model", fixture("views"), "-out", out, "-dot", "/nonexistent/dot"}
+	args := apiArgs(t, "-model", fixture("views"), "-out", out, "-dot", "/nonexistent/dot")
 	if code := run(t.Context(), args, &log); code != exitOK {
 		t.Fatalf("exit %d, want %d; log:\n%s", code, exitOK, log.String())
 	}

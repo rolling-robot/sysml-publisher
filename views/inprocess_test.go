@@ -5,19 +5,21 @@ package views_test
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/Open-MBEE/OpenSysML/client/opensysml"
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 	"github.com/rolling-robot/sysml-publisher/sysml"
 	"github.com/rolling-robot/sysml-publisher/views"
 )
 
-// These tests render testdata/views in process; only the diagram runs
-// Graphviz's dot, and a test that lays one out is skipped where it is not
-// installed.
+// These tests render testdata/views through the Service; only the diagram
+// runs Graphviz's dot, and a test that lays one out is skipped where it is
+// not installed.
 func needDot(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("dot"); err != nil {
@@ -25,15 +27,22 @@ func needDot(t *testing.T) {
 	}
 }
 
-// loadViews parses the views fixture and opens it: the model sysml-view
-// renders its views from.
+// loadViews sends the views fixture to a sysml-grpc service and opens it:
+// the model sysml-view renders its views from.
 func loadViews(t *testing.T) *sysml.Model {
 	t.Helper()
-	client, err := opensysml.New()
+	client, err := opensysml.Dial(servicetest.API(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed, err := client.ParseFiles(t.Context(), []string{"../testdata/views/views.sysml"})
+	content, err := os.ReadFile("../testdata/views/views.sysml")
+	if err != nil {
+		client.Close()
+		t.Fatal(err)
+	}
+	parsed, err := client.ParseDocuments(t.Context(), []opensysml.Document{
+		opensysml.Source("../testdata/views/views.sysml", string(content)),
+	})
 	if err != nil {
 		client.Close()
 		t.Fatal(err)

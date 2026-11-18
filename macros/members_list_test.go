@@ -31,7 +31,7 @@ func TestMembersList(t *testing.T) {
 			"front (Wheel)",
 			"spare (Sport)",
 			"Racing",
-			"both (Wheel, Sport)",
+			"both (Sport)",
 			"link",
 		}},
 		{"typed, subclasses and subsets at any depth", "M/pd", "sysml-members-list::Wheel[]",
@@ -121,7 +121,7 @@ func TestMembers(t *testing.T) {
 		"front PartUsage [Wheel]",
 		"spare PartUsage [Sport]",
 		"Racing PartDefinition []",
-		"both PartUsage [Wheel Sport]",
+		"both PartUsage [Sport]",
 		"link InterfaceUsage []",
 	}
 	if !slices.Equal(got, want) {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // Package views renders SysML v2 views, for the sysml-view macro
-// (requirement MC-21): OpenSysML writes a view in process with
+// (requirement MC-21): the Service writes a view with
 // sysml.Model.RenderView — DOT for a diagram, columns and rows for a table —
 // and Graphviz's dot lays the DOT out as SVG. A table needs no program.
 //
@@ -21,11 +21,12 @@ import (
 	"github.com/rolling-robot/sysml-publisher/sysml"
 )
 
-// InProcess renders views with OpenSysML's RenderView, in process, once per
+// InProcess renders views with the Service's RenderView, once per
 // view: it is a macros.Views. Renderings are kept, failures included, so a
 // view shown on several pages is rendered once. Safe for concurrent use.
 type InProcess struct {
-	// Model is the parsed model whose views these are, open while rendering.
+	// Model is the open model whose views these are; the Service holds the
+	// model and writes the views while the client is open.
 	Model *sysml.Model
 	// Dot is Graphviz's dot command, which lays a diagram out; "" runs "dot"
 	// from PATH. Only a diagram needs it: a table is written from the rows

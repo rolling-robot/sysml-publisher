@@ -11,11 +11,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/rolling-robot/sysml-publisher/internal/servicetest"
 )
 
 func load(t *testing.T, dir string) (*Model, error) {
 	t.Helper()
-	return Folder{Dir: filepath.Join("..", "..", "testdata", dir)}.Load(context.Background())
+	return Folder{Dir: filepath.Join("..", "..", "testdata", dir), API: servicetest.API(t)}.Load(context.Background())
 }
 
 // A model of two files is read as one: the usage in top.sysml is typed by
@@ -95,7 +97,7 @@ func TestLoadSkipsHiddenFiles(t *testing.T) {
 			if c.dir == "." {
 				t.Chdir(dir)
 			}
-			m, err := Folder{Dir: c.dir}.Load(t.Context())
+			m, err := Folder{Dir: c.dir, API: servicetest.API(t)}.Load(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
