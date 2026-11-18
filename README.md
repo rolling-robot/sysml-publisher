@@ -24,11 +24,21 @@ Install the tool (see [Requirements and building](#requirements-and-building)):
 go install github.com/rolling-robot/sysml-publisher/cmd/sysml-publish@latest
 ```
 
-Start a sysml-grpc service, from the OpenSysML repository:
+Run it with `-api local` and the tool brings up its own sysml-grpc for the
+run — found on your `PATH`, or built from the OpenSysML repository — and
+stops it after:
+
+```sh
+sysml-publish -api local
+```
+
+Or start a service yourself, from the OpenSysML repository, and name it:
 
 ```sh
 git clone https://github.com/Open-MBEE/OpenSysML && cd OpenSysML
 go run ./cmd/sysml-grpc        # serves localhost:50051 until you stop it
+
+sysml-publish -api localhost:50051
 ```
 
 Put a model in `./model`. This one is a shortened `model/aircraft.sysml`, the
@@ -111,6 +121,9 @@ Run it and open the result:
 sysml-publish -api localhost:50051    # reads ./model, writes ./site
 xdg-open site/index.html              # or open it in any browser
 ```
+
+(Or run `sysml-publish -api local` and skip starting the service yourself:
+the tool starts one for the run and stops it after.)
 
 You get six pages, one per documented element plus the package that holds
 them:
@@ -430,7 +443,7 @@ sysml-publish -api ADDR [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `-api ADDR` | none — required | address of the sysml-grpc service that parses the model and answers the reads, spelled as `localhost:50051` or `https://sysml.example.com`; the service's bearer token is read from `$OPENSYSML_GRPC_TOKEN` |
+| `-api ADDR` | none — required | address of the sysml-grpc service that parses the model and answers the reads, spelled as `localhost:50051` or `https://sysml.example.com`; `local` starts one for the run (from `PATH` or built from the OpenSysML repository) and stops it after; the service's bearer token is read from `$OPENSYSML_GRPC_TOKEN` |
 | `-config FILE` | `sysml-publish.toml` in the working directory, if present | the [configuration file](#configuration-file) |
 | `-model DIR` | `./model` | folder with the model; every `*.sysml` and `*.kerml` file in it, searched recursively, is read as one model, so references across files work; hidden files and folders (`.git`, editor lock files) are skipped |
 | `-out DIR` | `./site` | folder to write the site to; replaced on every run |
