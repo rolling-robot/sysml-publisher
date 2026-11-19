@@ -288,7 +288,8 @@ site/
   unrelated parts of the model change (except the numbered `unnamed-N`
   folders).
 - Every page has the whole tree as a sidebar on the left, with the current
-  page marked.
+  page marked; items with children are collapsible, and the browser
+  remembers which ones you opened.
 - All links are relative, so the site works from `file://`, from any web
   server, and from any sub-path.
 - With `baseURL` configured, every page also carries a canonical link naming

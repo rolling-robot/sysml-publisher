@@ -32,6 +32,23 @@
 }
 .sidebar ul { list-style: none; margin: 0; padding-left: 1rem; }
 .sidebar > nav > ul { padding-left: 0; }
+/* A collapsible branch (SB-6): the row is a summary; the chevron marks it
+   and turns down when the branch is open. No-JS state comes from the
+   server's open attribute; the script (SB-6) restores and remembers the
+   user's own choices. */
+.sidebar summary { list-style: none; cursor: pointer; }
+.sidebar summary::-webkit-details-marker { display: none; }
+.sidebar summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1rem;
+  margin-left: -.9rem;
+  font-size: .8em;
+  color: rgba(0, 0, 0, .45);
+  transform: rotate(0deg);
+}
+.sidebar details[open] > summary::before { transform: rotate(90deg); }
+.sidebar summary:hover a { text-decoration: underline; }
 .sidebar .home { display: block; font-weight: 600; margin-bottom: .5rem; }
 .sidebar a { text-decoration: none; }
 .sidebar a:hover { text-decoration: underline; }
@@ -85,6 +102,12 @@ html.sidebar-resizing body { user-select: none; -webkit-user-select: none; }
 }
 div.sysml-failed { margin-bottom: 1.25em; padding: .5em .75em; }
 div.sysml-failed > p { margin: 0; }
+
+/* A figure (MC-25): the Mermaid source mermaid.js draws in the browser. */
+.sysml-fig { margin: 1.25em 0; overflow-x: auto; }
+.sysml-fig > pre.mermaid { margin: 0; background: none; }
+/* A sysml-fig written out on a page of something that is no interface. */
+.sysml-fig-text { color: rgba(0, 0, 0, .45); }
 
 /* Sortable tables (SB-4): sort.js marks every sortable table and the column
    sorted last with aria-sort; the styles follow the marker, so a page whose

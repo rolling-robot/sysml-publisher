@@ -32,6 +32,23 @@
 }
 .sidebar ul { list-style: none; margin: 0; padding-left: 1rem; }
 .sidebar > nav > ul { padding-left: 0; }
+/* A collapsible branch (SB-6): the row is a summary; the chevron marks it
+   and turns down when the branch is open. No-JS state comes from the
+   server's open attribute; the script (SB-6) restores and remembers the
+   user's own choices. */
+.sidebar summary { list-style: none; cursor: pointer; }
+.sidebar summary::-webkit-details-marker { display: none; }
+.sidebar summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1rem;
+  margin-left: -.9rem;
+  font-size: .8em;
+  color: rgba(0, 0, 0, .45);
+  transform: rotate(0deg);
+}
+.sidebar details[open] > summary::before { transform: rotate(90deg); }
+.sidebar summary:hover a { text-decoration: underline; }
 .sidebar .home { display: block; font-weight: 600; margin-bottom: .5rem; }
 .sidebar a { text-decoration: none; }
 .sidebar a:hover { text-decoration: underline; }

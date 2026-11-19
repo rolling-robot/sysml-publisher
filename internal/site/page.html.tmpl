@@ -49,8 +49,10 @@
 {{- if .}}
 <ul>
 {{- range .}}
-<li{{if .Empty}} class="empty"{{end}}><a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Title}}</a>
-{{- template "tree" .Children}}</li>
+<li{{if .Empty}} class="empty"{{end}}>{{if .Branch}}<details data-branch="{{.Branch}}"{{if .Open}} open{{end}}><summary><a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Title}}</a></summary>
+{{- template "tree" .Children}}
+</details>{{else}}<a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Title}}</a>
+{{- template "tree" .Children}}{{end}}</li>
 {{- end}}
 </ul>
 {{- end}}

@@ -42,6 +42,12 @@
   browser and applied on every page. Double-click, or the arrow keys with the
   strip focused, restores the default width. A page without JavaScript keeps
   the default width, as before.
+- Collapsible sidebar items (SB-6): every item with children folds into a
+  `details` whose summary carries its link, with a chevron that turns down
+  when it is open. Without JavaScript the branches on the current page's
+  path are open and the others closed; a small script remembers the user's
+  own choices in the browser, keyed by the item's site path, and applies
+  them on every page.
 
 ## 0.4.0 — 2026-11-18
 

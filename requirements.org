@@ -165,6 +165,14 @@
   adjustment happens in the browser over a small script the site ships with
   the stylesheets; a page without it renders and reads exactly as before,
   with the default width.
+- SB-6 :: Every sidebar item with children is collapsible: a =details=
+  whose =summary= carries the item's link, drawn as a branch with a chevron
+  that turns down when the item is open. Without JavaScript the branches
+  on the current page's path are open and the others closed. The browser
+  remembers the user's own open/closed choices over a small script the
+  site ships with the stylesheets, keyed by the item's site path, and
+  applies them on every page of the site, overriding the default; a page
+  without the script keeps the default state.
 
 * Errors
 - ER-1 :: If the Service cannot be reached, does not answer, or does not

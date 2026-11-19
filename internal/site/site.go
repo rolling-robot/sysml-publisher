@@ -154,10 +154,16 @@ func canonical(baseURL, dir string) string {
 }
 
 type navItem struct {
-	Title    template.HTML
-	Href     string
-	Current  bool
-	Empty    bool
+	Title   template.HTML
+	Href    string
+	Current bool
+	Empty   bool
+	// Branch is a collapsible item's site path (SB-6), the key the browser
+	// remembers its open state by; empty for a leaf.
+	Branch string
+	// Open is a branch's server default: open when it holds the current
+	// page's path.
+	Open     bool
 	Children []navItem
 }
 
@@ -177,6 +183,12 @@ type pageView struct {
 
 func (l *layout) page(s *Site, n *tree.Node) error {
 	root := l.t.Root
+	// The path from the current page up to the root: the branches on it
+	// are the sidebar's open ones (SB-6).
+	onPath := make(map[*tree.Node]bool)
+	for p := n; p != nil; p = p.Parent {
+		onPath[p] = true
+	}
 	v := pageView{
 		SiteTitle:  l.title,
 		AssetsHref: strings.TrimSuffix(tree.Href(n, root), "index.html") + "assets/",
@@ -184,7 +196,7 @@ func (l *layout) page(s *Site, n *tree.Node) error {
 		Canonical:  canonical(l.baseURL, n.Dir),
 		Landing:    n == root,
 		Empty:      n != root && !n.Documented(),
-		Nav:        l.nav(n, root.Children),
+		Nav:        l.nav(n, onPath, root.Children),
 	}
 	if n == root {
 		t := render.PlainTitle(l.title)
@@ -218,20 +230,28 @@ func (l *layout) page(s *Site, n *tree.Node) error {
 	return nil
 }
 
-func (l *layout) nav(current *tree.Node, nodes []*tree.Node) []navItem {
+func (l *layout) nav(current *tree.Node, onPath map[*tree.Node]bool, nodes []*tree.Node) []navItem {
 	items := make([]navItem, 0, len(nodes))
 	for _, c := range nodes {
 		var title template.HTML
 		if p := l.pages[c]; p != nil {
 			title = p.Title.Text
 		}
-		items = append(items, navItem{
+		item := navItem{
 			Title:    title,
 			Href:     tree.Href(current, c),
 			Current:  c == current,
 			Empty:    !c.Documented(),
-			Children: l.nav(current, c.Children),
-		})
+			Children: l.nav(current, onPath, c.Children),
+		}
+		// A branch — an item with children — is collapsible (SB-6); its
+		// server default is open when it holds the current page's path.
+		// Branch is the site path the browser remembers the state by.
+		if len(c.Children) > 0 {
+			item.Branch = c.Dir
+			item.Open = onPath[c]
+		}
+		items = append(items, item)
 	}
 	return items
 }

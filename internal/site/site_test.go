@@ -71,11 +71,12 @@ func TestRenderSmoke(t *testing.T) {
 		t.Error("inherited representation has an owner label (PG-7)")
 	}
 	// The sidebar lists the whole tree, marks the current page, and links
-	// the empty ancestor page too (SB-1..3).
+	// the empty ancestor page too (SB-1..3). The branch holding the
+	// current page's path is a collapsible details, open (SB-6).
 	mustContain(t, s, "Model/aaaa/index.html",
 		`<aside class="sidebar"`,
 		`<a href="index.html" aria-current="page">Element: aaaa</a>`,
-		`<li class="empty"><a href="../index.html">Model</a>`,
+		`<li class="empty"><details data-branch="Model" open><summary><a href="../index.html">Model</a></summary>`,
 		`<a href="../bbb/index.html">Element: bbb</a>`)
 	mustContain(t, s, "Model/index.html", `<p class="empty-page">`)
 	mustContain(t, s, "index.html", "<h1>"+LandingTitle+"</h1>", `<a href="Model/pd/index.html">Element: pd</a>`)
@@ -90,6 +91,24 @@ func TestRenderSmoke(t *testing.T) {
 		`<script src="../../assets/sort.js" defer></script>`,
 		`<script src="../../assets/sidebar.js" defer></script>`,
 		`<div class="sidebar-resize" role="separator" aria-orientation="vertical"`)
+}
+
+// The sidebar's branches are collapsible details (SB-6): the branches on the
+// current page's path are open, the others closed, a leaf is a plain link,
+// and the landing page opens nothing.
+func TestSidebarBranchesCollapsible(t *testing.T) {
+	s := renderSite(t, "smoke")
+	mustContain(t, s, "Model/aaaa/index.html",
+		`<details data-branch="Model" open><summary><a href="../index.html">Model</a></summary>`)
+	mustContain(t, s, "Model/index.html",
+		`<details data-branch="Model" open><summary><a href="index.html" aria-current="page">Model</a></summary>`)
+	// The landing page: the branch is there, closed.
+	mustContain(t, s, "index.html", `<details data-branch="Model"><summary>`)
+	// A leaf is a plain link, no details of its own.
+	mustContain(t, s, "Model/aaaa/index.html", `<li><a href="index.html" aria-current="page">Element: aaaa</a></li>`)
+	if strings.Contains(string(s.Files["Model/aaaa/index.html"]), `data-branch="Model/aaaa"`) {
+		t.Error("leaf aaaa is a branch")
+	}
 }
 
 func TestHrefEscapesSegments(t *testing.T) {

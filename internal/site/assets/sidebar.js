@@ -2,18 +2,23 @@
 //
 // Resizing the sidebar (SB-5): dragging the .sidebar-resize strip changes the
 // sidebar's width for the page; the width is remembered in the browser and
-// applied on every page of the site. Progressive enhancement like the table
-// sorting (SB-4): a page whose script does not run keeps the default width,
-// and the strip, inert, changes nothing.
+// applied on every page of the site. The sidebar tree's collapsible branches
+// (SB-6): a branch's open state is remembered the same way, the user's own
+// choice overriding the server default (the current page's path open) on
+// every page of the site. Progressive enhancement like the table
+// sorting (SB-4): a page whose script does not run keeps the default width
+// and the server's open branches, and the strip, inert, changes nothing.
 (function () {
   "use strict";
 
   var MIN = 160, MAX = 640, STEP = 16; // px; keyboard steps, Shift for four
   var KEY = "sysml-publish:sidebar-width";
+  var TREE_KEY = "sysml-publish:sidebar-open";
 
   var root = document.documentElement;
   var handle = document.querySelector(".sidebar-resize");
   var sidebar = document.querySelector(".sidebar");
+  var nav = sidebar && sidebar.querySelector("nav");
   if (!handle || !sidebar) return;
 
   function clamp(px) {
@@ -83,4 +88,31 @@
     store();
     e.preventDefault();
   });
+
+  // The collapsible branches (SB-6). The user's choices are a sparse map by
+  // branch; a branch the user never toggled keeps the server default, open
+  // when it holds the current page's path. A browser that keeps nothing
+  // keeps the defaults.
+  if (!nav) return;
+  var saved = {};
+  try {
+    var raw = JSON.parse(localStorage.getItem(TREE_KEY));
+    if (raw && typeof raw === "object") saved = raw;
+  } catch (e) {}
+
+  var branches = nav.querySelectorAll("details[data-branch]");
+  for (var i = 0; i < branches.length; i++) {
+    var key = branches[i].getAttribute("data-branch");
+    if (key in saved) branches[i].open = !!saved[key];
+  }
+
+  // The toggle event does not bubble; the capture listener sees it anyway.
+  // Setting open in the restore above fires toggle too, writing back what
+  // was just read — harmless.
+  nav.addEventListener("toggle", function (e) {
+    var d = e.target;
+    if (!(d instanceof HTMLDetailsElement) || !d.hasAttribute("data-branch")) return;
+    saved[d.getAttribute("data-branch")] = d.open;
+    try { localStorage.setItem(TREE_KEY, JSON.stringify(saved)); } catch (err) {}
+  }, true);
 })();

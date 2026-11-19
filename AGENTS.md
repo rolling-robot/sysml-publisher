@@ -110,7 +110,8 @@ internal/render/            convert representations per page (asciidoctorg), tit
 internal/site/              lay a render result out as HTML files (html/template), write
 internal/site/assets/       asciidoctor.css (Asciidoctor default, MIT), layout.css,
                             sort.js (table sorting in the browser, SB-4),
-                            sidebar.js (sidebar resizing, SB-5),
+                            sidebar.js (sidebar resizing, SB-5; collapsible
+                            branches remembered, SB-6),
                             mermaid.min.js (Mermaid 12, MIT; MC-25; written with the site only when a
                             page shows a figure)
 internal/site/page.html.tmpl
