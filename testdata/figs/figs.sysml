@@ -38,15 +38,16 @@ package F {
         part c {
             port s : P;
         }
-        // i1 connects a and b: the figure shows a (with p) and b (with q),
-        // the edge p === q. c, inner, loose and i2 are not in it.
+        // i1 connects a and b: the figure shows vehicle holding a (with p)
+        // and b (with q), the edge p === q. c, inner, loose and i2 are not
+        // in it.
         interface i1 connect (a.p, b.q) {
             rep language "asciidoc"
                 /* = i1 */
         }
-        // i2 connects a.sub.deep and b.q: the figure shows a > sub (with
-        // deep) and b (with q), the edge deep === q. inner and loose are not
-        // in it.
+        // i2 connects a.sub.deep and b.q: the figure shows vehicle > a >
+        // sub (with deep) and vehicle > b (with q), the edge deep === q.
+        // inner and loose are not in it.
         interface i2 connect (a.sub.deep, b.q) {
             rep language "asciidoc"
                 /* = i2 */
@@ -55,8 +56,9 @@ package F {
     }
 
     // An interface between parts of different packages: their chains share
-    // only F, a package, which is not drawn; the figure shows px (with p)
-    // and py (with p) as loose boxes, the edge p === p.
+    // only F, a package, which is the common ancestor and drawn as the
+    // figure's frame; the figure shows F holding px (with p) and py (with
+    // p), the edge p === p.
     package X {
         part px {
             port p : P;

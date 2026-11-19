@@ -446,10 +446,10 @@ Block macro, on a line of its own. Replaced, when the target is an
 draws in the browser with the site's mermaid.js, in the look of OpenSysML's
 Mermaid interconnection form. The figure shows, and nothing else:
 
-* one box per part the figure needs: the owner of each end's feature, and
-  every part between it and the ends' common ancestor, nested as the model
-  nests them. The common ancestor itself is not drawn, and neither is a
-  package on the way;
+* one box per part the figure needs: the ends' common ancestor, the owner
+  of each end's feature, and every part between, nested as the model nests
+  them. The common ancestor is the figure's frame and is drawn whatever it
+  is, a package included; a package further down a chain is not drawn;
 * a rounded node per end feature, inside its owner's box;
 * one thick edge per pair of ends, the connection line of OpenSysML's
   Mermaid form.
@@ -496,7 +496,8 @@ package Example {
 }
 ----
 
-The page of `aircraft` shows a figure: the boxes `aircraft` and
+The page of `aircraft` shows a figure: the package `Example` — the ends'
+common ancestor — as the frame, holding the boxes `aircraft` and
 `airConditioner`, each with its `air` port, joined by a thick line, and
 nothing else of the model.
 

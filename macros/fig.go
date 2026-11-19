@@ -152,17 +152,17 @@ func (e *env) figure(iface string, ends []connectorEnd) (figTree, error) {
 	if !ok {
 		return t, errors.New("the ends' parts have no common ancestor; a figure needs them under one owner")
 	}
-	// The drawn elements are the chains cut below the common ancestor: one
-	// node per element, each standing where it stands in its chain. An
-	// element two ends reach is drawn once. A package in a chain is not
-	// drawn — an interconnection shows no namespaces — so what it owns
-	// stands where the package would have stood.
+	// The drawn elements are the chains cut at the common ancestor: one
+	// node per element, the common ancestor the outermost, drawn whatever
+	// it is, for the frame of the figure. A package further down a chain
+	// is not drawn — an interconnection shows no namespaces — so what it
+	// owns stands where the package would have stood.
 	// Every chain shares its start with the first, and the common ancestor
 	// is the deepest of what they share, so it sits at the same index of
-	// every chain; cutting there leaves what is drawn.
+	// every chain; cutting there leaves the common ancestor first.
 	k := slices.Index(chains[0], common)
 	for i := range chains {
-		chains[i] = chains[i][k+1:]
+		chains[i] = chains[i][k:]
 	}
 	byID := map[string]*figNode{}   // model id → node
 	parentOf := map[string]string{} // a chain element's predecessor, by model id
@@ -175,7 +175,8 @@ func (e *env) figure(iface string, ends []connectorEnd) (figTree, error) {
 				if err != nil {
 					return t, err
 				}
-				if meta == "Package" {
+				if meta == "Package" && id != common {
+					parentOf[id] = prev
 					prev = id // not drawn: its members stand where it would
 					continue
 				}
@@ -183,7 +184,7 @@ func (e *env) figure(iface string, ends []connectorEnd) (figTree, error) {
 				if err != nil {
 					return t, err
 				}
-				n = &figNode{elem: id, kind: "«" + figKeyword(meta) + "»", name: nm, box: isPartLike(meta)}
+				n = &figNode{elem: id, kind: "«" + figKeyword(meta) + "»", name: nm, box: isPartLike(meta) || id == common}
 				byID[id] = n
 				parentOf[id] = prev
 				order = append(order, n)

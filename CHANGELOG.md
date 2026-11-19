@@ -18,13 +18,13 @@
 
 ### Added
 - The block macro `sysml-fig::[<interface>][]` (MC-25): a Mermaid figure of
-  an interface — the parts on its ends and the parts between them and their
-  common ancestor, each end's feature, and one edge per pair of ends — drawn
-  in the browser by the vendored `mermaid.min.js` in OpenSysML's Mermaid
-  interconnection style. A resolvable target that is not an interface is
-  written out as the macro text; a target naming no element fails the macro
-  with a warning. A page loads the asset only when it shows a figure, and a
-  site with no figure carries no asset.
+  an interface — the ends' common ancestor as the frame, the parts on its
+  ends and the parts between, each end's feature, and one edge per pair of
+  ends — drawn in the browser by the vendored `mermaid.min.js` in
+  OpenSysML's Mermaid interconnection style. A resolvable target that is not
+  an interface is written out as the macro text; a target naming no element
+  fails the macro with a warning. A page loads the asset only when it shows
+  a figure, and a site with no figure carries no asset.
 - Running without a service of your own: `-api local` (or
   `[source] api = "local"`) starts a sysml-grpc for the run — found on
   `PATH` or built from the OpenSysML checkout — uses it, and stops it

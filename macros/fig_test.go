@@ -42,42 +42,51 @@ func TestFig(t *testing.T) {
 	attrs := Attributes(pageAt(t, tr, "F/vehicle").ID)
 	cases := []struct{ name, target, iface, body string }{
 		{"the parts on the ends", "i1", "F::vehicle::i1",
-			`  subgraph n0 [` + "`*«part»* **a**`" + `]
+			`  subgraph n0 [` + "`*«part»* **vehicle**`" + `]
     direction LR
-    n1(` + "`*«port»*\n**p**`" + `)
-  end
-  subgraph n2 [` + "`*«part»* **b**`" + `]
-    direction LR
-    n3(` + "`*«port»*\n**q**`" + `)
-  end
-  n1 === n3
-  linkStyle 0 stroke-width:3px
-`},
-		{"an end nested in a part", "i2", "F::vehicle::i2",
-			`  subgraph n0 [` + "`*«part»* **a**`" + `]
-    direction LR
-    subgraph n1 [` + "`*«part»* **sub**`" + `]
+    subgraph n1 [` + "`*«part»* **a**`" + `]
       direction LR
-      n2(` + "`*«port»*\n**deep**`" + `)
+      n2(` + "`*«port»*\n**p**`" + `)
     end
-  end
-  subgraph n3 [` + "`*«part»* **b**`" + `]
-    direction LR
-    n4(` + "`*«port»*\n**q**`" + `)
+    subgraph n3 [` + "`*«part»* **b**`" + `]
+      direction LR
+      n4(` + "`*«port»*\n**q**`" + `)
+    end
   end
   n2 === n4
   linkStyle 0 stroke-width:3px
 `},
+		{"an end nested in a part", "i2", "F::vehicle::i2",
+			`  subgraph n0 [` + "`*«part»* **vehicle**`" + `]
+    direction LR
+    subgraph n1 [` + "`*«part»* **a**`" + `]
+      direction LR
+      subgraph n2 [` + "`*«part»* **sub**`" + `]
+        direction LR
+        n3(` + "`*«port»*\n**deep**`" + `)
+      end
+    end
+    subgraph n4 [` + "`*«part»* **b**`" + `]
+      direction LR
+      n5(` + "`*«port»*\n**q**`" + `)
+    end
+  end
+  n3 === n5
+  linkStyle 0 stroke-width:3px
+`},
 		{"ends in different packages", "ixy", "F::ixy",
-			`  subgraph n0 [` + "`*«part»* **px**`" + `]
+			`  subgraph n0 [` + "`*«package»* **F**`" + `]
     direction LR
-    n1(` + "`*«port»*\n**p**`" + `)
+    subgraph n1 [` + "`*«part»* **px**`" + `]
+      direction LR
+      n2(` + "`*«port»*\n**p**`" + `)
+    end
+    subgraph n3 [` + "`*«part»* **py**`" + `]
+      direction LR
+      n4(` + "`*«port»*\n**p**`" + `)
+    end
   end
-  subgraph n2 [` + "`*«part»* **py**`" + `]
-    direction LR
-    n3(` + "`*«port»*\n**p**`" + `)
-  end
-  n1 === n3
+  n2 === n4
   linkStyle 0 stroke-width:3px
 `},
 	}
