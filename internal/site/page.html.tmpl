@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="{{.AssetsHref}}layout.css">
 <script src="{{.AssetsHref}}sort.js" defer></script>
 <script src="{{.AssetsHref}}sidebar.js" defer></script>
-</head>
+{{if .Mermaid}}<script src="{{.AssetsHref}}mermaid.min.js" defer></script>
+{{end -}}</head>
 <body class="article">
 <div class="layout">
 <aside class="sidebar" aria-label="Page tree">

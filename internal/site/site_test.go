@@ -268,3 +268,30 @@ func TestPageTitles(t *testing.T) {
 	// The empty package page keeps the element name (PG-6).
 	mustContain(t, s, "T/index.html", "<h1>T</h1>")
 }
+
+// A page whose representation shows a figure (MC-25) loads the site's
+// mermaid.js, which draws it; pages without a figure, and the landing page,
+// load nothing, and the site carries the asset only when a figure needs it.
+func TestMermaidLoadsOnFigurePages(t *testing.T) {
+	s := renderSite(t, "figs")
+	if _, ok := s.Files["assets/mermaid.min.js"]; !ok {
+		t.Error("the site carries no mermaid.min.js though a page shows a figure")
+	}
+	mustContain(t, s, "F/vehicle/index.html", `<script src="../../assets/mermaid.min.js" defer></script>`)
+	if strings.Contains(string(s.Files["F/vehicle/i1/index.html"]), "mermaid.min.js") {
+		t.Error("the page of i1 loads mermaid.js though its body has no figure")
+	}
+	if strings.Contains(string(s.Files["index.html"]), "mermaid.min.js") {
+		t.Error("the landing page loads mermaid.js though it shows no figure")
+	}
+
+	// A site with no figure carries no asset and no script.
+	s = renderSite(t, "ifaces")
+	if _, ok := s.Files["assets/mermaid.min.js"]; ok {
+		t.Error("the site carries mermaid.min.js though no page shows a figure")
+	}
+	mustContain(t, s, "I/x/index.html", `<script src="../../assets/sort.js" defer></script>`)
+	if strings.Contains(string(s.Files["I/x/index.html"]), "mermaid.min.js") {
+		t.Error("the page of x loads mermaid.js though it shows no figure")
+	}
+}

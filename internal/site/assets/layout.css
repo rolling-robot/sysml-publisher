@@ -86,6 +86,12 @@ html.sidebar-resizing body { user-select: none; -webkit-user-select: none; }
 div.sysml-failed { margin-bottom: 1.25em; padding: .5em .75em; }
 div.sysml-failed > p { margin: 0; }
 
+/* A figure (MC-25): the Mermaid source mermaid.js draws in the browser. */
+.sysml-fig { margin: 1.25em 0; overflow-x: auto; }
+.sysml-fig > pre.mermaid { margin: 0; background: none; }
+/* A sysml-fig written out on a page of something that is no interface. */
+.sysml-fig-text { color: rgba(0, 0, 0, .45); }
+
 /* Sortable tables (SB-4): sort.js marks every sortable table and the column
    sorted last with aria-sort; the styles follow the marker, so a page whose
    script does not run shows plain headers. */

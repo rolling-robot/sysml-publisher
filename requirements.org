@@ -417,6 +417,28 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   a view with no expose or no filter, or an unresolvable exposed root or
   filter def fails the macro (MC-19). An exposed tree with no element
   carrying the filter metadata drops the macro line (MC-12).
+- MC-25 :: The block macro =sysml-fig::[<element>][]= shall be replaced, when
+  the target is an interface (an =InterfaceUsage=; without a target the
+  page's element is used, named as MC-15 says), by a figure of that
+  interface: a Mermaid flowchart the site draws in the browser with the
+  vendored =mermaid.min.js=, in the look of OpenSysML's Mermaid
+  interconnection form. The figure shows, and nothing else: one box per part
+  of the figure's tree — the owner of each end's leaf feature and every part
+  between it and the ends' deepest common ancestor, nested as the model
+  nests them, the common ancestor itself not drawn — and a stadium node per
+  end feature inside its owner's box. One edge per pair of ends joins the
+  end features, drawn as the thick ==== connection line of OpenSysML's
+  Mermaid form; an edge whose two ends are the same feature is not drawn.
+  The figure's elements are found in the model the way MC-15 and MC-23 read
+  it; the figure draws exactly what the ends' chains pass through, unnamed
+  elements included. The Mermaid text is written by this tool; its style
+  constants are copied from OpenSysML's Mermaid writer (§10-8). A target
+  that names no element fails the macro (MC-19); a resolvable target that is
+  not an interface is written out as the macro text, no warning raised. An
+  interface with fewer than two ends, an end that connects nothing, or ends
+  whose parts have no common ancestor fails the macro (MC-19). The site
+  carries =assets/mermaid.min.js= and a page loads it only when the page
+  shows a figure; a site with no figure carries no asset.
 * Open questions
 - TBD-9 :: (Decided: 3, behind the interface macros.Views, with =dot
   -Tsvg= for the layout as in 1; MC-21.)

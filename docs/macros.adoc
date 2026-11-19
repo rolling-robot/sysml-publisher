@@ -439,6 +439,67 @@ package Example {
 
 The page of `aircraft` lists `airDuct -> airConditioner`.
 
+== sysml-fig
+
+Block macro, on a line of its own. Replaced, when the target is an
+`interface`, by a figure of that interface: a Mermaid flowchart the page
+draws in the browser with the site's mermaid.js, in the look of OpenSysML's
+Mermaid interconnection form. The figure shows, and nothing else:
+
+* one box per part the figure needs: the owner of each end's feature, and
+  every part between it and the ends' common ancestor, nested as the model
+  nests them. The common ancestor itself is not drawn, and neither is a
+  package on the way;
+* a rounded node per end feature, inside its owner's box;
+* one thick edge per pair of ends, the connection line of OpenSysML's
+  Mermaid form.
+
+Without a target the page's element is used; a target is named as described
+in <<naming>>. A resolvable target that is not an interface — a part, a
+package, an interface *definition* — is written out as the macro text
+(`sysml-fig::airDuct[]`), no warning raised. A target that names no element
+fails the macro (a placeholder and a warning), as does an interface whose
+ends' parts have no common ancestor.
+
+The figure needs no view in the model and no Graphviz: the tool writes the
+Mermaid source itself, in OpenSysML's style, and the site draws it. The
+mermaid.js asset (`assets/mermaid.min.js`) is written with the site when any
+page shows a figure, and a page loads it only then. A page is static HTML;
+without JavaScript, or on paper, the figure's place stays empty.
+
+Syntax:: `sysml-fig::[]`, `sysml-fig::<interface>[]`
+
+Example:
+
+[source,sysml]
+----
+package Example {
+    port def P;
+    part aircraft {
+        rep language "asciidoc"
+            /*
+            = Aircraft
+
+            sysml-fig::airDuct[]
+            */
+        port air : P;
+    }
+    part airConditioner {
+        rep language "asciidoc"
+            /* = airConditioner */
+        port air : P;
+    }
+    interface airDuct connect (aircraft.air, airConditioner.air) {
+        rep language "asciidoc"
+            /* = airDuct */
+    }
+}
+----
+
+The page of `aircraft` shows a figure: the boxes `aircraft` and
+`airConditioner`, each with its `air` port, joined by a thick line, and
+nothing else of the model.
+
 == sysml-metadata-table
 
 Block macro, on a line of its own. Replaced by a table of the attributes of
