@@ -85,13 +85,13 @@ func (e *env) fig(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNod
 		if err != nil {
 			return nil, err
 		}
-		return figBlock(c.parent, t)
+		return figBlock(c.parent, e.figLinks(c.page.id, t))
 	case isPartLike(meta):
 		t, err := e.partFigure(name, id, meta)
 		if err != nil {
 			return nil, err
 		}
-		return figBlock(c.parent, t)
+		return figBlock(c.parent, e.figLinks(c.page.id, t))
 	default:
 		return figEcho(c.parent, c.macro)
 	}
@@ -103,6 +103,27 @@ func (e *env) fig(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNod
 func figEcho(parent asciidoctor.StructuralNode, macro string) (asciidoctor.StructuralNode, error) {
 	return asciidoctor.CreatePassBlock(parent,
 		`<p class="`+FigRole+`-text">`+html.EscapeString(macro)+`</p>`, nil, nil)
+}
+
+// figLinks sets each drawn node's href: the link from the page the figure
+// is drawn on to the node element's page, empty when the element is the
+// page's own or has no page (MC-18).
+func (e *env) figLinks(page string, t figTree) figTree {
+	var walk func([]*figNode)
+	walk = func(nodes []*figNode) {
+		for _, n := range nodes {
+			if n.elem != page {
+				if href, ok := e.href(page, n.elem); ok {
+					n.href = href
+				}
+			}
+			walk(n.children)
+		}
+	}
+	for _, r := range t.roots {
+		walk([]*figNode{r})
+	}
+	return t
 }
 
 // figBlock is a figure as a pass block: its content the Mermaid source in a
@@ -417,6 +438,7 @@ type figNode struct {
 	kind     string // the notation keyword: «part», «port», ...
 	name     string // the element's name, "" when it has none
 	box      bool   // a part: drawn as a box
+	href     string // the link to the element's page, "" when there is none
 	children []*figNode
 }
 

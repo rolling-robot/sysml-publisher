@@ -33,9 +33,16 @@ package F {
 
                sysml-fig::vehicle[] */
         // a owns p and, nested in it, sub with deep; inner with r and loose
-        // are on no end of i1 or i2, so no figure of them shows them.
+        // are on no end of i1 or i2, so no figure of them shows them. a and
+        // its port p carry pages of their own, so the figures of i1, i2 and
+        // a link a's box and p's node to them.
         part a {
-            port p : P;
+            rep language "asciidoc"
+                /* = A */
+            port p : P {
+                rep language "asciidoc"
+                    /* = p */
+            }
             part sub {
                 port deep : P;
                 part loose {

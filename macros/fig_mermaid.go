@@ -5,6 +5,7 @@ package macros
 
 import (
 	"fmt"
+	"html"
 	"strings"
 )
 
@@ -22,7 +23,8 @@ const mermaidConfig = `config:
   theme: base
   look: classic
   layout: elk
-  themeCSS: ".edgeLabel rect { opacity: 1 !important; } .cluster-label .nodeLabel { text-align: center; }"
+  securityLevel: loose
+  themeCSS: ".edgeLabel rect { opacity: 1 !important; } .cluster-label .nodeLabel { text-align: center; } .cluster-label a, .nodeLabel a { color: inherit; text-decoration: none; cursor: pointer; }"
   themeVariables:
     fontFamily: "Helvetica, Arial, sans-serif"
     fontSize: "14px"
@@ -54,7 +56,9 @@ const (
 // flowchart with a subgraph per part box (containment nested), a stadium
 // node per end feature, and one thick edge per pair of ends, the way
 // OpenSysML draws a connection. The figure carries no title: the page names
-// the interface.
+// the interface. A node whose element has a page carries the link in its
+// label (MC-18): mermaid takes no click on a subgraph, and the label is
+// where the link reads as the object's name.
 func mermaidFigure(t figTree) string {
 	var b strings.Builder
 	b.WriteString("---\n")
@@ -67,13 +71,13 @@ func mermaidFigure(t figTree) string {
 		for _, n := range nodes {
 			if n.box {
 				boxes = append(boxes, n.id)
-				fmt.Fprintf(&b, "%ssubgraph %s [%s]\n", indent, n.id, mermaidString(figLabel(n.kind, n.name)))
+				fmt.Fprintf(&b, "%ssubgraph %s [%s]\n", indent, n.id, mermaidLabel(n.kind, n.name, n.href))
 				fmt.Fprintf(&b, "%s  direction LR\n", indent)
 				write(n.children, indent+"  ")
 				fmt.Fprintf(&b, "%send\n", indent)
 			} else {
 				ports = append(ports, n.id)
-				fmt.Fprintf(&b, "%s%s(%s)\n", indent, n.id, mermaidString(figLabel(n.kind, n.name)))
+				fmt.Fprintf(&b, "%s%s(%s)\n", indent, n.id, mermaidLabel(n.kind, n.name, n.href))
 			}
 		}
 	}
@@ -114,6 +118,31 @@ func mermaidString(text string) string {
 		return `"` + htmlEscapeLabel(text) + `"`
 	}
 	return "\"`" + text + "`\""
+}
+
+// mermaidLabel is a drawn element's label: linked, when href is not empty,
+// to the element's page. The link is in the label's HTML (securityLevel
+// loose lets mermaid render it): the name line becomes an anchor, and an
+// unnamed element's keyword line is the anchor's text. The keyword line
+// keeps its markdown italics; the newline stays a literal one. Every
+// character a label's HTML or Mermaid string reads — a backtick included,
+// which would end the markdown string — is escaped, so the backtick form
+// always holds.
+func mermaidLabel(kind, name, href string) string {
+	if href == "" {
+		return mermaidString(figLabel(kind, name))
+	}
+	esc := func(text string) string {
+		return strings.ReplaceAll(html.EscapeString(text), "`", "&#96;")
+	}
+	var content string
+	if name != "" {
+		content = "*" + kind + "*\n" +
+			`<a href="` + esc(href) + `"><strong>` + esc(name) + `</strong></a>`
+	} else {
+		content = `<a href="` + esc(href) + `"><em>` + esc(kind) + `</em></a>`
+	}
+	return "\"`" + content + "`\""
 }
 
 // htmlEscapeLabel escapes a label for a double-quoted Mermaid string: the

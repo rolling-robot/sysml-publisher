@@ -41,16 +41,16 @@ func TestFig(t *testing.T) {
 	attrs := Attributes(pageAt(t, tr, "F/vehicle").ID)
 	cases := []struct{ name, target, iface, body string }{
 		{"the parts on the ends", "i1", "F::vehicle::i1",
-			"  subgraph n0 [\"`*«part»*\n**vehicle**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n**a**`\"]\n      direction LR\n      n2(\"`*«port»*\n**p**`\")\n    end\n    subgraph n3 [\"`*«part»*\n**b**`\"]\n      direction LR\n      n4(\"`*«port»*\n**q**`\")\n    end\n  end\n  n2 === n4\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n3 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n2,n4 figport\n",
+			"  subgraph n0 [\"`*«part»*\n**vehicle**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n<a href=\"a/index.html\"><strong>a</strong></a>`\"]\n      direction LR\n      n2(\"`*«port»*\n<a href=\"a/p/index.html\"><strong>p</strong></a>`\")\n    end\n    subgraph n3 [\"`*«part»*\n**b**`\"]\n      direction LR\n      n4(\"`*«port»*\n**q**`\")\n    end\n  end\n  n2 === n4\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n3 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n2,n4 figport\n",
 		},
 		{"an end nested in a part", "i2", "F::vehicle::i2",
-			"  subgraph n0 [\"`*«part»*\n**vehicle**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n**a**`\"]\n      direction LR\n      subgraph n2 [\"`*«part»*\n**sub**`\"]\n        direction LR\n        n3(\"`*«port»*\n**deep**`\")\n      end\n    end\n    subgraph n4 [\"`*«part»*\n**b**`\"]\n      direction LR\n      n5(\"`*«port»*\n**q**`\")\n    end\n  end\n  n3 === n5\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n2,n4 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n3,n5 figport\n",
+			"  subgraph n0 [\"`*«part»*\n**vehicle**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n<a href=\"a/index.html\"><strong>a</strong></a>`\"]\n      direction LR\n      subgraph n2 [\"`*«part»*\n**sub**`\"]\n        direction LR\n        n3(\"`*«port»*\n**deep**`\")\n      end\n    end\n    subgraph n4 [\"`*«part»*\n**b**`\"]\n      direction LR\n      n5(\"`*«port»*\n**q**`\")\n    end\n  end\n  n3 === n5\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n2,n4 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n3,n5 figport\n",
 		},
 		{"ends in different packages", "ixy", "F::ixy",
-			"  subgraph n0 [\"`*«package»*\n**F**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n**px**`\"]\n      direction LR\n      n2(\"`*«port»*\n**p**`\")\n    end\n    subgraph n3 [\"`*«part»*\n**py**`\"]\n      direction LR\n      n4(\"`*«port»*\n**p**`\")\n    end\n  end\n  n2 === n4\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n3 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n2,n4 figport\n",
+			"  subgraph n0 [\"`*«package»*\n<a href=\"../index.html\"><strong>F</strong></a>`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n**px**`\"]\n      direction LR\n      n2(\"`*«port»*\n**p**`\")\n    end\n    subgraph n3 [\"`*«part»*\n**py**`\"]\n      direction LR\n      n4(\"`*«port»*\n**p**`\")\n    end\n  end\n  n2 === n4\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n3 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n2,n4 figport\n",
 		},
 		{"a part and the part an interface connects it to", "a", "F::vehicle::a",
-			"  subgraph n0 [\"`*«part»*\n**a**`\"]\n    direction LR\n    n1(\"`*«port»*\n**p**`\")\n  end\n  subgraph n2 [\"`*«part»*\n**b**`\"]\n    direction LR\n    n3(\"`*«port»*\n**q**`\")\n  end\n  n1 === n3\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n2 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1,n3 figport\n",
+			"  subgraph n0 [\"`*«part»*\n<a href=\"a/index.html\"><strong>a</strong></a>`\"]\n    direction LR\n    n1(\"`*«port»*\n<a href=\"a/p/index.html\"><strong>p</strong></a>`\")\n  end\n  subgraph n2 [\"`*«part»*\n**b**`\"]\n    direction LR\n    n3(\"`*«port»*\n**q**`\")\n  end\n  n1 === n3\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n2 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1,n3 figport\n",
 		},
 		{"a part on no interface", "c", "F::vehicle::c",
 			"  subgraph n0 [\"`*«part»*\n**c**`\"]\n    direction LR\n    n1(\"`*«port»*\n**s**`\")\n  end\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1 figport\n",
@@ -172,6 +172,37 @@ func TestCommonAncestor(t *testing.T) {
 			got, ok := commonAncestor(c.chains)
 			if got != c.want || ok != c.ok {
 				t.Errorf("commonAncestor(%q) = %q, %v; want %q, %v", c.chains, got, ok, c.want, c.ok)
+			}
+		})
+	}
+}
+
+// mermaidLabel links a label whose element has a page: the name line an
+// anchor, an unnamed element's keyword line the anchor's text. Every
+// character the label's HTML or the Mermaid string reads is escaped.
+func TestFigMermaidLabel(t *testing.T) {
+	cases := []struct {
+		name  string
+		kind  string
+		label string
+		href  string
+		want  string
+	}{
+		{"an unlinked label is markdown", "«port»", "p", "",
+			"\"`*«port»*\n**p**`\""},
+		{"a linked name", "«part»", "a", "a/index.html",
+			"\"`*«part»*\n<a href=\"a/index.html\"><strong>a</strong></a>`\""},
+		{"a linked unnamed element", "«port»", "", "a/p/index.html",
+			"\"`<a href=\"a/p/index.html\"><em>«port»</em></a>`\""},
+		{"a name with a backtick", "«part»", "a`b", "x.html",
+			"\"`*«part»*\n<a href=\"x.html\"><strong>a&#96;b</strong></a>`\""},
+		{"a name with a double quote", "«part»", `a"b`, "x.html",
+			"\"`*«part»*\n<a href=\"x.html\"><strong>a&#34;b</strong></a>`\""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := mermaidLabel(c.kind, c.label, c.href); got != c.want {
+				t.Errorf("mermaidLabel = %q, want %q", got, c.want)
 			}
 		})
 	}

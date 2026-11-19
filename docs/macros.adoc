@@ -481,6 +481,12 @@ mermaid.js asset (`assets/mermaid.min.js`) is written with the site when any
 page shows a figure, and a page loads it only then. A page is static HTML;
 without JavaScript, or on paper, the figure's place stays empty.
 
+The drawn elements link to their pages: a box or node whose element has a
+page, other than the page the figure is on, carries the link in its name —
+click the name and the browser follows it to the page. The link lives in
+the figure's Mermaid source, which mermaid makes clickable; without
+JavaScript nothing shows it.
+
 Syntax:: `sysml-fig::[]`, `sysml-fig::<element>[]`
 
 Example:
