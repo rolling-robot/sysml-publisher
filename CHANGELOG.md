@@ -28,7 +28,7 @@
   when the model owns them there. A box's title carries the keyword line
   above the name, and the box's contents are drawn below all the title's
   lines. A drawn element with a page, not the page the figure is on, links
-  to it in its label. A resolvable target that is neither an interface nor
+  to it in its label, styled as a link. A resolvable target that is neither an interface nor
   a part is
   written out as the macro text; a target naming no element, or a part
   without ports, fails the macro with a warning. A page loads the asset only

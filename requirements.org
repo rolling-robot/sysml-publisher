@@ -448,7 +448,9 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   element has a page, other than the page the figure is drawn on, links to
   that page: the link is in the label's HTML, mermaid taking no click on a
   subgraph, and the figure's frontmatter states =securityLevel: loose= so
-  mermaid keeps the label's HTML. A target that names no
+  mermaid keeps the label's HTML; the link's text is styled as a link,
+  underlined in the site's link color, as the site's stylesheet styles a
+  page's links. A target that names no
   element fails the macro (MC-19); a resolvable target that is neither an
   interface nor a part is written out as the macro text, no warning raised.
   An interface with fewer than two ends, an end that connects nothing, or

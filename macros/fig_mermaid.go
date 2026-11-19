@@ -24,7 +24,7 @@ const mermaidConfig = `config:
   look: classic
   layout: elk
   securityLevel: loose
-  themeCSS: ".edgeLabel rect { opacity: 1 !important; } .cluster-label .nodeLabel { text-align: center; } .cluster-label a, .nodeLabel a { color: inherit; text-decoration: none; cursor: pointer; }"
+  themeCSS: ".edgeLabel rect { opacity: 1 !important; } .cluster-label .nodeLabel { text-align: center; } .cluster-label a, .nodeLabel a { color: #2156a5; text-decoration: underline; cursor: pointer; } .cluster-label a:hover, .nodeLabel a:hover { color: #1d4b8f; }"
   themeVariables:
     fontFamily: "Helvetica, Arial, sans-serif"
     fontSize: "14px"
