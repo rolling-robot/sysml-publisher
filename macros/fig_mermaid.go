@@ -10,13 +10,18 @@ import (
 
 // The Mermaid figure of an interface (MC-25): a flowchart written in the
 // look of OpenSysML's Mermaid interconnection form. The style constants
-// below are that writer's frontmatter (OpenSysML internal/ir/view/
-// mermaid.go, writeMermaidFrontmatter, at the commit go.mod pins): white
-// fills, thin #181818 lines, Helvetica. If OpenSysML restyles its writer,
-// copy the frontmatter again.
+// below pin what that writer's frontmatter states (OpenSysML internal/ir/
+// view/mermaid.go, writeMermaidFrontmatter, at the commit go.mod pins):
+// white fills, thin #181818 lines, Helvetica. The layout is ELK (mermaid
+// 12's own), which places a box's contents below all of its title's lines;
+// the look classic and the classDefs pin the Pilot's white-on-#181818 on
+// top of the theme a mermaid version defaults to. If OpenSysML restyles
+// its writer, copy the frontmatter again.
 const mermaidConfig = `config:
   fontFamily: "Helvetica, Arial, sans-serif"
   theme: base
+  look: classic
+  layout: elk
   themeCSS: ".edgeLabel rect { opacity: 1 !important; } .cluster-label .nodeLabel { text-align: center; }"
   themeVariables:
     fontFamily: "Helvetica, Arial, sans-serif"
@@ -37,6 +42,14 @@ const mermaidConfig = `config:
     edgeLabelBackground: "#FFFFFF"
 `
 
+// The classDefs the figure states, so its boxes and its stadium nodes draw
+// in the Pilot's white-on-#181818 whatever the theme and look a mermaid
+// version fills from.
+const (
+	mermaidBoxClass  = "classDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\n"
+	mermaidPortClass = "classDef figport fill:#FFFFFF,stroke:#181818,color:#000000\n"
+)
+
 // mermaidFigure is the Mermaid source of a figure: the frontmatter with the
 // interface for the title, a flowchart with a subgraph per part box
 // (containment nested), a stadium node per end feature, and one thick edge
@@ -48,16 +61,19 @@ func mermaidFigure(t figTree) string {
 	fmt.Fprintf(&b, "title: %s\n", mermaidYAMLString("«interface» "+t.iface))
 	fmt.Fprintf(&b, "---\n%%%% %s — interconnection figure\n", t.iface)
 	b.WriteString("flowchart LR\n")
+	var boxes, ports []string
 	var write func(nodes []*figNode, indent string)
 	write = func(nodes []*figNode, indent string) {
 		for _, n := range nodes {
 			if n.box {
-				fmt.Fprintf(&b, "%ssubgraph %s [%s]\n", indent, n.id, figLabel(n.kind, n.name, false))
+				boxes = append(boxes, n.id)
+				fmt.Fprintf(&b, "%ssubgraph %s [%s]\n", indent, n.id, mermaidString(figLabel(n.kind, n.name)))
 				fmt.Fprintf(&b, "%s  direction LR\n", indent)
 				write(n.children, indent+"  ")
 				fmt.Fprintf(&b, "%send\n", indent)
 			} else {
-				fmt.Fprintf(&b, "%s%s(%s)\n", indent, n.id, figLabel(n.kind, n.name, true))
+				ports = append(ports, n.id)
+				fmt.Fprintf(&b, "%s%s(%s)\n", indent, n.id, mermaidString(figLabel(n.kind, n.name)))
 			}
 		}
 	}
@@ -66,30 +82,38 @@ func mermaidFigure(t figTree) string {
 		fmt.Fprintf(&b, "  %s === %s\n", edge[0], edge[1])
 		fmt.Fprintf(&b, "  linkStyle %d stroke-width:3px\n", i)
 	}
+	if len(boxes) > 0 {
+		b.WriteString(mermaidBoxClass)
+		fmt.Fprintf(&b, "class %s figbox\n", strings.Join(boxes, ","))
+	}
+	if len(ports) > 0 {
+		b.WriteString(mermaidPortClass)
+		fmt.Fprintf(&b, "class %s figport\n", strings.Join(ports, ","))
+	}
 	return b.String()
 }
 
-// figLabel is a node's or box's label: the keyword line in italics and, when
-// the element has a name, the name in bold. A box's label has both on one
-// line; a stadium's carries the name on a second line. The text goes in a
-// Mermaid markdown string ("`…`"), which takes a newline literally; a text
-// with a backtick or a double quote cannot go in one, so such a label falls
-// back to a double-quoted string, the text HTML-escaped and the newline a
-// <br/>.
-func figLabel(keyword, name string, multiline bool) string {
-	text := "*" + keyword + "*"
+// figLabel is a node's or box's label text: the keyword line in italics and,
+// when the element has a name, the name in bold on a line under it.
+func figLabel(kind, name string) string {
+	text := "*" + kind + "*"
 	if name != "" {
-		if multiline {
-			text += "\n"
-		} else {
-			text += " "
-		}
-		text += "**" + name + "**"
+		text += "\n**" + name + "**"
 	}
+	return text
+}
+
+// mermaidString is text as a Mermaid string: a markdown string ("`…`",
+// written inside the double quotes every Mermaid string is written in) when
+// text holds nothing a markdown string cannot — a backtick, a double quote,
+// <, > or & — else a double-quoted string with the text HTML-escaped and the
+// newline a <br/>. A box's and a stadium's label are the same string; a
+// subgraph's title carries it in [..], a stadium's in (..).
+func mermaidString(text string) string {
 	if strings.ContainsAny(text, "`\"&<>") {
 		return `"` + htmlEscapeLabel(text) + `"`
 	}
-	return "`" + text + "`"
+	return "\"`" + text + "`\""
 }
 
 // htmlEscapeLabel escapes a label for a double-quoted Mermaid string: the

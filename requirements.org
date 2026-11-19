@@ -427,7 +427,9 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   each end's leaf feature, and every part between, nested as the model nests
   them; the common ancestor is the figure's frame and drawn whatever it is,
   a package included, while a package further down a chain is not drawn —
-  and a stadium node per end feature inside its owner's box. One edge per
+  and a stadium node per end feature inside its owner's box. A box's title
+  carries the keyword line above the name, and the box's contents are drawn
+  below all the title's lines, however many they are. One edge per
   pair of ends joins the end features, drawn as the thick ==== connection
   line of OpenSysML's Mermaid form; an edge whose two ends are the same
   feature is not drawn. The figure's elements are found in the model the way

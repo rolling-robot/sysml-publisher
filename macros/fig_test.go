@@ -42,53 +42,14 @@ func TestFig(t *testing.T) {
 	attrs := Attributes(pageAt(t, tr, "F/vehicle").ID)
 	cases := []struct{ name, target, iface, body string }{
 		{"the parts on the ends", "i1", "F::vehicle::i1",
-			`  subgraph n0 [` + "`*«part»* **vehicle**`" + `]
-    direction LR
-    subgraph n1 [` + "`*«part»* **a**`" + `]
-      direction LR
-      n2(` + "`*«port»*\n**p**`" + `)
-    end
-    subgraph n3 [` + "`*«part»* **b**`" + `]
-      direction LR
-      n4(` + "`*«port»*\n**q**`" + `)
-    end
-  end
-  n2 === n4
-  linkStyle 0 stroke-width:3px
-`},
+			"  subgraph n0 [\"`*«part»*\n**vehicle**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n**a**`\"]\n      direction LR\n      n2(\"`*«port»*\n**p**`\")\n    end\n    subgraph n3 [\"`*«part»*\n**b**`\"]\n      direction LR\n      n4(\"`*«port»*\n**q**`\")\n    end\n  end\n  n2 === n4\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n3 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n2,n4 figport\n",
+		},
 		{"an end nested in a part", "i2", "F::vehicle::i2",
-			`  subgraph n0 [` + "`*«part»* **vehicle**`" + `]
-    direction LR
-    subgraph n1 [` + "`*«part»* **a**`" + `]
-      direction LR
-      subgraph n2 [` + "`*«part»* **sub**`" + `]
-        direction LR
-        n3(` + "`*«port»*\n**deep**`" + `)
-      end
-    end
-    subgraph n4 [` + "`*«part»* **b**`" + `]
-      direction LR
-      n5(` + "`*«port»*\n**q**`" + `)
-    end
-  end
-  n3 === n5
-  linkStyle 0 stroke-width:3px
-`},
+			"  subgraph n0 [\"`*«part»*\n**vehicle**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n**a**`\"]\n      direction LR\n      subgraph n2 [\"`*«part»*\n**sub**`\"]\n        direction LR\n        n3(\"`*«port»*\n**deep**`\")\n      end\n    end\n    subgraph n4 [\"`*«part»*\n**b**`\"]\n      direction LR\n      n5(\"`*«port»*\n**q**`\")\n    end\n  end\n  n3 === n5\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n2,n4 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n3,n5 figport\n",
+		},
 		{"ends in different packages", "ixy", "F::ixy",
-			`  subgraph n0 [` + "`*«package»* **F**`" + `]
-    direction LR
-    subgraph n1 [` + "`*«part»* **px**`" + `]
-      direction LR
-      n2(` + "`*«port»*\n**p**`" + `)
-    end
-    subgraph n3 [` + "`*«part»* **py**`" + `]
-      direction LR
-      n4(` + "`*«port»*\n**p**`" + `)
-    end
-  end
-  n2 === n4
-  linkStyle 0 stroke-width:3px
-`},
+			"  subgraph n0 [\"`*«package»*\n**F**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n**px**`\"]\n      direction LR\n      n2(\"`*«port»*\n**p**`\")\n    end\n    subgraph n3 [\"`*«part»*\n**py**`\"]\n      direction LR\n      n4(\"`*«port»*\n**p**`\")\n    end\n  end\n  n2 === n4\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n3 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n2,n4 figport\n",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -203,22 +164,20 @@ func TestCommonAncestor(t *testing.T) {
 // double quote falls back to a double-quoted string, HTML-escaped.
 func TestFigLabel(t *testing.T) {
 	cases := []struct {
-		name      string
-		keyword   string
-		label     string
-		multiline bool
-		want      string
+		name    string
+		keyword string
+		label   string
+		want    string
 	}{
-		{"a named part on one line", "«part»", "a", false, "`*«part»* **a**`"},
-		{"an unnamed port on two lines", "«port»", "", true, "`*«port»*`"},
-		{"a named port on two lines", "«port»", "p", true, "`*«port»*\n**p**`"},
-		{"a name with a backtick", "«part»", "a`b", false, "\"*«part»* **a`b**\""},
-		{"a name with a double quote", "«part»", `a"b`, false, `"*«part»* **a&quot;b**"`},
-		{"a name with a less-than", "«port»", "a<b", true, `"*«port»*<br/>**a&lt;b**"`},
+		{"an unnamed port", "«port»", "", "\"`*«port»*`\""},
+		{"a named port", "«port»", "p", "\"`*«port»*\n**p**`\""},
+		{"a name with a backtick", "«part»", "a`b", "\"*«part»*<br/>**a`b**\""},
+		{"a name with a double quote", "«part»", `a"b`, `"*«part»*<br/>**a&quot;b**"`},
+		{"a name with a less-than", "«port»", "a<b", `"*«port»*<br/>**a&lt;b**"`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := figLabel(c.keyword, c.label, c.multiline); got != c.want {
+			if got := mermaidString(figLabel(c.keyword, c.label)); got != c.want {
 				t.Errorf("figLabel = %q, want %q", got, c.want)
 			}
 		})

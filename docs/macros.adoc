@@ -449,7 +449,9 @@ Mermaid interconnection form. The figure shows, and nothing else:
 * one box per part the figure needs: the ends' common ancestor, the owner
   of each end's feature, and every part between, nested as the model nests
   them. The common ancestor is the figure's frame and is drawn whatever it
-  is, a package included; a package further down a chain is not drawn;
+  is, a package included; a package further down a chain is not drawn. A
+  box's title carries the keyword line above the name, and the box's
+  contents are drawn below all the title's lines, however many they are;
 * a rounded node per end feature, inside its owner's box;
 * one thick edge per pair of ends, the connection line of OpenSysML's
   Mermaid form.
