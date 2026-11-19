@@ -26,10 +26,9 @@ func mermaidOf(out string) string {
 }
 
 // figSource is the whole Mermaid source a figure of iface with body is
-// expected to be: the style frontmatter, the title, and the flowchart.
+// expected to be: the style frontmatter and the flowchart, no title.
 func figSource(iface, body string) string {
 	return "---\n" + mermaidConfig +
-		`title: "«interface» ` + iface + `"` + "\n" +
 		"---\n%% " + iface + " — interconnection figure\n" +
 		"flowchart LR\n" + body
 }

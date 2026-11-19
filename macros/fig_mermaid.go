@@ -50,15 +50,15 @@ const (
 	mermaidPortClass = "classDef figport fill:#FFFFFF,stroke:#181818,color:#000000\n"
 )
 
-// mermaidFigure is the Mermaid source of a figure: the frontmatter with the
-// interface for the title, a flowchart with a subgraph per part box
-// (containment nested), a stadium node per end feature, and one thick edge
-// per pair of ends, the way OpenSysML draws a connection.
+// mermaidFigure is the Mermaid source of a figure: the style frontmatter, a
+// flowchart with a subgraph per part box (containment nested), a stadium
+// node per end feature, and one thick edge per pair of ends, the way
+// OpenSysML draws a connection. The figure carries no title: the page names
+// the interface.
 func mermaidFigure(t figTree) string {
 	var b strings.Builder
 	b.WriteString("---\n")
 	b.WriteString(mermaidConfig)
-	fmt.Fprintf(&b, "title: %s\n", mermaidYAMLString("«interface» "+t.iface))
 	fmt.Fprintf(&b, "---\n%%%% %s — interconnection figure\n", t.iface)
 	b.WriteString("flowchart LR\n")
 	var boxes, ports []string
@@ -125,12 +125,4 @@ func htmlEscapeLabel(text string) string {
 	text = strings.ReplaceAll(text, ">", "&gt;")
 	text = strings.ReplaceAll(text, `"`, "&quot;")
 	return strings.ReplaceAll(text, "\n", "<br/>")
-}
-
-// mermaidYAMLString writes s as a YAML double-quoted scalar: the characters
-// YAML reads, escaped.
-func mermaidYAMLString(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return `"` + s + `"`
 }
