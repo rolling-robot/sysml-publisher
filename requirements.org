@@ -436,13 +436,21 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   MC-15 and MC-23 read it; the figure draws exactly what the ends' chains
   pass through, unnamed elements included. The Mermaid text is written by
   this tool; its style constants are copied from OpenSysML's Mermaid writer
-  (§10-8). A target that names no element fails the macro (MC-19); a
-  resolvable target that is not an interface is written out as the macro
-  text, no warning raised. An interface with fewer than two ends, an end
-  that connects nothing, or ends whose parts have no common ancestor fails
-  the macro (MC-19). The site carries =assets/mermaid.min.js= and a page
-  loads it only when the page shows a figure; a site with no figure carries
-  no asset.
+  (§10-8). When the target is a part (a =PartUsage= or a =PartDefinition=),
+  the figure is of the part: its box, its owned ports drawn inside it as
+  stadium nodes, and, for every connection its ports are on, each end of it
+  — an end on one of the part's ports anchored at the port's node, another
+  end's leaf feature inside a box for its immediate owner, the owner drawn
+  beside the part's box, or inside it when the model owns it there — with
+  one edge per pair of the connection's ends, as the interface's figure
+  draws. A part with ports but no connections shows its ports and no edges;
+  a part with no ports fails the macro (MC-19). A target that names no
+  element fails the macro (MC-19); a resolvable target that is neither an
+  interface nor a part is written out as the macro text, no warning raised.
+  An interface with fewer than two ends, an end that connects nothing, or
+  ends whose parts have no common ancestor fails the macro (MC-19). The site
+  carries =assets/mermaid.min.js= and a page loads it only when the page
+  shows a figure; a site with no figure carries no asset.
 * Open questions
 - TBD-9 :: (Decided: 3, behind the interface macros.Views, with =dot
   -Tsvg= for the layout as in 1; MC-21.)

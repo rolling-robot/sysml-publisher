@@ -14,22 +14,25 @@ import (
 )
 
 // Fig is the block macro sysml-fig::[<element>][], replaced, when the target
-// is an interface, by a Mermaid figure of it (MC-25): the parts on its ends
-// and the parts between them and their common ancestor, each end's feature,
-// and one edge per pair of ends, drawn by the site's mermaid.js in the look
-// of OpenSysML's Mermaid interconnection form. Without a target the page's
-// element is used; a target is read as sysml-name reads it (MC-8, MC-15).
-// A resolvable target that is not an interface is written out as the macro
-// text, no warning raised. The figure draws exactly what the ends' chains
-// pass through; the model is read the way sysml-ifaces reads it, the
-// connections indexed once for every page (MC-3).
+// is an interface or a part, by a Mermaid figure of it (MC-25): an
+// interface's figure shows the parts on its ends and the parts between them
+// and their common ancestor, each end's feature, and one edge per pair of
+// ends; a part's figure shows its owned ports, and, for every connection
+// they are on, the other ends' features and their owner parts. The figures
+// are drawn by the site's mermaid.js in the look of OpenSysML's Mermaid
+// interconnection form. Without a target the page's element is used; a
+// target is read as sysml-name reads it (MC-8, MC-15). A resolvable target
+// that is neither an interface nor a part is written out as the macro text,
+// no warning raised. The figure draws exactly what the ends' chains pass
+// through; the model is read the way sysml-ifaces reads it, the connections
+// indexed once for every page (MC-3).
 const Fig = "sysml-fig"
 
 // FigRole is the role of the block a figure is put in, for styling.
 const FigRole = "sysml-fig"
 
 // AttrFig is the attribute of the block a figure is put in: the qualified
-// name of the interface the figure is of. As links are anchor nodes
+// name of the element the figure is of. As links are anchor nodes
 // (AttrLink) and a view an image block (AttrView), a figure is a pass block
 // the document's converter writes verbatim; a converter for another output
 // can tell the figure by AttrFig and take its Mermaid source from
@@ -55,8 +58,8 @@ func registerFig(g *asciidoctor.ExtensionGroup, e *env) {
 }
 
 // fig is one use of sysml-fig. A target that names no element fails; a
-// resolvable one that is not an interface is written out; an interface is
-// figured.
+// resolvable one that is neither an interface nor a part is written out; an
+// interface or a part is figured.
 func (e *env) fig(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNode, error) {
 	id, name := c.page.id, c.page.qualifiedName
 	if c.target != "" {
@@ -72,22 +75,31 @@ func (e *env) fig(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNod
 	if err != nil {
 		return nil, err
 	}
-	if meta != "InterfaceUsage" {
+	switch {
+	case meta == "InterfaceUsage":
+		ends, err := connectorEnds(e, id)
+		if err != nil {
+			return nil, err
+		}
+		t, err := e.figure(name, ends)
+		if err != nil {
+			return nil, err
+		}
+		return figBlock(c.parent, t)
+	case isPartLike(meta):
+		t, err := e.partFigure(name, id, meta)
+		if err != nil {
+			return nil, err
+		}
+		return figBlock(c.parent, t)
+	default:
 		return figEcho(c.parent, c.macro)
 	}
-	ends, err := connectorEnds(e, id)
-	if err != nil {
-		return nil, err
-	}
-	t, err := e.figure(name, ends)
-	if err != nil {
-		return nil, err
-	}
-	return figBlock(c.parent, t)
 }
 
-// figEcho is the macro written out: a resolvable target that is not an
-// interface leaves the text of the macro call where it was, no warning.
+// figEcho is the macro written out: a resolvable target that is neither an
+// interface nor a part leaves the text of the macro call where it was, no
+// warning.
 func figEcho(parent asciidoctor.StructuralNode, macro string) (asciidoctor.StructuralNode, error) {
 	return asciidoctor.CreatePassBlock(parent,
 		`<p class="`+FigRole+`-text">`+html.EscapeString(macro)+`</p>`, nil, nil)
@@ -103,7 +115,7 @@ func figBlock(parent asciidoctor.StructuralNode, t figTree) (asciidoctor.Structu
 	if err != nil {
 		return nil, err
 	}
-	b.SetAttr(AttrFig, t.iface, true)
+	b.SetAttr(AttrFig, t.of, true)
 	b.SetAttr(AttrMermaid, text, true)
 	b.AddRole(FigRole)
 	return b, nil
@@ -124,7 +136,7 @@ func MermaidText(n asciidoctor.Node) (text string, ok bool) {
 // end's feature, and the edges. ends are the interface's ends, source
 // first, as connectorEnds reads them.
 func (e *env) figure(iface string, ends []connectorEnd) (figTree, error) {
-	t := figTree{iface: iface}
+	t := figTree{of: iface}
 	if len(ends) < 2 {
 		return t, fmt.Errorf("has %d ends; a figure needs at least two", len(ends))
 	}
@@ -224,6 +236,157 @@ func (e *env) figure(iface string, ends []connectorEnd) (figTree, error) {
 	return t, nil
 }
 
+// partFigure is the figure of one part: the part's box with its owned ports
+// drawn inside, and, for every connection its ports are on, each end of it:
+// an end whose path references one of the part's ports anchors at that
+// port's node; another end's leaf feature draws inside a box for its
+// immediate owner, the owner beside the part's box, or inside it when the
+// model owns it there. One edge per pair of the same connection's ends, as
+// the interface's figure draws. An end that connects nothing draws no node
+// and no edge.
+func (e *env) partFigure(name, part, meta string) (figTree, error) {
+	t := figTree{of: name}
+	nm, err := e.names.name(part)
+	if err != nil {
+		return t, err
+	}
+	root := &figNode{elem: part, kind: "«" + figKeyword(meta) + "»", name: nm, box: true}
+	byID := map[string]*figNode{part: root} // model id → the node drawn for it
+	order := []*figNode{root}               // the nodes in drawing order
+	parentOf := map[*figNode]*figNode{}     // where a node nests, nil: the top
+	newNode := func(id string, box bool) (*figNode, error) {
+		if n := byID[id]; n != nil {
+			return n, nil
+		}
+		mc, err := e.metaclass(id)
+		if err != nil {
+			return nil, err
+		}
+		nm, err := e.names.name(id)
+		if err != nil {
+			return nil, err
+		}
+		n := &figNode{elem: id, kind: "«" + figKeyword(mc) + "»", name: nm, box: box}
+		byID[id] = n
+		order = append(order, n)
+		return n, nil
+	}
+	ports, err := portsOf(e, part)
+	if err != nil {
+		return t, err
+	}
+	if len(ports) == 0 {
+		return t, errors.New("has no ports; a figure needs at least one")
+	}
+	portSet := make(map[string]bool, len(ports))
+	for _, p := range ports {
+		n, err := newNode(p, false)
+		if err != nil {
+			return t, err
+		}
+		parentOf[n] = root
+		portSet[p] = true
+	}
+	cons, err := e.connectionsThrough(part, ports)
+	if err != nil {
+		return t, err
+	}
+	// The nodes are created first and placed after, so a chain that passes
+	// through a box another end creates later is still placed inside it.
+	// pend holds each node with the owners chain its place walks.
+	type pending struct {
+		n     *figNode
+		chain []string
+	}
+	var pend []pending
+	var anchored [][]*figNode // per connection: the nodes its ends anchor at
+	for _, con := range cons {
+		var anchors []*figNode
+		for _, end := range con.ends {
+			if len(end.path) == 0 {
+				continue // connects nothing
+			}
+			if pid := endPort(end.path, portSet); pid != "" {
+				anchors = append(anchors, byID[pid])
+				continue
+			}
+			leaf := end.path[len(end.path)-1]
+			chain, err := owners(e, leaf)
+			if err != nil {
+				return t, err
+			}
+			if len(chain) == 0 {
+				continue // a top-level feature: no owner to draw it in
+			}
+			obox, err := newNode(chain[len(chain)-1], true)
+			if err != nil {
+				return t, err
+			}
+			leafBox := false
+			if mc, err := e.metaclass(leaf); err != nil {
+				return t, err
+			} else {
+				leafBox = isPartLike(mc)
+			}
+			lnode, err := newNode(leaf, leafBox)
+			if err != nil {
+				return t, err
+			}
+			pend = append(pend, pending{obox, chain[:len(chain)-1]}, pending{lnode, chain})
+			anchors = append(anchors, lnode)
+		}
+		anchored = append(anchored, anchors)
+	}
+	place := func(n *figNode, chain []string) {
+		if n == root {
+			return
+		}
+		for i := len(chain) - 1; i >= 0; i-- {
+			if a := byID[chain[i]]; a != nil && a.box {
+				parentOf[n] = a
+				return
+			}
+		}
+		// no drawn ancestor: the top of the figure, beside the part's box
+	}
+	for _, p := range pend {
+		place(p.n, p.chain)
+	}
+	t.roots = []*figNode{root}
+	for _, n := range order[1:] {
+		if p := parentOf[n]; p != nil {
+			p.children = append(p.children, n)
+		} else {
+			t.roots = append(t.roots, n)
+		}
+	}
+	for i, n := range order {
+		n.id = "n" + fmt.Sprint(i)
+	}
+	for _, anchors := range anchored {
+		for i := 0; i < len(anchors); i++ {
+			for j := i + 1; j < len(anchors); j++ {
+				if anchors[i].id == anchors[j].id {
+					continue
+				}
+				t.edges = append(t.edges, [2]string{anchors[i].id, anchors[j].id})
+			}
+		}
+	}
+	return t, nil
+}
+
+// endPort is the first of ports an end's path references, "" when it
+// references none.
+func endPort(path []string, ports map[string]bool) string {
+	for _, id := range path {
+		if ports[id] {
+			return id
+		}
+	}
+	return ""
+}
+
 // commonAncestor is the deepest element every chain passes through: the
 // chains are outermost first, so it is the last element their shared start
 // holds. ok is false when they share none.
@@ -257,11 +420,12 @@ type figNode struct {
 	children []*figNode
 }
 
-// figTree is one figure: what the interface is of, the drawn elements whose
-// parent is the common ancestor (which itself is not drawn), and one edge
-// per pair of ends, between the end features' node ids.
+// figTree is one figure: the qualified name of the element it is of, the
+// drawn elements whose parent is the top of the figure (the ends' common
+// ancestor for an interface, the part's box with the parts beside it for a
+// part), and one edge per pair of ends, between the end features' node ids.
 type figTree struct {
-	iface string
+	of    string
 	roots []*figNode
 	edges [][2]string
 }

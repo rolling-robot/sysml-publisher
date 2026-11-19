@@ -49,6 +49,18 @@ func TestFig(t *testing.T) {
 		{"ends in different packages", "ixy", "F::ixy",
 			"  subgraph n0 [\"`*«package»*\n**F**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n**px**`\"]\n      direction LR\n      n2(\"`*«port»*\n**p**`\")\n    end\n    subgraph n3 [\"`*«part»*\n**py**`\"]\n      direction LR\n      n4(\"`*«port»*\n**p**`\")\n    end\n  end\n  n2 === n4\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n3 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n2,n4 figport\n",
 		},
+		{"a part and the part an interface connects it to", "a", "F::vehicle::a",
+			"  subgraph n0 [\"`*«part»*\n**a**`\"]\n    direction LR\n    n1(\"`*«port»*\n**p**`\")\n  end\n  subgraph n2 [\"`*«part»*\n**b**`\"]\n    direction LR\n    n3(\"`*«port»*\n**q**`\")\n  end\n  n1 === n3\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n2 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1,n3 figport\n",
+		},
+		{"a part on no interface", "c", "F::vehicle::c",
+			"  subgraph n0 [\"`*«part»*\n**c**`\"]\n    direction LR\n    n1(\"`*«port»*\n**s**`\")\n  end\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1 figport\n",
+		},
+		{"a part and its own sub-part on an interface", "d", "F::vehicle::d",
+			"  subgraph n0 [\"`*«part»*\n**d**`\"]\n    direction LR\n    n1(\"`*«port»*\n**pd**`\")\n    subgraph n2 [\"`*«part»*\n**da**`\"]\n      direction LR\n      n3(\"`*«port»*\n**pa**`\")\n    end\n  end\n  n1 === n3\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n2 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1,n3 figport\n",
+		},
+		{"a part whose two own ports are on one interface", "e", "F::vehicle::e",
+			"  subgraph n0 [\"`*«part»*\n**e**`\"]\n    direction LR\n    n1(\"`*«port»*\n**e1**`\")\n    n2(\"`*«port»*\n**e2**`\")\n  end\n  n1 === n2\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1,n2 figport\n",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -64,16 +76,14 @@ func TestFig(t *testing.T) {
 	}
 }
 
-// A resolvable target that is not an interface, and no target on a page
-// whose element is not one, leave the macro text where it was, no warning
-// (MC-25).
+// A resolvable target that is neither an interface nor a part leaves the
+// macro text where it was, no warning (MC-25).
 func TestFigEchoes(t *testing.T) {
 	tr, ad := setupFixture(t, "figs")
 	attrs := Attributes(pageAt(t, tr, "F/vehicle").ID)
 	cases := []struct{ name, src, want string }{
-		{"a part", "sysml-fig::a[]", `<p class="sysml-fig-text">sysml-fig::a[]</p>`},
+		{"a package", "sysml-fig::F[]", `<p class="sysml-fig-text">sysml-fig::F[]</p>`},
 		{"an interface def", "sysml-fig::Itself[]", `<p class="sysml-fig-text">sysml-fig::Itself[]</p>`},
-		{"no target: the page's element", "sysml-fig::[]", `<p class="sysml-fig-text">sysml-fig::[]</p>`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -98,6 +108,14 @@ func TestFigUnknownTargetFails(t *testing.T) {
 	attrs := Attributes(pageAt(t, tr, "F/vehicle").ID)
 	mustFail(t, ad, "sysml-fig::nope[]", attrs,
 		`F::vehicle: sysml-fig::nope[]: the model has no element named "nope"`)
+}
+
+// A part without ports has nothing to figure: the macro fails (MC-19).
+func TestFigPartWithoutPortsFails(t *testing.T) {
+	tr, ad := setupFixture(t, "figs")
+	attrs := Attributes(pageAt(t, tr, "F/vehicle").ID)
+	mustFail(t, ad, "sysml-fig::vehicle[]", attrs,
+		`F::vehicle: sysml-fig::vehicle[]: has no ports; a figure needs at least one`)
 }
 
 // A figure is a pass block the document's converter writes (MC-25): html5

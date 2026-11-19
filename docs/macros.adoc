@@ -457,11 +457,23 @@ Mermaid interconnection form. The figure shows, and nothing else:
   Mermaid form.
 
 Without a target the page's element is used; a target is named as described
-in <<naming>>. A resolvable target that is not an interface — a part, a
-package, an interface *definition* — is written out as the macro text
-(`sysml-fig::airDuct[]`), no warning raised. A target that names no element
+in <<naming>>. A resolvable target that is neither an interface nor a part —
+a package, an interface *definition* — is written out as the macro text, no
+warning raised. A target that names no element
 fails the macro (a placeholder and a warning), as does an interface whose
 ends' parts have no common ancestor.
+
+When the target is a part (a part usage or a part definition), the figure is
+of the part, not of one interface: the part's box carries its owned ports,
+each a rounded node inside it, and, for every connection those ports are on,
+each end of the connection draws — an end on one of the part's ports joins
+at that port, another end's feature draws as a rounded node inside a box for
+the part owning it. A part the model owns inside the target draws inside the
+target's box; the other parts draw beside it, since the model does not own
+them there and the figure asserts no containment the model does not have.
+The edges are one per pair of the connection's ends, as the interface's
+figure draws. A part with ports but no connections shows its ports and no
+edges; a part with no ports fails the macro.
 
 The figure needs no view in the model and no Graphviz: the tool writes the
 Mermaid source itself, in OpenSysML's style, and the site draws it. The
@@ -469,7 +481,7 @@ mermaid.js asset (`assets/mermaid.min.js`) is written with the site when any
 page shows a figure, and a page loads it only then. A page is static HTML;
 without JavaScript, or on paper, the figure's place stays empty.
 
-Syntax:: `sysml-fig::[]`, `sysml-fig::<interface>[]`
+Syntax:: `sysml-fig::[]`, `sysml-fig::<element>[]`
 
 Example:
 
@@ -483,6 +495,8 @@ package Example {
             = Aircraft
 
             sysml-fig::airDuct[]
+
+            sysml-fig::aircraft[]
             */
         port air : P;
     }
@@ -498,10 +512,14 @@ package Example {
 }
 ----
 
-The page of `aircraft` shows a figure: the package `Example` — the ends'
-common ancestor — as the frame, holding the boxes `aircraft` and
-`airConditioner`, each with its `air` port, joined by a thick line, and
-nothing else of the model.
+The page of `aircraft` shows two figures. The first, from
+`sysml-fig::airDuct[]`: the package `Example` — the ends' common ancestor —
+as the frame, holding the boxes `aircraft` and `airConditioner`, each with
+its `air` port, joined by a thick line, and nothing else of the model. The
+second, from `sysml-fig::aircraft[]`: the box `aircraft` with its `air`
+port, the box `airConditioner` with its `air` port beside it — the model
+does not own `airConditioner` inside `aircraft` — and a thick line joining
+the two `air` ports.
 
 == sysml-metadata-table
 

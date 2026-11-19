@@ -59,7 +59,7 @@ func mermaidFigure(t figTree) string {
 	var b strings.Builder
 	b.WriteString("---\n")
 	b.WriteString(mermaidConfig)
-	fmt.Fprintf(&b, "---\n%%%% %s — interconnection figure\n", t.iface)
+	fmt.Fprintf(&b, "---\n%%%% %s — interconnection figure\n", t.of)
 	b.WriteString("flowchart LR\n")
 	var boxes, ports []string
 	var write func(nodes []*figNode, indent string)
