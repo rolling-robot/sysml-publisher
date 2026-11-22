@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Changed
+- The example model in `model/` is now a multi-file fixed-wing UAV: the whole
+  system (`System::uavSystem`) contains the UAV and its ground remote control,
+  the UAV subsets a general UAV (`UavKinds::uav`), and the model demonstrates
+  inherited representations, interface figures, views and values across files.
+  The UAV is a 50 kg air vehicle with a payload radio, a CAN bus linking its
+  digital systems, and a power line with a BEC and a motor controller.
+  `docs/example/` is regenerated from it.
 - The tool no longer parses the model itself, and holds no model in memory
   (DS-1): it sends the model files' text to a sysml-grpc service (OpenSysML),
   which parses the model, holds it, and answers the tool's reads. Every run

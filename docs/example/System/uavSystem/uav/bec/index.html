@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bec () — Model documentation</title>
+<link rel="stylesheet" href="../../../../assets/asciidoctor.css">
+<link rel="stylesheet" href="../../../../assets/layout.css">
+<script src="../../../../assets/sort.js" defer></script>
+<script src="../../../../assets/sidebar.js" defer></script>
+<script src="../../../../assets/mermaid.min.js" defer></script>
+</head>
+<body class="article">
+<div class="layout">
+<aside class="sidebar" aria-label="Page tree">
+<nav>
+<a class="home" href="../../../../index.html">Model documentation</a>
+
+<ul>
+<li class="empty"><details data-branch="UavDefinitions"><summary><a href="../../../../UavDefinitions/index.html">UavDefinitions</a></summary>
+<ul>
+<li><a href="../../../../UavDefinitions/UavPart/index.html">UavPart (up)</a></li>
+<li><a href="../../../../UavDefinitions/Battery/index.html">Battery ()</a></li>
+<li><a href="../../../../UavDefinitions/PowerDistribution/index.html">PowerDistribution ()</a></li>
+<li><a href="../../../../UavDefinitions/Bec/index.html">Bec ()</a></li>
+<li><a href="../../../../UavDefinitions/MotorController/index.html">MotorController ()</a></li>
+<li><a href="../../../../UavDefinitions/Motor/index.html">Motor ()</a></li>
+<li><a href="../../../../UavDefinitions/Propeller/index.html">Propeller ()</a></li>
+<li><a href="../../../../UavDefinitions/FlightController/index.html">FlightController ()</a></li>
+<li><a href="../../../../UavDefinitions/Imu/index.html">Imu ()</a></li>
+<li><a href="../../../../UavDefinitions/Gps/index.html">Gps ()</a></li>
+<li><a href="../../../../UavDefinitions/CanBus/index.html">CanBus ()</a></li>
+<li><a href="../../../../UavDefinitions/Antenna/index.html">Antenna ()</a></li>
+<li><a href="../../../../UavDefinitions/CommandReceiver/index.html">CommandReceiver ()</a></li>
+<li><a href="../../../../UavDefinitions/DataReceiver/index.html">DataReceiver ()</a></li>
+<li><a href="../../../../UavDefinitions/Operator/index.html">Operator ()</a></li>
+</ul>
+</details></li>
+<li class="empty"><details data-branch="Payloads"><summary><a href="../../../../Payloads/index.html">Payloads</a></summary>
+<ul>
+<li><a href="../../../../Payloads/Payload/index.html">Payload (PL)</a></li>
+<li><a href="../../../../Payloads/CameraPayload/index.html">CameraPayload (CP)</a></li>
+<li><a href="../../../../Payloads/PayloadRadio/index.html">PayloadRadio (PR)</a></li>
+</ul>
+</details></li>
+<li class="empty"><details data-branch="System" open><summary><a href="../../../index.html">System</a></summary>
+<ul>
+<li><details data-branch="System/uavSystem" open><summary><a href="../../index.html">uavSystem (us)</a></summary>
+<ul>
+<li><details data-branch="System/uavSystem/uav" open><summary><a href="../index.html">uav (U1)</a></summary>
+<ul>
+<li><a href="../fuselage/index.html">fuselage ()</a></li>
+<li><details data-branch="System/uavSystem/uav/wing"><summary><a href="../wing/index.html">wing (W)</a></summary>
+<ul>
+<li><a href="../wing/left/index.html">left (LW)</a></li>
+<li><a href="../wing/right/index.html">right (RW)</a></li>
+</ul>
+</details></li>
+<li><a href="../tail/index.html">tail ()</a></li>
+<li><a href="../landingGear/index.html">landingGear ()</a></li>
+<li><a href="../motor/index.html">motor ()</a></li>
+<li><a href="../propeller/index.html">propeller ()</a></li>
+<li><a href="../battery/index.html">battery ()</a></li>
+<li><a href="../powerDistribution/index.html">powerDistribution ()</a></li>
+<li><a href="index.html" aria-current="page">bec ()</a></li>
+<li><a href="../motorController/index.html">motorController ()</a></li>
+<li><a href="../flightController/index.html">flightController ()</a></li>
+<li><a href="../imu/index.html">imu ()</a></li>
+<li><a href="../gps/index.html">gps ()</a></li>
+<li><a href="../canBus/index.html">canBus ()</a></li>
+<li><details data-branch="System/uavSystem/uav/payloadBay"><summary><a href="../payloadBay/index.html">payloadBay ()</a></summary>
+<ul>
+<li><a href="../payloadBay/payload/index.html">payload ()</a></li>
+</ul>
+</details></li>
+<li><a href="../payloadRadio/index.html">payloadRadio ()</a></li>
+<li><a href="../commandAntenna/index.html">commandAntenna ()</a></li>
+<li><a href="../dataAntenna/index.html">dataAntenna ()</a></li>
+</ul>
+</details></li>
+<li><details data-branch="System/uavSystem/remoteControl"><summary><a href="../../remoteControl/index.html">remoteControl (RC)</a></summary>
+<ul>
+<li><a href="../../remoteControl/commandReceiver/index.html">commandReceiver ()</a></li>
+<li><a href="../../remoteControl/dataReceiver/index.html">dataReceiver ()</a></li>
+<li><a href="../../remoteControl/operator/index.html">operator (O)</a></li>
+</ul>
+</details></li>
+<li><a href="../../commandLink/index.html">commandLink</a></li>
+<li><a href="../../dataLink/index.html">dataLink</a></li>
+<li><a href="../../operatorLink/index.html">operatorLink</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="empty"><details data-branch="UavKinds"><summary><a href="../../../../UavKinds/index.html">UavKinds</a></summary>
+<ul>
+<li><a href="../../../../UavKinds/uav/index.html">uav (U)</a></li>
+</ul>
+</details></li>
+</ul>
+</nav>
+</aside>
+<main id="content">
+<h1>bec ()</h1>
+<p class="qualified-name">System::uavSystem::uav::bec</p>
+<section class="rep inherited">
+<div class="sect1">
+<h2 id="_technical_data">Technical data</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">output voltage</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">5 V</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">maximum current</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">10 A</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">efficiency</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0.9</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section class="rep inherited">
+<div id="preamble">
+<div class="sectionbody">
+<div class="openblock sysml-doc">
+<div class="content">
+<div class="paragraph">
+<p>The BEC regulates the battery voltage to 5 V for the avionics
+and the payload.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_properties">Properties</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mass</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0.2 kg</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">power</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1 W</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_members">Members</h2>
+<div class="sectionbody">
+
+</div>
+</div>
+<div class="sect1">
+<h2 id="_interfaces">Interfaces</h2>
+<div class="sectionbody">
+<div class="ulist sysml-ifaces">
+<ul>
+<li>
+<p>becPower -> <a href="../powerDistribution/index.html">powerDistribution</a></p>
+</li>
+<li>
+<p>flightControllerPower -> <a href="../flightController/index.html">flightController</a></p>
+</li>
+<li>
+<p>imuPower -> <a href="../imu/index.html">imu</a></p>
+</li>
+<li>
+<p>gpsPower -> <a href="../gps/index.html">gps</a></p>
+</li>
+<li>
+<p>payloadRadioPower -> <a href="../payloadRadio/index.html">payloadRadio</a></p>
+</li>
+<li>
+<p>payloadPower -> <a href="../payloadBay/payload/index.html">payload</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_figure">Figure</h2>
+<div class="sectionbody">
+<div class="sysml-fig"><pre class="mermaid">---
+config:
+  fontFamily: &#34;Helvetica, Arial, sans-serif&#34;
+  theme: base
+  look: classic
+  layout: elk
+  securityLevel: loose
+  themeCSS: &#34;.edgeLabel rect { opacity: 1 !important; } .cluster-label .nodeLabel { text-align: center; } .cluster-label a, .nodeLabel a { color: #2156a5; text-decoration: underline; cursor: pointer; } .cluster-label a:hover, .nodeLabel a:hover { color: #1d4b8f; }&#34;
+  themeVariables:
+    fontFamily: &#34;Helvetica, Arial, sans-serif&#34;
+    fontSize: &#34;14px&#34;
+    primaryColor: &#34;#FFFFFF&#34;
+    secondaryColor: &#34;#FFFFFF&#34;
+    tertiaryColor: &#34;#FFFFFF&#34;
+    background: &#34;#FFFFFF&#34;
+    primaryBorderColor: &#34;#181818&#34;
+    primaryTextColor: &#34;#000000&#34;
+    lineColor: &#34;#181818&#34;
+    textColor: &#34;#000000&#34;
+    noteBkgColor: &#34;#FEFFDD&#34;
+    noteBorderColor: &#34;#181818&#34;
+    noteTextColor: &#34;#000000&#34;
+    clusterBkg: &#34;#FFFFFF&#34;
+    clusterBorder: &#34;#181818&#34;
+    edgeLabelBackground: &#34;#FFFFFF&#34;
+---
+%% System::uavSystem::uav::bec — interconnection figure
+flowchart LR
+  subgraph n0 [&#34;`*«part»*
+**bec**`&#34;]
+    direction LR
+    n1(&#34;`*«port»*
+**powerIn**`&#34;)
+    n2(&#34;`*«port»*
+**flightController**`&#34;)
+    n3(&#34;`*«port»*
+**imu**`&#34;)
+    n4(&#34;`*«port»*
+**gps**`&#34;)
+    n5(&#34;`*«port»*
+**payloadRadio**`&#34;)
+    n6(&#34;`*«port»*
+**payload**`&#34;)
+  end
+  subgraph n7 [&#34;`*«part»*
+&lt;a href=&#34;../powerDistribution/index.html&#34;&gt;&lt;strong&gt;powerDistribution&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n8(&#34;`*«port»*
+**bec**`&#34;)
+  end
+  subgraph n9 [&#34;`*«part»*
+&lt;a href=&#34;../flightController/index.html&#34;&gt;&lt;strong&gt;flightController&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n10(&#34;`*«port»*
+**powerIn**`&#34;)
+  end
+  subgraph n11 [&#34;`*«part»*
+&lt;a href=&#34;../imu/index.html&#34;&gt;&lt;strong&gt;imu&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n12(&#34;`*«port»*
+**powerIn**`&#34;)
+  end
+  subgraph n13 [&#34;`*«part»*
+&lt;a href=&#34;../gps/index.html&#34;&gt;&lt;strong&gt;gps&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n14(&#34;`*«port»*
+**powerIn**`&#34;)
+  end
+  subgraph n15 [&#34;`*«part»*
+&lt;a href=&#34;../payloadRadio/index.html&#34;&gt;&lt;strong&gt;payloadRadio&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n16(&#34;`*«port»*
+**powerIn**`&#34;)
+  end
+  subgraph n17 [&#34;`*«part»*
+&lt;a href=&#34;../payloadBay/payload/index.html&#34;&gt;&lt;strong&gt;payload&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n18(&#34;`*«port»*
+**powerIn**`&#34;)
+  end
+  n8 === n1
+  linkStyle 0 stroke-width:3px
+  n2 === n10
+  linkStyle 1 stroke-width:3px
+  n3 === n12
+  linkStyle 2 stroke-width:3px
+  n4 === n14
+  linkStyle 3 stroke-width:3px
+  n5 === n16
+  linkStyle 4 stroke-width:3px
+  n6 === n18
+  linkStyle 5 stroke-width:3px
+classDef figbox fill:#FFFFFF,stroke:#181818,color:#000000
+class n0,n7,n9,n11,n13,n15,n17 figbox
+classDef figport fill:#FFFFFF,stroke:#181818,color:#000000
+class n1,n2,n3,n4,n5,n6,n8,n10,n12,n14,n16,n18 figport
+</pre></div>
+</div>
+</div>
+</section>
+</main>
+<div class="sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" title="Drag to resize the sidebar; double-click to restore"></div>
+</div>
+</body>
+</html>

@@ -22,6 +22,6 @@ api = "localhost:50051"      # the SysML service's address (the -api flag,
 
 [site]
 dir = "site"                 # the output folder (the -out default)
-title = "Aircraft documentation"          # landing page, sidebar, browser tabs
-baseURL = "https://example.com/aircraft/"  # the URL the site is published under;
+title = "UAV documentation"          # landing page, sidebar, browser tabs
+baseURL = "https://example.com/uav/"  # the URL the site is published under;
                                            # every page then carries a canonical link

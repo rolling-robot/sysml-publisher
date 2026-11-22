@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flightController () — Model documentation</title>
+<link rel="stylesheet" href="../../../../assets/asciidoctor.css">
+<link rel="stylesheet" href="../../../../assets/layout.css">
+<script src="../../../../assets/sort.js" defer></script>
+<script src="../../../../assets/sidebar.js" defer></script>
+<script src="../../../../assets/mermaid.min.js" defer></script>
+</head>
+<body class="article">
+<div class="layout">
+<aside class="sidebar" aria-label="Page tree">
+<nav>
+<a class="home" href="../../../../index.html">Model documentation</a>
+
+<ul>
+<li class="empty"><details data-branch="UavDefinitions"><summary><a href="../../../../UavDefinitions/index.html">UavDefinitions</a></summary>
+<ul>
+<li><a href="../../../../UavDefinitions/UavPart/index.html">UavPart (up)</a></li>
+<li><a href="../../../../UavDefinitions/Battery/index.html">Battery ()</a></li>
+<li><a href="../../../../UavDefinitions/PowerDistribution/index.html">PowerDistribution ()</a></li>
+<li><a href="../../../../UavDefinitions/Bec/index.html">Bec ()</a></li>
+<li><a href="../../../../UavDefinitions/MotorController/index.html">MotorController ()</a></li>
+<li><a href="../../../../UavDefinitions/Motor/index.html">Motor ()</a></li>
+<li><a href="../../../../UavDefinitions/Propeller/index.html">Propeller ()</a></li>
+<li><a href="../../../../UavDefinitions/FlightController/index.html">FlightController ()</a></li>
+<li><a href="../../../../UavDefinitions/Imu/index.html">Imu ()</a></li>
+<li><a href="../../../../UavDefinitions/Gps/index.html">Gps ()</a></li>
+<li><a href="../../../../UavDefinitions/CanBus/index.html">CanBus ()</a></li>
+<li><a href="../../../../UavDefinitions/Antenna/index.html">Antenna ()</a></li>
+<li><a href="../../../../UavDefinitions/CommandReceiver/index.html">CommandReceiver ()</a></li>
+<li><a href="../../../../UavDefinitions/DataReceiver/index.html">DataReceiver ()</a></li>
+<li><a href="../../../../UavDefinitions/Operator/index.html">Operator ()</a></li>
+</ul>
+</details></li>
+<li class="empty"><details data-branch="Payloads"><summary><a href="../../../../Payloads/index.html">Payloads</a></summary>
+<ul>
+<li><a href="../../../../Payloads/Payload/index.html">Payload (PL)</a></li>
+<li><a href="../../../../Payloads/CameraPayload/index.html">CameraPayload (CP)</a></li>
+<li><a href="../../../../Payloads/PayloadRadio/index.html">PayloadRadio (PR)</a></li>
+</ul>
+</details></li>
+<li class="empty"><details data-branch="System" open><summary><a href="../../../index.html">System</a></summary>
+<ul>
+<li><details data-branch="System/uavSystem" open><summary><a href="../../index.html">uavSystem (us)</a></summary>
+<ul>
+<li><details data-branch="System/uavSystem/uav" open><summary><a href="../index.html">uav (U1)</a></summary>
+<ul>
+<li><a href="../fuselage/index.html">fuselage ()</a></li>
+<li><details data-branch="System/uavSystem/uav/wing"><summary><a href="../wing/index.html">wing (W)</a></summary>
+<ul>
+<li><a href="../wing/left/index.html">left (LW)</a></li>
+<li><a href="../wing/right/index.html">right (RW)</a></li>
+</ul>
+</details></li>
+<li><a href="../tail/index.html">tail ()</a></li>
+<li><a href="../landingGear/index.html">landingGear ()</a></li>
+<li><a href="../motor/index.html">motor ()</a></li>
+<li><a href="../propeller/index.html">propeller ()</a></li>
+<li><a href="../battery/index.html">battery ()</a></li>
+<li><a href="../powerDistribution/index.html">powerDistribution ()</a></li>
+<li><a href="../bec/index.html">bec ()</a></li>
+<li><a href="../motorController/index.html">motorController ()</a></li>
+<li><a href="index.html" aria-current="page">flightController ()</a></li>
+<li><a href="../imu/index.html">imu ()</a></li>
+<li><a href="../gps/index.html">gps ()</a></li>
+<li><a href="../canBus/index.html">canBus ()</a></li>
+<li><details data-branch="System/uavSystem/uav/payloadBay"><summary><a href="../payloadBay/index.html">payloadBay ()</a></summary>
+<ul>
+<li><a href="../payloadBay/payload/index.html">payload ()</a></li>
+</ul>
+</details></li>
+<li><a href="../payloadRadio/index.html">payloadRadio ()</a></li>
+<li><a href="../commandAntenna/index.html">commandAntenna ()</a></li>
+<li><a href="../dataAntenna/index.html">dataAntenna ()</a></li>
+</ul>
+</details></li>
+<li><details data-branch="System/uavSystem/remoteControl"><summary><a href="../../remoteControl/index.html">remoteControl (RC)</a></summary>
+<ul>
+<li><a href="../../remoteControl/commandReceiver/index.html">commandReceiver ()</a></li>
+<li><a href="../../remoteControl/dataReceiver/index.html">dataReceiver ()</a></li>
+<li><a href="../../remoteControl/operator/index.html">operator (O)</a></li>
+</ul>
+</details></li>
+<li><a href="../../commandLink/index.html">commandLink</a></li>
+<li><a href="../../dataLink/index.html">dataLink</a></li>
+<li><a href="../../operatorLink/index.html">operatorLink</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="empty"><details data-branch="UavKinds"><summary><a href="../../../../UavKinds/index.html">UavKinds</a></summary>
+<ul>
+<li><a href="../../../../UavKinds/uav/index.html">uav (U)</a></li>
+</ul>
+</details></li>
+</ul>
+</nav>
+</aside>
+<main id="content">
+<h1>flightController ()</h1>
+<p class="qualified-name">System::uavSystem::uav::flightController</p>
+<section class="rep inherited">
+<div class="sect1">
+<h2 id="_technical_data">Technical data</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">update rate</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">400 Hz</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">processor</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">STM32H7</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">firmware</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">(no value)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section class="rep inherited">
+<div id="preamble">
+<div class="sectionbody">
+<div class="openblock sysml-doc">
+<div class="content">
+<div class="paragraph">
+<p>The flight controller stabilises the UAV and flies the
+mission.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_properties">Properties</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mass</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0.15 kg</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">power</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">5 W</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_members">Members</h2>
+<div class="sectionbody">
+
+</div>
+</div>
+<div class="sect1">
+<h2 id="_interfaces">Interfaces</h2>
+<div class="sectionbody">
+<div class="ulist sysml-ifaces">
+<ul>
+<li>
+<p>flightControllerCan -> <a href="../canBus/index.html">canBus</a></p>
+</li>
+<li>
+<p>flightControllerPower -> <a href="../bec/index.html">bec</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_figure">Figure</h2>
+<div class="sectionbody">
+<div class="sysml-fig"><pre class="mermaid">---
+config:
+  fontFamily: &#34;Helvetica, Arial, sans-serif&#34;
+  theme: base
+  look: classic
+  layout: elk
+  securityLevel: loose
+  themeCSS: &#34;.edgeLabel rect { opacity: 1 !important; } .cluster-label .nodeLabel { text-align: center; } .cluster-label a, .nodeLabel a { color: #2156a5; text-decoration: underline; cursor: pointer; } .cluster-label a:hover, .nodeLabel a:hover { color: #1d4b8f; }&#34;
+  themeVariables:
+    fontFamily: &#34;Helvetica, Arial, sans-serif&#34;
+    fontSize: &#34;14px&#34;
+    primaryColor: &#34;#FFFFFF&#34;
+    secondaryColor: &#34;#FFFFFF&#34;
+    tertiaryColor: &#34;#FFFFFF&#34;
+    background: &#34;#FFFFFF&#34;
+    primaryBorderColor: &#34;#181818&#34;
+    primaryTextColor: &#34;#000000&#34;
+    lineColor: &#34;#181818&#34;
+    textColor: &#34;#000000&#34;
+    noteBkgColor: &#34;#FEFFDD&#34;
+    noteBorderColor: &#34;#181818&#34;
+    noteTextColor: &#34;#000000&#34;
+    clusterBkg: &#34;#FFFFFF&#34;
+    clusterBorder: &#34;#181818&#34;
+    edgeLabelBackground: &#34;#FFFFFF&#34;
+---
+%% System::uavSystem::uav::flightController — interconnection figure
+flowchart LR
+  subgraph n0 [&#34;`*«part»*
+**flightController**`&#34;]
+    direction LR
+    n1(&#34;`*«port»*
+**can**`&#34;)
+    n2(&#34;`*«port»*
+**powerIn**`&#34;)
+  end
+  subgraph n3 [&#34;`*«part»*
+&lt;a href=&#34;../canBus/index.html&#34;&gt;&lt;strong&gt;canBus&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n4(&#34;`*«port»*
+**flightController**`&#34;)
+  end
+  subgraph n5 [&#34;`*«part»*
+&lt;a href=&#34;../bec/index.html&#34;&gt;&lt;strong&gt;bec&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n6(&#34;`*«port»*
+**flightController**`&#34;)
+  end
+  n4 === n1
+  linkStyle 0 stroke-width:3px
+  n6 === n2
+  linkStyle 1 stroke-width:3px
+classDef figbox fill:#FFFFFF,stroke:#181818,color:#000000
+class n0,n3,n5 figbox
+classDef figport fill:#FFFFFF,stroke:#181818,color:#000000
+class n1,n2,n4,n6 figport
+</pre></div>
+</div>
+</div>
+</section>
+</main>
+<div class="sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" title="Drag to resize the sidebar; double-click to restore"></div>
+</div>
+</body>
+</html>

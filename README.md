@@ -41,79 +41,140 @@ go run ./cmd/sysml-grpc        # serves localhost:50051 until you stop it
 sysml-publish -api localhost:50051
 ```
 
-Put a model in `./model`. This one is a shortened `model/aircraft.sysml`, the
-example model in this repository:
+Put a model in `./model`. The example in this repository is a five-file
+fixed-wing UAV model, one top-level package per file. The snippets below are
+shortened: the full files are in [`model/`](model/).
+
+`model/definitions.sysml` holds the shared part template and the component
+definitions. Every part inherits `UavPart`'s representation, so every page gets
+the same name, doc, metadata, value and figure sections:
 
 ```sysml
-package Model {
+package UavDefinitions {
+    private import ScalarValues::*;
     private import SI::*;
 
-    part def <ap> AircraftPart {
-        rep language "asciidoc"
-            /*
-            = sysml-name:[] (sysml-short-name:[])
-
-            sysml-doc::[]
-
-            == Properties
-
-            [cols="1,1"]
-            |===
-            |weight | sysml-value:mass[]
-            |power | sysml-value:power[]
-            |===
-            */
-        attribute mass : ISQ::MassValue default 12 [kg];
-        attribute power : ISQ::PowerValue default 1.5 [kW];
-    }
-    part aircraft : ap {
+    part def <up> UavPart {
         rep language "asciidoc"
         /*
-        == Purpose
+        = sysml-name:[] (sysml-short-name:[])
 
         sysml-doc::[]
 
-        == Owned parts:
+        == Properties
 
-        sysml-members-list::PartUsage[]
+        [cols="1,1"]
+        |===
+        |mass | sysml-value:mass[]
+        |power | sysml-value:power[]
+        |===
 
-        == Interfaces:
+        == Figure
 
-        sysml-members-list::InterfaceUsage[]
+        sysml-fig::[]
         */
+        attribute mass : ISQ::MassValue default 0.1 [kg];
+        attribute power : ISQ::PowerValue default 0 [W];
+    }
 
+    part def Battery :> UavPart {
         doc /*
-        The purpose of the aircraft is to transport people
+        The flight battery stores the energy for the electric motor and the
+        avionics.
         */
-        part <a> wing : ap {
-            doc /*
-            Documentation for part sysml-name:[]
-
-            Owned elements:
-
-            sysml-members-list::[]
-            */
-            attribute :>> mass = 9.5 [kg];
-            attribute :>> power = 750 [W];
-            port 'de-icing fluid';
-        }
-        part engine : ap {
-            doc /*
-            Engine provides thrust and compressed air for life-support
-            system and other systems
-            */
-            in port fuel;
-            out port air;
-            attribute :>> mass = 400 [kg];
-        }
-        part fuelTank : ap {
-            out fuel;
-            attribute :>> mass = 100 [kg];
-        }
-        interface fuelLine connect (fuelTank.fuel, engine.fuel);
+        attribute :>> mass = 8 [kg];
+        attribute capacity : ISQ::ElectricChargeValue default 22 [A*h];
+        attribute voltage : ISQ::ElectricPotentialValue default 50.4 [V];
+        port powerOut : UavLinks::PowerPort;
     }
 }
 ```
+
+`model/uavkinds.sysml` defines the general air vehicle the system specialises:
+
+```sysml
+package UavKinds {
+    private import ScalarValues::*;
+    private import SI::*;
+    private import UavDefinitions::*;
+
+    part <U> uav : UavDefinitions::UavPart {
+        attribute :>> mass = 50 [kg];
+        attribute cruiseSpeed : ISQ::SpeedValue default 25 [m/s];
+        attribute endurance : ISQ::DurationValue default 90 [min];
+        attribute range : ISQ::LengthValue = endurance * cruiseSpeed;
+        attribute emptyMass : ISQ::MassValue default 42 [kg];
+        attribute payloadCapacity : ISQ::MassValue default 8 [kg];
+    }
+}
+```
+
+`model/system.sysml` puts the UAV and its ground remote control in one part,
+so the links have a common owner and the system view can draw them:
+
+```sysml
+package System {
+    private import ScalarValues::*;
+    private import SI::*;
+    private import UavDefinitions::*;
+    private import Views::*;
+    private import StandardViewDefinitions::*;
+
+    part uavSystem {
+        part uav :> UavKinds::uav {
+            // fuselage, wing, tail, landing gear, motor, propeller,
+            // flightController, imu, gps, payloadBay ...
+            part battery : Battery { port :>> powerOut : UavLinks::PowerPort; }
+            part powerDistribution : PowerDistribution {
+                port :>> battery : UavLinks::PowerPort;
+                port :>> bec : UavLinks::PowerPort;
+                port :>> motorController : UavLinks::PowerPort;
+            }
+            part bec : Bec {
+                port :>> powerIn : UavLinks::PowerPort;
+                port :>> flightController : UavLinks::PowerPort;
+            }
+            part motorController : MotorController {
+                port :>> powerIn : UavLinks::PowerPort;
+                port :>> motor : UavLinks::PowerPort;
+            }
+            part canBus : CanBus {
+                port :>> flightController : UavLinks::CanPort;
+                port :>> motorController : UavLinks::CanPort;
+            }
+            part payloadRadio : Payloads::PayloadRadio {
+                port :>> rf : UavLinks::RfPort;
+                port :>> data : Payloads::DataPort;
+            }
+            part commandAntenna : Antenna { port :>> rf : UavLinks::RfPort; }
+            part dataAntenna : Antenna { port :>> rf : UavLinks::RfPort; }
+
+            interface batteryPower connect (battery.powerOut, powerDistribution.battery);
+            interface becPower connect (powerDistribution.bec, bec.powerIn);
+            interface motorControllerPower connect (powerDistribution.motorController, motorController.powerIn);
+            interface motorPower connect (motorController.motor, motor.powerIn);
+            interface flightControllerCan connect (canBus.flightController, flightController.can);
+            interface payloadRfLink connect (payloadRadio.rf, dataAntenna.rf);
+        }
+        part remoteControl {
+            part commandReceiver : CommandReceiver { port :>> rf : UavLinks::RfPort; }
+            part dataReceiver : DataReceiver { port :>> rf : UavLinks::RfPort; }
+        }
+        interface commandLink connect (uav.commandAntenna.rf, remoteControl.commandReceiver.rf);
+        interface dataLink connect (uav.dataAntenna.rf, remoteControl.dataReceiver.rf);
+
+        view systemInterfaces {
+            expose uavSystem;
+            render asInterconnectionDiagram;
+        }
+    }
+}
+```
+
+The remaining files are `payloads.sysml` (a generic `Payload`, a
+`CameraPayload` specialising it, and the `PayloadRadio` module) and
+`links.sysml` (the `RfPort`, `ConsolePort`, `CanPort` and `PowerPort`
+definitions).
 
 Run it and open the result:
 
@@ -125,54 +186,75 @@ xdg-open site/index.html              # or open it in any browser
 (Or run `sysml-publish -api local` and skip starting the service yourself:
 the tool starts one for the run and stops it after.)
 
-You get six pages, one per documented element plus the package that holds
-them:
+You get 53 pages, one per documented element plus the empty package ancestors,
+arranged as the model's containment tree:
 
-- `site/Model/index.html`: the package. It has no documentation of its own,
-  but it contains documented elements, so it gets a page with just its name.
-- `site/Model/AircraftPart/index.html`, titled "AircraftPart (ap)", with a
-  Properties table: weight 12 kg, power 1.5 kW, the definition's defaults.
-- `site/Model/aircraft/wing/index.html`, titled "wing (a)". `wing` is typed by
-  `AircraftPart` (through its short name `ap`), so it shows that
-  representation, but the macros speak about `wing`: its own name and short
-  name, its own doc (which itself lists wing's members: mass, power,
-  de-icing fluid), and its own values, 9.5 kg and 750 W.
-- `site/Model/aircraft/engine/index.html` and `.../fuelTank/index.html`, the
-  same way: engine's doc and 400 kg; fuelTank's 100 kg.
-- `site/Model/aircraft/index.html`: aircraft's own representation first
-  (its purpose, then its parts wing, engine and fuelTank, then its interface
-  fuelLine, each list picked by element kind), then the inherited
-  AircraftPart one. Its own representation has no `= Title` line, so the
-  page takes its title from the inherited one: "aircraft ()", empty
-  parentheses because `aircraft` has no short name. The purpose shows twice,
-  because both representations include `sysml-doc::[]`.
+- `site/UavDefinitions/UavPart/index.html`, titled "UavPart (up)": the
+  definition whose representation every part inherits.
+- `site/UavDefinitions/Battery/index.html`: the battery definition with its
+  electrical data, and `site/System/uavSystem/uav/battery/index.html`: the
+  same representation filled in for the part, with its metadata bindings.
+- `site/System/uavSystem/uav/index.html`, titled "uav (U1)": the air vehicle.
+  It shows its own representation first (including the 16 internal interfaces
+  and an avionics diagram), then the inherited `UavKinds::uav` flight data,
+  then the inherited `UavPart` template; the values speak about the air
+  vehicle: mass 50 kg, range 135000 m.
+- `site/System/uavSystem/uav/wing/index.html`, titled "wing (W)": span 5 m,
+  area 1.5 m², mean chord 0.3 m, aspect ratio 16.7, and the composite
+  `size` value as `[composite]` with a warning.
+- `site/System/uavSystem/uav/canBus/index.html`: the CAN bus and its five
+  connections to the flight controller, IMU, GPS, payload radio and motor
+  controller.
+- `site/System/uavSystem/uav/powerDistribution/index.html`,
+  `.../bec/index.html` and `.../motorController/index.html`: the power line,
+  from the battery to the BEC and the motor controller.
+- `site/System/uavSystem/uav/payloadRadio/index.html`: the payload radio,
+  linked to the payload, the data antenna, the CAN bus and the BEC.
+- `site/System/uavSystem/commandLink/index.html`: one of the three interface
+  pages. Its figure frames the whole system and draws the command link from
+  the UAV's antenna to the ground receiver.
+- `site/System/uavSystem/index.html`, titled "uavSystem (us)": the system's
+  metadata table, its three interfaces, its system diagram and its parts
+  table.
 
-The full model adds a metadata table (`sysml-metadata-table`) to every part
-page; see the example below.
+`sysml-fig` needs a part with an owned port, or an interface. A part without
+ports leaves a placeholder and logs a warning; the run still succeeds. The
+`UavPart` template, the airframe parts, the propeller and the UAV itself are
+in that group, so the example shows both the figure and the failure mode.
 
 ### Example output
 
 [`docs/example/`](docs/example/) holds the site generated from the full
-[`model/aircraft.sysml`](model/aircraft.sysml), committed so you can look
-before building anything:
+[`model/`](model/), committed so you can look before building anything:
 
 - [landing page](docs/example/index.html)
-- [AircraftPart](docs/example/Model/AircraftPart/index.html): the definition
+- [UavPart](docs/example/UavDefinitions/UavPart/index.html): the definition
   whose representation every part inherits
-- [aircraft](docs/example/Model/aircraft/index.html): parts and interfaces
-  listed by element kind
-- [wing](docs/example/Model/aircraft/wing/index.html): the inherited
-  representation filled in for the wing, with its metadata table
-- [engine](docs/example/Model/aircraft/engine/index.html),
-  [fuelTank](docs/example/Model/aircraft/fuelTank/index.html),
-  [airConditioner](docs/example/Model/aircraft/airConditioner/index.html)
+- [uavSystem](docs/example/System/uavSystem/index.html): the whole system,
+  with both views
+- [uav](docs/example/System/uavSystem/uav/index.html): three representations,
+  own first, with its 16 internal interfaces and avionics diagram
+- [wing](docs/example/System/uavSystem/uav/wing/index.html): the geometry and
+  the composite `size`
+- [battery](docs/example/System/uavSystem/uav/battery/index.html): the
+  inherited technical data and metadata
+- [commandLink](docs/example/System/uavSystem/commandLink/index.html): the
+  interface figure
+- [canBus](docs/example/System/uavSystem/uav/canBus/index.html): the CAN bus
+  and its five connections
+- [powerDistribution](docs/example/System/uavSystem/uav/powerDistribution/index.html):
+  the power line, with the BEC and the motor controller
+- [payloadRadio](docs/example/System/uavSystem/uav/payloadRadio/index.html):
+  the payload radio and its four links
+- [CameraPayload](docs/example/Payloads/CameraPayload/index.html): a payload
+  definition specialising the generic one
 
 Open them from a clone in a browser (`xdg-open docs/example/index.html`): a
 repository browser such as GitHub shows HTML files as source, not as pages.
 After changing the model or the tool, regenerate them with:
 
 ```sh
-go run ./cmd/sysml-publish -model model -out docs/example   # in a clone
+go run ./cmd/sysml-publish -api local -model model -out docs/example   # in a clone
 ```
 
 ## Requirements and building
@@ -237,7 +319,7 @@ with a warning.
   representation of its own, or inherits one.
 - **Inherited representations**: definitions and usages inherit the
   representations of what they specialize: a usage those of its type
-  (`part wing : AircraftPart`), a definition those of its supertypes
+  (`part wing : UavPart`), a definition those of its supertypes
   (`part def Sport :> Wheel`), a usage those of what it subsets or redefines,
   at any depth. A page shows its own representations first, then the
   inherited ones, nearest first, each once, with no label saying where they
@@ -270,18 +352,44 @@ a representation keeps every link working.
 
 ## The generated site
 
+The tree, shortened to the pages the example discusses:
+
 ```
 site/
-├── index.html                  landing page: the whole tree
-├── Model/
-│   ├── index.html              page of Model
-│   ├── AircraftPart/index.html page of Model::AircraftPart
-│   └── aircraft/
-│       ├── index.html          page of Model::aircraft
-│       ├── wing/index.html     page of Model::aircraft::wing
-│       └── ...
-├── assets/                     asciidoctor.css, layout.css
-└── .sysml-publish              marker: this folder was written by the tool
+├── index.html                      landing page: the whole tree
+├── UavDefinitions/
+│   ├── index.html                  page of UavDefinitions
+│   ├── UavPart/index.html          page of UavDefinitions::UavPart
+│   ├── Battery/index.html          page of UavDefinitions::Battery
+│   ├── PowerDistribution/index.html
+│   ├── Bec/index.html
+│   ├── MotorController/index.html
+│   └── CanBus/index.html
+├── UavKinds/
+│   ├── index.html                  page of UavKinds
+│   └── uav/index.html              page of UavKinds::uav
+├── Payloads/
+│   ├── Payload/index.html          page of Payloads::Payload
+│   ├── CameraPayload/index.html    page of Payloads::CameraPayload
+│   └── PayloadRadio/index.html     page of Payloads::PayloadRadio
+├── System/
+│   ├── index.html                  page of System
+│   └── uavSystem/
+│       ├── index.html              page of System::uavSystem
+│       ├── uav/
+│       │   ├── index.html          page of System::uavSystem::uav
+│       │   ├── wing/index.html     page of ...::uav::wing
+│       │   ├── canBus/index.html
+│       │   ├── powerDistribution/index.html
+│       │   ├── bec/index.html
+│       │   ├── motorController/index.html
+│       │   └── payloadRadio/index.html
+│       ├── remoteControl/index.html
+│       └── commandLink/index.html
+├── assets/                         asciidoctor.css, layout.css, sidebar.js,
+│                                   sort.js, and mermaid.min.js when a page
+│                                   shows a figure
+└── .sysml-publish                  marker: this folder was written by the tool
 ```
 
 - The page of `A::B::C` is `site/A/B/C/index.html`. A page keeps its path when
@@ -310,10 +418,10 @@ the element that owns the representation.
 |---|---|---|
 | `sysml-name:[<element>]` | inline | the element's name |
 | `sysml-name:@<metadata>::<attribute>[]` | inline | the name of metadata on the element, or of its attribute |
-| `sysml-qualified-name:[<element>]` | inline | its qualified name, `Model::aircraft::wing` |
+| `sysml-qualified-name:[<element>]` | inline | its qualified name, `System::uavSystem::uav::wing` |
 | `sysml-short-name:[<element>]` | inline | its short name, the `<W>` in `part def <W> Wheel` |
 | `sysml-rep:[<element>][<language>]` | inline | the body of the element's representation in another language, as plain text |
-| `sysml-value:<attribute>[]` | inline | the attribute's value with its unit, `9 kg`; also another element's attribute (`Model::aircraft::engine::mass`) by a qualified or relative name, or a feature chain (`engine.mass`); a metadata attribute: `@m::owner` |
+| `sysml-value:<attribute>[]` | inline | the attribute's value with its unit, `8 kg`; also another element's attribute (`System::uavSystem::uav::battery`) by a qualified or relative name, or a feature chain (`battery.voltage`); a metadata attribute: `@m::owner` |
 | `sysml-doc::[<element>][]` | block | the element's `doc` comments |
 | `sysml-members-list::[]` | block | a list of its members with their types |
 | `sysml-members-list::<element>[]` | block | its members typed by, subclassing or subsetting `<element>` |
@@ -322,15 +430,17 @@ the element that owns the representation.
 | `sysml-ifaces::[<element>][name=short\|long]` | block | the interfaces and connections the element's ports are on: `i1 -> y`, or `i3 -> y, z` for the other parts |
 | `sysml-metadata-table::<metadata def>[]` | block | a table of that metadata's attributes on the element |
 | `sysml-view::[<view>][]` | block | the view as OpenSysML renders it: a diagram as an SVG picture, a table view as a table; a diagram needs Graphviz's `dot` |
+| `sysml-fig::[<element>][]` | block | a Mermaid figure of an interface or a part: an interface's ends' common ancestor as the frame with an edge per pair of ends, or a part with its owned ports and the connections they are on; a part without ports fails with a placeholder |
 
 Inline macros go anywhere in text; block macros go on a line of their own.
 Without a target, `sysml-name`, `sysml-qualified-name`, `sysml-short-name`,
 `sysml-doc` and `sysml-rep` describe the page's element; give them an element
-(`sysml-name:engine[]`, `sysml-doc::Model::AircraftPart[]`) to describe that
+(`sysml-name:battery[]`, `sysml-doc::UavDefinitions::UavPart[]`) to describe that
 one instead.
 Where a macro takes an element, name it as SysML would: by qualified name,
 by a name relative to the page's element, or by a name only one element has;
-short names work in every part of a name (`Model::ap` for `Model::AircraftPart`).
+short names work in every part of a name (`UavDefinitions::up` for
+`UavDefinitions::UavPart`).
 
 ```sysml
 part def Pump {
@@ -418,8 +528,8 @@ api = "localhost:50051"      # the SysML service's address (the -api flag)
 
 [site]
 dir = "site"                 # the output folder (the -out default)
-title = "Aircraft docs"      # the site's title: landing page, sidebar, browser tabs
-baseURL = "https://example.com/aircraft/"  # the URL the site is published under
+title = "UAV documentation"          # the site's title: landing page, sidebar, browser tabs
+baseURL = "https://example.com/uav/"  # the URL the site is published under
 ```
 
 A commented example to copy is [`docs/sysml-publish.toml`](docs/sysml-publish.toml).
@@ -452,15 +562,15 @@ sysml-publish -api ADDR [-config FILE] [-model DIR] [-out DIR] [-v] [-log-format
 | `-log-format` | `text` | `text` for people, `json` for one JSON object per line, for CI and log tools |
 | `-dot CMD` | `dot` from `PATH` | Graphviz's `dot` command, which lays out the diagrams `sysml-view` shows; a diagram needs it, a table view needs no program |
 
-Everything the tool reports goes to stderr as log records (here for
-`model/aircraft.sysml`, with a warning as it would appear for a composite
-value):
+Everything the tool reports goes to stderr as log records (here for the UAV
+model, with the composite warning and one of the figure warnings):
 
 ```
-level=INFO msg="model loaded" folder=./model files=1 elements=294 warnings=0 duration=251ms
-level=INFO msg="page written" element=Model::aircraft::wing empty=false path=site/Model/aircraft/wing/index.html
-level=WARN msg="Model::aircraft::wing: sysml-value:size[]: size is composite; shown as [composite]"
-level=INFO msg="site published" pages=7 landing=site/index.html duration=943ms
+level=INFO msg="model loaded" folder=model files=5 elements=395 warnings=0 duration=3.224110373s
+level=INFO msg="page written" element=System::uavSystem::uav::wing empty=false path=docs/example/System/uavSystem/uav/wing/index.html
+level=WARN msg="model/system.sysml:119: System::uavSystem::uav::wing: sysml-value:size[]: size is composite; shown as [composite]"
+level=WARN msg="model/definitions.sysml:66: UavDefinitions::UavPart: sysml-fig::[]: has no ports; a figure needs at least one"
+level=INFO msg="site published" pages=53 landing=docs/example/index.html duration=52.88812304s
 ```
 
 Exit status:
@@ -497,6 +607,8 @@ Exit status:
 - an unnamed element with a page;
 - a `sysml-value` whose attribute is composite (made of attributes of its
   own), shown as `[composite]`; one warning per page and macro;
+- a `sysml-fig` target that is a part without an owned port, shown as a
+  placeholder; one warning per page and macro;
 - a model with no documented elements at all: only the landing page is
   written, and the run still succeeds.
 
@@ -508,8 +620,7 @@ This is a first version.
   planned.
 - Views (`sysml-view`) are rendered by OpenSysML in process; a diagram is
   laid out by Graphviz, which must be installed where the site is built.
-- A failing macro stops the whole run; whether it should instead leave a
-  placeholder and warn is undecided.
+- A failing macro leaves a placeholder and a warning; the run carries on.
 - The tool reads models through OpenSysML's SysML v2 API queries and element
   reads, which are not in an OpenSysML release yet: it is built against a
   development commit of OpenSysML.

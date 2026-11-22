@@ -124,7 +124,7 @@ views/                      public: renders views for sysml-view through the Ser
 model/                      the user's model (default input)
 testdata/<case>/            fixture models, one folder per test case
 docs/macros.adoc            user reference for the macros
-docs/example/               generated site of model/aircraft.sysml, linked from README.md
+docs/example/               generated site of the multi-file UAV model in model/, linked from README.md
 requirements.org            requirements, decisions, open questions
 ```
 
@@ -632,11 +632,11 @@ What the suite is:
   `run(...)` and assert log records, exit codes and files written.
 - `docs/example/` is generated output, committed for the README. After a
   change that alters rendered pages (templates, CSS, macros, the model),
-  regenerate it: `bin/sysml-publish -model model -out docs/example`.
+  regenerate it: `bin/sysml-publish -api local -model model -out docs/example`.
 - `testdata/smoke` is a frozen copy of an older version of the user's model
-  (then `model/smoke.sysml`, now `model/aircraft.sysml`); "smoke" names the
-  smoke tests that use it. The user's `model/` is not a test input and has
-  since diverged.
+  (then `model/smoke.sysml`, now the multi-file UAV model in `model/`); "smoke"
+  names the smoke tests that use it. The user's `model/` is not a test input
+  and has since diverged.
 - `go test -race -shuffle=on ./...` passes; keep it that way.
 
 Rules for new tests:
