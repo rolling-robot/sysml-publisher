@@ -35,7 +35,9 @@ func figSource(iface, body string) string {
 
 // The figures of the // notes in testdata/figs, on the page of vehicle: the
 // parts on the ends and between them and their common ancestor, the end
-// features, and one edge per pair of ends; nothing else of the model.
+// features, and the edges — one between the two ends of a two-ended
+// interface, one per end into the interface's node for one with more;
+// nothing else of the model.
 func TestFig(t *testing.T) {
 	tr, ad := setupFixture(t, "figs")
 	attrs := Attributes(pageAt(t, tr, "F/vehicle").ID)
@@ -49,11 +51,17 @@ func TestFig(t *testing.T) {
 		{"ends in different packages", "ixy", "F::ixy",
 			"  subgraph n0 [\"`*«package»*\n<a href=\"../index.html\"><strong>F</strong></a>`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n**px**`\"]\n      direction LR\n      n2(\"`*«port»*\n**p**`\")\n    end\n    subgraph n3 [\"`*«part»*\n**py**`\"]\n      direction LR\n      n4(\"`*«port»*\n**p**`\")\n    end\n  end\n  n2 === n4\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n3 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n2,n4 figport\n",
 		},
-		{"a part and the part an interface connects it to", "a", "F::vehicle::a",
-			"  subgraph n0 [\"`*«part»*\n<a href=\"a/index.html\"><strong>a</strong></a>`\"]\n    direction LR\n    n1(\"`*«port»*\n<a href=\"a/p/index.html\"><strong>p</strong></a>`\")\n  end\n  subgraph n2 [\"`*«part»*\n**b**`\"]\n    direction LR\n    n3(\"`*«port»*\n**q**`\")\n  end\n  n1 === n3\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n2 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1,n3 figport\n",
+		{"a part and the parts an interface with three ends connects it to", "a", "F::vehicle::a",
+			"  subgraph n0 [\"`*«part»*\n<a href=\"a/index.html\"><strong>a</strong></a>`\"]\n    direction LR\n    n1(\"`*«port»*\n<a href=\"a/p/index.html\"><strong>p</strong></a>`\")\n  end\n  subgraph n2 [\"`*«part»*\n**b**`\"]\n    direction LR\n    n3(\"`*«port»*\n**q**`\")\n  end\n  subgraph n4 [\"`*«part»*\n**c**`\"]\n    direction LR\n    n5(\"`*«port»*\n**s**`\")\n  end\n  n6(\"`*«interface»*\n**i3**`\")\n  n1 === n3\n  linkStyle 0 stroke-width:3px\n  n1 === n6\n  linkStyle 1 stroke-width:3px\n  n3 === n6\n  linkStyle 2 stroke-width:3px\n  n5 === n6\n  linkStyle 3 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n2,n4 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1,n3,n5,n6 figport\n",
 		},
-		{"a part on no interface", "c", "F::vehicle::c",
-			"  subgraph n0 [\"`*«part»*\n**c**`\"]\n    direction LR\n    n1(\"`*«port»*\n**s**`\")\n  end\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1 figport\n",
+		{"a part on no interface", "g", "F::vehicle::g",
+			"  subgraph n0 [\"`*«part»*\n**g**`\"]\n    direction LR\n    n1(\"`*«port»*\n**t**`\")\n  end\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1 figport\n",
+		},
+		{"a part whose n-ary connection it owns", "f", "F::vehicle::f",
+			"  subgraph n0 [\"`*«part»*\n**f**`\"]\n    direction LR\n    n1(\"`*«port»*\n**pf**`\")\n    n2(\"`*«port»*\n**pb**`\")\n    subgraph n3 [\"`*«part»*\n**fa**`\"]\n      direction LR\n      n4(\"`*«port»*\n**pa**`\")\n    end\n    n5(\"`*«interface»*\n**if3**`\")\n  end\n  n1 === n5\n  linkStyle 0 stroke-width:3px\n  n4 === n5\n  linkStyle 1 stroke-width:3px\n  n2 === n5\n  linkStyle 2 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n3 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1,n2,n4,n5 figport\n",
+		},
+		{"an interface with three ends", "i3", "F::vehicle::i3",
+			"  subgraph n0 [\"`*«part»*\n**vehicle**`\"]\n    direction LR\n    subgraph n1 [\"`*«part»*\n<a href=\"a/index.html\"><strong>a</strong></a>`\"]\n      direction LR\n      n2(\"`*«port»*\n<a href=\"a/p/index.html\"><strong>p</strong></a>`\")\n    end\n    subgraph n3 [\"`*«part»*\n**b**`\"]\n      direction LR\n      n4(\"`*«port»*\n**q**`\")\n    end\n    subgraph n5 [\"`*«part»*\n**c**`\"]\n      direction LR\n      n6(\"`*«port»*\n**s**`\")\n    end\n    n7(\"`*«interface»*\n**i3**`\")\n  end\n  n2 === n7\n  linkStyle 0 stroke-width:3px\n  n4 === n7\n  linkStyle 1 stroke-width:3px\n  n6 === n7\n  linkStyle 2 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n1,n3,n5 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n2,n4,n6,n7 figport\n",
 		},
 		{"a part and its own sub-part on an interface", "d", "F::vehicle::d",
 			"  subgraph n0 [\"`*«part»*\n**d**`\"]\n    direction LR\n    n1(\"`*«port»*\n**pd**`\")\n    subgraph n2 [\"`*«part»*\n**da**`\"]\n      direction LR\n      n3(\"`*«port»*\n**pa**`\")\n    end\n  end\n  n1 === n3\n  linkStyle 0 stroke-width:3px\nclassDef figbox fill:#FFFFFF,stroke:#181818,color:#000000\nclass n0,n2 figbox\nclassDef figport fill:#FFFFFF,stroke:#181818,color:#000000\nclass n1,n3 figport\n",

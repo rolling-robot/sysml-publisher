@@ -138,6 +138,7 @@ func portsOf(e *env, id string) ([]string, error) {
 // ifaceConn is one connection the target's ports are on.
 type ifaceConn struct {
 	id   string
+	meta string // the connection's metaclass: ConnectionUsage or InterfaceUsage
 	ends []connectorEnd
 }
 
@@ -170,7 +171,7 @@ func (e *env) conns() (connIndex, error) {
 		if err != nil {
 			return idx, err
 		}
-		con := ifaceConn{id: cid, ends: ends}
+		con := ifaceConn{id: cid, meta: q.Type, ends: ends}
 		idx.byID[cid] = con
 		for _, end := range ends {
 			for _, id := range end.path {

@@ -67,7 +67,6 @@
 <li><a href="../flightController/index.html">flightController ()</a></li>
 <li><a href="../imu/index.html">imu ()</a></li>
 <li><a href="../gps/index.html">gps ()</a></li>
-<li><a href="../canBus/index.html">canBus ()</a></li>
 <li><details data-branch="System/uavSystem/uav/payloadBay"><summary><a href="../payloadBay/index.html">payloadBay ()</a></summary>
 <ul>
 <li><a href="../payloadBay/payload/index.html">payload ()</a></li>
@@ -76,6 +75,7 @@
 <li><a href="../payloadRadio/index.html">payloadRadio ()</a></li>
 <li><a href="../commandAntenna/index.html">commandAntenna ()</a></li>
 <li><a href="../dataAntenna/index.html">dataAntenna ()</a></li>
+<li><a href="../canBusLink/index.html">canBusLink</a></li>
 </ul>
 </details></li>
 <li><details data-branch="System/uavSystem/remoteControl"><summary><a href="../../remoteControl/index.html">remoteControl (RC)</a></summary>
@@ -181,7 +181,7 @@
 <p>motorPower -> <a href="../motor/index.html">motor</a></p>
 </li>
 <li>
-<p>motorControllerCan -> <a href="../canBus/index.html">canBus</a></p>
+<p><a href="../canBusLink/index.html">canBusLink</a> -> <a href="../flightController/index.html">flightController</a>, <a href="../imu/index.html">imu</a>, <a href="../gps/index.html">gps</a>, <a href="../payloadRadio/index.html">payloadRadio</a></p>
 </li>
 </ul>
 </div>
@@ -241,21 +241,49 @@ flowchart LR
 **powerIn**`&#34;)
   end
   subgraph n8 [&#34;`*«part»*
-&lt;a href=&#34;../canBus/index.html&#34;&gt;&lt;strong&gt;canBus&lt;/strong&gt;&lt;/a&gt;`&#34;]
+&lt;a href=&#34;../flightController/index.html&#34;&gt;&lt;strong&gt;flightController&lt;/strong&gt;&lt;/a&gt;`&#34;]
     direction LR
     n9(&#34;`*«port»*
-**motorController**`&#34;)
+**can**`&#34;)
   end
+  subgraph n10 [&#34;`*«part»*
+&lt;a href=&#34;../imu/index.html&#34;&gt;&lt;strong&gt;imu&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n11(&#34;`*«port»*
+**can**`&#34;)
+  end
+  subgraph n12 [&#34;`*«part»*
+&lt;a href=&#34;../gps/index.html&#34;&gt;&lt;strong&gt;gps&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n13(&#34;`*«port»*
+**can**`&#34;)
+  end
+  subgraph n14 [&#34;`*«part»*
+&lt;a href=&#34;../payloadRadio/index.html&#34;&gt;&lt;strong&gt;payloadRadio&lt;/strong&gt;&lt;/a&gt;`&#34;]
+    direction LR
+    n15(&#34;`*«port»*
+**can**`&#34;)
+  end
+  n16(&#34;`*«interface»*
+&lt;a href=&#34;../canBusLink/index.html&#34;&gt;&lt;strong&gt;canBusLink&lt;/strong&gt;&lt;/a&gt;`&#34;)
   n5 === n1
   linkStyle 0 stroke-width:3px
   n2 === n7
   linkStyle 1 stroke-width:3px
-  n9 === n3
+  n9 === n16
   linkStyle 2 stroke-width:3px
+  n11 === n16
+  linkStyle 3 stroke-width:3px
+  n13 === n16
+  linkStyle 4 stroke-width:3px
+  n15 === n16
+  linkStyle 5 stroke-width:3px
+  n3 === n16
+  linkStyle 6 stroke-width:3px
 classDef figbox fill:#FFFFFF,stroke:#181818,color:#000000
-class n0,n4,n6,n8 figbox
+class n0,n4,n6,n8,n10,n12,n14 figbox
 classDef figport fill:#FFFFFF,stroke:#181818,color:#000000
-class n1,n2,n3,n5,n7,n9 figport
+class n1,n2,n3,n5,n7,n9,n11,n13,n15,n16 figport
 </pre></div>
 </div>
 </div>

@@ -453,8 +453,12 @@ Mermaid interconnection form. The figure shows, and nothing else:
   box's title carries the keyword line above the name, and the box's
   contents are drawn below all the title's lines, however many they are;
 * a rounded node per end feature, inside its owner's box;
-* one thick edge per pair of ends, the connection line of OpenSysML's
-  Mermaid form.
+* the edges: for an interface with two ends, one thick edge between the end
+  features, the connection line of OpenSysML's Mermaid form; one with more,
+  drawn as a rounded node of its own — labelled =«interface»= and the
+  interface's name — where the model owns it (inside its nearest drawn box
+  ancestor, the frame included, else at the top of the figure), with one
+  thick edge per end joining the end features to it.
 
 Without a target the page's element is used; a target is named as described
 in <<naming>>. A resolvable target that is neither an interface nor a part —
@@ -471,8 +475,13 @@ at that port, another end's feature draws as a rounded node inside a box for
 the part owning it. A part the model owns inside the target draws inside the
 target's box; the other parts draw beside it, since the model does not own
 them there and the figure asserts no containment the model does not have.
-The edges are one per pair of the connection's ends, as the interface's
-figure draws. A part with ports but no connections shows its ports and no
+The edges are one per pair of the connection's ends when it has two, as the
+interface's figure draws; a connection with more ends is drawn as a rounded
+node of its own — labelled =«interface»= or =«connection»=, by its metaclass,
+and its name — where the model owns it (inside its nearest drawn box
+ancestor, the part's box included, else at the top of the figure), and each
+end joins it, one edge per end. A
+part with ports but no connections shows its ports and no
 edges; a part with no ports fails the macro.
 
 The figure needs no view in the model and no Graphviz: the tool writes the

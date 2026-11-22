@@ -307,34 +307,6 @@ package UavDefinitions {
         port powerIn : PowerPort;
     }
 
-    part def CanBus :> UavPart {
-        doc /*
-        The CAN bus links the flight controller, the IMU, the GPS, the
-        payload radio and the motor controller.
-        */
-        rep language "asciidoc"
-        /*
-        == Technical data
-
-        [cols="1,1"]
-        |===
-        |bit rate | sysml-value:bitRate[]
-        |nodes | sysml-value:nodes[]
-        |terminated | sysml-value:terminated[]
-        |===
-        */
-        attribute :>> mass = 0.2 [kg];
-        attribute :>> power = 0.5 [W];
-        attribute bitRate : ISQ::TransferRateValue default 125000 [B/s];
-        attribute nodes : Integer default 5;
-        attribute terminated : Boolean default true;
-        port flightController : CanPort;
-        port imu : CanPort;
-        port gps : CanPort;
-        port payloadRadio : CanPort;
-        port motorController : CanPort;
-    }
-
     part def Antenna :> UavPart {
         doc /*
         A small omnidirectional antenna for one of the radio links. The

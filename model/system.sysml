@@ -311,19 +311,6 @@ package System {
                 port :>> powerIn : UavLinks::PowerPort;
             }
 
-            part canBus : CanBus {
-                doc /*
-                The CAN bus: the shared digital link between the flight
-                controller, the IMU, the GPS, the payload radio and the motor
-                controller.
-                */
-                port :>> flightController : UavLinks::CanPort;
-                port :>> imu : UavLinks::CanPort;
-                port :>> gps : UavLinks::CanPort;
-                port :>> payloadRadio : UavLinks::CanPort;
-                port :>> motorController : UavLinks::CanPort;
-            }
-
             part payloadBay : UavPart {
                 doc /*
                 The payload bay holds the mission payload and feeds it data and
@@ -411,15 +398,24 @@ package System {
 
             interface payloadPower connect (bec.payload, payloadBay.payload.powerIn);
 
-            interface flightControllerCan connect (canBus.flightController, flightController.can);
+            interface canBusLink connect (flightController.can, imu.can, gps.can, payloadRadio.can, motorController.can) {
+                rep language "asciidoc"
+                /*
+                = sysml-name:[]
 
-            interface imuCan connect (canBus.imu, imu.can);
+                The CAN bus itself, as one interface joining the nodes on it:
+                the flight controller, the IMU, the GPS, the payload radio and
+                the motor controller.
 
-            interface gpsCan connect (canBus.gps, gps.can);
+                == Ends
 
-            interface payloadRadioCan connect (canBus.payloadRadio, payloadRadio.can);
+                sysml-iface-ends::[]
 
-            interface motorControllerCan connect (canBus.motorController, motorController.can);
+                == Figure
+
+                sysml-fig::[]
+                */
+            }
 
             interface payloadDataLink connect (payloadBay.payload.data, payloadRadio.data);
 
@@ -428,6 +424,8 @@ package System {
             view avionicsInterfaces {
                 expose uav;
                 render asInterconnectionDiagram;
+                attribute depth = 1;
+                filter @PartUsage;
             }
         }
 

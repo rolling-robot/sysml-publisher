@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>canBus () — Model documentation</title>
+<title>canBusLink — Model documentation</title>
 <link rel="stylesheet" href="../../../../assets/asciidoctor.css">
 <link rel="stylesheet" href="../../../../assets/layout.css">
 <script src="../../../../assets/sort.js" defer></script>
@@ -67,7 +67,6 @@
 <li><a href="../flightController/index.html">flightController ()</a></li>
 <li><a href="../imu/index.html">imu ()</a></li>
 <li><a href="../gps/index.html">gps ()</a></li>
-<li><a href="index.html" aria-current="page">canBus ()</a></li>
 <li><details data-branch="System/uavSystem/uav/payloadBay"><summary><a href="../payloadBay/index.html">payloadBay ()</a></summary>
 <ul>
 <li><a href="../payloadBay/payload/index.html">payload ()</a></li>
@@ -76,6 +75,7 @@
 <li><a href="../payloadRadio/index.html">payloadRadio ()</a></li>
 <li><a href="../commandAntenna/index.html">commandAntenna ()</a></li>
 <li><a href="../dataAntenna/index.html">dataAntenna ()</a></li>
+<li><a href="index.html" aria-current="page">canBusLink</a></li>
 </ul>
 </details></li>
 <li><details data-branch="System/uavSystem/remoteControl"><summary><a href="../../remoteControl/index.html">remoteControl (RC)</a></summary>
@@ -101,95 +101,37 @@
 </nav>
 </aside>
 <main id="content">
-<h1>canBus ()</h1>
-<p class="qualified-name">System::uavSystem::uav::canBus</p>
-<section class="rep inherited">
-<div class="sect1">
-<h2 id="_technical_data">Technical data</h2>
-<div class="sectionbody">
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col width="50%">
-<col width="50%">
-</colgroup>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">bit rate</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">125000 B/s</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">nodes</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">5</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">terminated</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-</section>
-<section class="rep inherited">
+<h1>canBusLink</h1>
+<p class="qualified-name">System::uavSystem::uav::canBusLink</p>
+<section class="rep">
 <div id="preamble">
 <div class="sectionbody">
-<div class="openblock sysml-doc">
-<div class="content">
 <div class="paragraph">
-<p>The CAN bus: the shared digital link between the flight
-controller, the IMU, the GPS, the payload radio and the motor
-controller.</p>
-</div>
-</div>
+<p>The CAN bus itself, as one interface joining the nodes on it:
+the flight controller, the IMU, the GPS, the payload radio and
+the motor controller.</p>
 </div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_properties">Properties</h2>
+<h2 id="_ends">Ends</h2>
 <div class="sectionbody">
-<table class="tableblock frame-all grid-all stretch">
-<colgroup>
-<col width="50%">
-<col width="50%">
-</colgroup>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">mass</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0.2 kg</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">power</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">0.5 W</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_members">Members</h2>
-<div class="sectionbody">
-
-</div>
-</div>
-<div class="sect1">
-<h2 id="_interfaces">Interfaces</h2>
-<div class="sectionbody">
-<div class="ulist sysml-ifaces">
+<div class="ulist sysml-iface-ends">
 <ul>
 <li>
-<p>flightControllerCan -> <a href="../flightController/index.html">flightController</a></p>
+<p><a href="../flightController/index.html">flightController</a>.can</p>
 </li>
 <li>
-<p>imuCan -> <a href="../imu/index.html">imu</a></p>
+<p><a href="../imu/index.html">imu</a>.can</p>
 </li>
 <li>
-<p>gpsCan -> <a href="../gps/index.html">gps</a></p>
+<p><a href="../gps/index.html">gps</a>.can</p>
 </li>
 <li>
-<p>payloadRadioCan -> <a href="../payloadRadio/index.html">payloadRadio</a></p>
+<p><a href="../payloadRadio/index.html">payloadRadio</a>.can</p>
 </li>
 <li>
-<p>motorControllerCan -> <a href="../motorController/index.html">motorController</a></p>
+<p><a href="../motorController/index.html">motorController</a>.can</p>
 </li>
 </ul>
 </div>
@@ -224,66 +166,58 @@ config:
     clusterBorder: &#34;#181818&#34;
     edgeLabelBackground: &#34;#FFFFFF&#34;
 ---
-%% System::uavSystem::uav::canBus — interconnection figure
+%% System::uavSystem::uav::canBusLink — interconnection figure
 flowchart LR
   subgraph n0 [&#34;`*«part»*
-**canBus**`&#34;]
+&lt;a href=&#34;../index.html&#34;&gt;&lt;strong&gt;uav&lt;/strong&gt;&lt;/a&gt;`&#34;]
     direction LR
-    n1(&#34;`*«port»*
-**flightController**`&#34;)
-    n2(&#34;`*«port»*
-**imu**`&#34;)
-    n3(&#34;`*«port»*
-**gps**`&#34;)
-    n4(&#34;`*«port»*
-**payloadRadio**`&#34;)
-    n5(&#34;`*«port»*
-**motorController**`&#34;)
-  end
-  subgraph n6 [&#34;`*«part»*
+    subgraph n1 [&#34;`*«part»*
 &lt;a href=&#34;../flightController/index.html&#34;&gt;&lt;strong&gt;flightController&lt;/strong&gt;&lt;/a&gt;`&#34;]
-    direction LR
-    n7(&#34;`*«port»*
+      direction LR
+      n2(&#34;`*«port»*
 **can**`&#34;)
-  end
-  subgraph n8 [&#34;`*«part»*
+    end
+    subgraph n3 [&#34;`*«part»*
 &lt;a href=&#34;../imu/index.html&#34;&gt;&lt;strong&gt;imu&lt;/strong&gt;&lt;/a&gt;`&#34;]
-    direction LR
-    n9(&#34;`*«port»*
+      direction LR
+      n4(&#34;`*«port»*
 **can**`&#34;)
-  end
-  subgraph n10 [&#34;`*«part»*
+    end
+    subgraph n5 [&#34;`*«part»*
 &lt;a href=&#34;../gps/index.html&#34;&gt;&lt;strong&gt;gps&lt;/strong&gt;&lt;/a&gt;`&#34;]
-    direction LR
-    n11(&#34;`*«port»*
+      direction LR
+      n6(&#34;`*«port»*
 **can**`&#34;)
-  end
-  subgraph n12 [&#34;`*«part»*
+    end
+    subgraph n7 [&#34;`*«part»*
 &lt;a href=&#34;../payloadRadio/index.html&#34;&gt;&lt;strong&gt;payloadRadio&lt;/strong&gt;&lt;/a&gt;`&#34;]
-    direction LR
-    n13(&#34;`*«port»*
+      direction LR
+      n8(&#34;`*«port»*
 **can**`&#34;)
-  end
-  subgraph n14 [&#34;`*«part»*
+    end
+    subgraph n9 [&#34;`*«part»*
 &lt;a href=&#34;../motorController/index.html&#34;&gt;&lt;strong&gt;motorController&lt;/strong&gt;&lt;/a&gt;`&#34;]
-    direction LR
-    n15(&#34;`*«port»*
+      direction LR
+      n10(&#34;`*«port»*
 **can**`&#34;)
+    end
+    n11(&#34;`*«interface»*
+**canBusLink**`&#34;)
   end
-  n1 === n7
+  n2 === n11
   linkStyle 0 stroke-width:3px
-  n2 === n9
+  n4 === n11
   linkStyle 1 stroke-width:3px
-  n3 === n11
+  n6 === n11
   linkStyle 2 stroke-width:3px
-  n4 === n13
+  n8 === n11
   linkStyle 3 stroke-width:3px
-  n5 === n15
+  n10 === n11
   linkStyle 4 stroke-width:3px
 classDef figbox fill:#FFFFFF,stroke:#181818,color:#000000
-class n0,n6,n8,n10,n12,n14 figbox
+class n0,n1,n3,n5,n7,n9 figbox
 classDef figport fill:#FFFFFF,stroke:#181818,color:#000000
-class n1,n2,n3,n4,n5,n7,n9,n11,n13,n15 figport
+class n2,n4,n6,n8,n10,n11 figport
 </pre></div>
 </div>
 </div>

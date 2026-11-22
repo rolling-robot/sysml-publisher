@@ -81,7 +81,7 @@ func (e *env) fig(c call[asciidoctor.StructuralNode]) (asciidoctor.StructuralNod
 		if err != nil {
 			return nil, err
 		}
-		t, err := e.figure(name, ends)
+		t, err := e.figure(name, id, ends)
 		if err != nil {
 			return nil, err
 		}
@@ -155,8 +155,10 @@ func MermaidText(n asciidoctor.Node) (text string, ok bool) {
 
 // figure is the figure of one interface: its tree of drawn elements, each
 // end's feature, and the edges. ends are the interface's ends, source
-// first, as connectorEnds reads them.
-func (e *env) figure(iface string, ends []connectorEnd) (figTree, error) {
+// first, as connectorEnds reads them. An interface with more than two ends
+// is drawn as a node of its own, the ends' features joining it one edge
+// each; two ends join directly.
+func (e *env) figure(iface, id string, ends []connectorEnd) (figTree, error) {
 	t := figTree{of: iface}
 	if len(ends) < 2 {
 		return t, fmt.Errorf("has %d ends; a figure needs at least two", len(ends))
@@ -225,13 +227,28 @@ func (e *env) figure(iface string, ends []connectorEnd) (figTree, error) {
 			prev = id
 		}
 	}
+	// More than two ends: the interface is drawn as a node of its own, the
+	// ends' features joining it one edge each.
+	var ifaceNode *figNode
+	if len(ends) > 2 {
+		nm, err := e.names.name(id)
+		if err != nil {
+			return t, err
+		}
+		ifaceNode = &figNode{elem: id, kind: "«interface»", name: nm}
+		order = append(order, ifaceNode)
+	}
 	for i, n := range order {
 		n.id = "n" + fmt.Sprint(i)
 	}
 	// What a drawn element is nested in: its nearest drawn ancestor that
 	// holds things, a part box; the top of the figure for one whose
-	// ancestors are all packages or features.
+	// ancestors are all packages or features. The interface's node is
+	// placed after, by its owners.
 	for _, n := range order {
+		if n == ifaceNode {
+			continue
+		}
 		for p := parentOf[n.elem]; ; p = parentOf[p] {
 			if p == "" {
 				t.roots = append(t.roots, n)
@@ -243,15 +260,49 @@ func (e *env) figure(iface string, ends []connectorEnd) (figTree, error) {
 			}
 		}
 	}
-	// One edge per pair of ends, joining the end features. An edge whose
-	// ends are the same feature is not drawn: Mermaid draws no loop.
-	for i := 0; i < len(ends); i++ {
-		for j := i + 1; j < len(ends); j++ {
-			a, b := byID[leaf[i]], byID[leaf[j]]
-			if a == nil || b == nil || a.id == b.id {
+	if ifaceNode != nil {
+		// The interface is drawn where the model owns it: inside its
+		// nearest drawn box ancestor, the frame included, else the top of
+		// the figure.
+		own, err := owners(e, id)
+		if err != nil {
+			return t, err
+		}
+		placed := false
+		for i := len(own) - 1; i >= 0 && !placed; i-- {
+			if b := byID[own[i]]; b != nil && b.box {
+				b.children = append(b.children, ifaceNode)
+				placed = true
+			}
+		}
+		if !placed {
+			t.roots = append(t.roots, ifaceNode)
+		}
+	}
+	switch {
+	case ifaceNode != nil:
+		// One edge per end, the end's feature joining the interface's node;
+		// two ends on the same feature draw one edge.
+		seen := map[string]bool{}
+		for i := range ends {
+			a := byID[leaf[i]]
+			if a == nil || seen[a.id] {
 				continue
 			}
-			t.edges = append(t.edges, [2]string{a.id, b.id})
+			seen[a.id] = true
+			t.edges = append(t.edges, [2]string{a.id, ifaceNode.id})
+		}
+	default:
+		// One edge per pair of ends, joining the end features. An edge whose
+		// ends are the same feature is not drawn: Mermaid draws no loop.
+		for i := 0; i < len(ends); i++ {
+			for j := i + 1; j < len(ends); j++ {
+				a, b := byID[leaf[i]], byID[leaf[j]]
+				if a == nil || b == nil || a.id == b.id {
+					continue
+				}
+				t.edges = append(t.edges, [2]string{a.id, b.id})
+			}
 		}
 	}
 	return t, nil
@@ -262,9 +313,10 @@ func (e *env) figure(iface string, ends []connectorEnd) (figTree, error) {
 // an end whose path references one of the part's ports anchors at that
 // port's node; another end's leaf feature draws inside a box for its
 // immediate owner, the owner beside the part's box, or inside it when the
-// model owns it there. One edge per pair of the same connection's ends, as
-// the interface's figure draws. An end that connects nothing draws no node
-// and no edge.
+// model owns it there. A connection with more than two ends is drawn as a
+// node of its own, the ends joining it one edge each; two ends join
+// directly, as the interface's figure draws. An end that connects nothing
+// draws no node and no edge.
 func (e *env) partFigure(name, part, meta string) (figTree, error) {
 	t := figTree{of: name}
 	nm, err := e.names.name(part)
@@ -321,6 +373,7 @@ func (e *env) partFigure(name, part, meta string) (figTree, error) {
 	}
 	var pend []pending
 	var anchored [][]*figNode // per connection: the nodes its ends anchor at
+	var connNodes []*figNode  // per connection: the connection's node, nil when its two ends join directly
 	for _, con := range cons {
 		var anchors []*figNode
 		for _, end := range con.ends {
@@ -356,6 +409,20 @@ func (e *env) partFigure(name, part, meta string) (figTree, error) {
 			pend = append(pend, pending{obox, chain[:len(chain)-1]}, pending{lnode, chain})
 			anchors = append(anchors, lnode)
 		}
+		// More than two ends: the connection is drawn as a node of its own
+		// at the top of the figure, the ends joining it one edge each. Not
+		// in parentOf, so the roots below make it a root.
+		if len(anchors) > 2 {
+			nm, err := e.names.name(con.id)
+			if err != nil {
+				return t, err
+			}
+			n := &figNode{elem: con.id, kind: "«" + figKeyword(con.meta) + "»", name: nm}
+			order = append(order, n)
+			connNodes = append(connNodes, n)
+		} else {
+			connNodes = append(connNodes, nil)
+		}
 		anchored = append(anchored, anchors)
 	}
 	place := func(n *figNode, chain []string) {
@@ -375,16 +442,54 @@ func (e *env) partFigure(name, part, meta string) (figTree, error) {
 	}
 	t.roots = []*figNode{root}
 	for _, n := range order[1:] {
+		if slices.Contains(connNodes, n) {
+			continue // the connection's node is placed below, by its owners
+		}
 		if p := parentOf[n]; p != nil {
 			p.children = append(p.children, n)
 		} else {
 			t.roots = append(t.roots, n)
 		}
 	}
+	// A connection's node is drawn where the model owns it: inside its
+	// nearest drawn box ancestor, the part's box included, else the top of
+	// the figure.
+	for _, cn := range connNodes {
+		if cn == nil {
+			continue
+		}
+		own, err := owners(e, cn.elem)
+		if err != nil {
+			return t, err
+		}
+		placed := false
+		for i := len(own) - 1; i >= 0 && !placed; i-- {
+			if b := byID[own[i]]; b != nil && b.box {
+				b.children = append(b.children, cn)
+				placed = true
+			}
+		}
+		if !placed {
+			t.roots = append(t.roots, cn)
+		}
+	}
 	for i, n := range order {
 		n.id = "n" + fmt.Sprint(i)
 	}
-	for _, anchors := range anchored {
+	for k, anchors := range anchored {
+		if cn := connNodes[k]; cn != nil {
+			// One edge per end, the anchor joining the connection's node;
+			// two ends on the same anchor draw one edge.
+			seen := map[string]bool{}
+			for _, a := range anchors {
+				if seen[a.id] {
+					continue
+				}
+				seen[a.id] = true
+				t.edges = append(t.edges, [2]string{a.id, cn.id})
+			}
+			continue
+		}
 		for i := 0; i < len(anchors); i++ {
 			for j := i + 1; j < len(anchors); j++ {
 				if anchors[i].id == anchors[j].id {
@@ -445,7 +550,8 @@ type figNode struct {
 // figTree is one figure: the qualified name of the element it is of, the
 // drawn elements whose parent is the top of the figure (the ends' common
 // ancestor for an interface, the part's box with the parts beside it for a
-// part), and one edge per pair of ends, between the end features' node ids.
+// part), and the edges: one per pair of ends for a two-ended connection,
+// one per end into the interface's node for one with more.
 type figTree struct {
 	of    string
 	roots []*figNode

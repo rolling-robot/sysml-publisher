@@ -437,10 +437,17 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   a package included, while a package further down a chain is not drawn —
   and a stadium node per end feature inside its owner's box. A box's title
   carries the keyword line above the name, and the box's contents are drawn
-  below all the title's lines, however many they are. One edge per
-  pair of ends joins the end features, drawn as the thick ==== connection
-  line of OpenSysML's Mermaid form; an edge whose two ends are the same
-  feature is not drawn. The figure's elements are found in the model the way
+  below all the title's lines, however many they are. An interface with
+  two ends is joined by one edge between the end features, drawn as the
+  thick ==== connection line of OpenSysML's Mermaid form; an edge whose
+  two ends are the same feature is not drawn. An interface with more than
+  two ends is drawn as a stadium node of its own, labelled =«interface»=
+  and the interface's name, drawn where the model owns it — inside its
+  nearest drawn box ancestor, the frame included — or at the top of the
+  figure when no owner is drawn, and the end features join it, one edge
+  per end, whatever metaclass of
+  =InterfaceUsage= the interface is. The figure's elements are found in the
+  model the way
   MC-15 and MC-23 read it; the figure draws exactly what the ends' chains
   pass through, unnamed elements included. The Mermaid text is written by
   this tool; its style constants are copied from OpenSysML's Mermaid writer
@@ -450,8 +457,13 @@ Rules every AsciiDoc macro of the tool follows; AM-1 is the first macro.
   — an end on one of the part's ports anchored at the port's node, another
   end's leaf feature inside a box for its immediate owner, the owner drawn
   beside the part's box, or inside it when the model owns it there — with
-  one edge per pair of the connection's ends, as the interface's figure
-  draws. A part with ports but no connections shows its ports and no edges;
+  one edge per pair of the connection's ends when the connection has two,
+  as the interface's figure draws, and, one with more, drawn as a stadium
+  node of its own at its place in the model — inside its nearest drawn box
+  ancestor, the part's box included, else the top of the figure — labelled
+  by its metaclass
+  (=«interface»= or =«connection»=) and its name, the ends joining it one
+  edge each. A part with ports but no connections shows its ports and no edges;
   a part with no ports fails the macro (MC-19). A drawn element whose
   element has a page, other than the page the figure is drawn on, links to
   that page: the link is in the label's HTML, mermaid taking no click on a
